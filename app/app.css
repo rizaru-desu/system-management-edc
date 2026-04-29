@@ -22,6 +22,47 @@ body {
   }
 }
 
+* {
+  scrollbar-color: rgb(63 111 168 / 0.48) transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  background-color: rgb(63 111 168 / 0.42);
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(63 111 168 / 0.68);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.sidebar-scroll {
+  scrollbar-color: rgb(221 224 236 / 0.28) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(221 224 236 / 0.22);
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(221 224 236 / 0.38);
+}
+
 .grid-bg {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
