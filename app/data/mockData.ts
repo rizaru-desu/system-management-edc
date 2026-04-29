@@ -73,6 +73,27 @@ export type RecentJob = {
   updated: string;
 };
 
+export type Technician = {
+  username: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  department: string;
+  active: boolean;
+};
+
+export type ServicePoint = {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  address: string;
+  status: "Online" | "Degraded" | "Offline";
+  load: number;
+  openJobs: number;
+  technicianCount: number;
+};
+
 export type SidebarSubmenu = {
   title: string;
   path: string;
@@ -249,6 +270,254 @@ export const RECENT_JOBS: RecentJob[] = [
     updated: "3 h ago",
   },
 ];
+
+export const TECHNICIANS: Technician[] = [
+  {
+    username: "bagus.r",
+    fullName: "Bagus Rahardian",
+    phone: "+62 812-1010-2481",
+    email: "bagus.rahardian@edc.io",
+    department: "Field Service - Jakarta",
+    active: true,
+  },
+  {
+    username: "dewi.s",
+    fullName: "Dewi Safitri",
+    phone: "+62 813-7788-1042",
+    email: "dewi.safitri@edc.io",
+    department: "Field Service - Surabaya",
+    active: true,
+  },
+  {
+    username: "rian.p",
+    fullName: "Rian Prasetyo",
+    phone: "+62 811-5544-8021",
+    email: "rian.prasetyo@edc.io",
+    department: "Maintenance Support",
+    active: true,
+  },
+  {
+    username: "faiz.m",
+    fullName: "Faiz Maulana",
+    phone: "+62 857-9021-1145",
+    email: "faiz.maulana@edc.io",
+    department: "Repair Center",
+    active: false,
+  },
+  {
+    username: "anissa.k",
+    fullName: "Anissa Kartika",
+    phone: "+62 812-3344-7765",
+    email: "anissa.kartika@edc.io",
+    department: "Field Service - Bandung",
+    active: true,
+  },
+  {
+    username: "wahyu.n",
+    fullName: "Wahyu Nugroho",
+    phone: "+62 819-2211-3088",
+    email: "wahyu.nugroho@edc.io",
+    department: "Installation Team",
+    active: true,
+  },
+  {
+    username: "mira.l",
+    fullName: "Mira Lestari",
+    phone: "+62 818-7002-1450",
+    email: "mira.lestari@edc.io",
+    department: "Field Service - Medan",
+    active: false,
+  },
+  {
+    username: "yoga.a",
+    fullName: "Yoga Adhitama",
+    phone: "+62 812-9900-2317",
+    email: "yoga.adhitama@edc.io",
+    department: "Maintenance Support",
+    active: true,
+  },
+  {
+    username: "nabila.f",
+    fullName: "Nabila Fitria",
+    phone: "+62 856-4422-6712",
+    email: "nabila.fitria@edc.io",
+    department: "Field Service - Denpasar",
+    active: true,
+  },
+  {
+    username: "reza.h",
+    fullName: "Reza Hidayat",
+    phone: "+62 813-1901-5560",
+    email: "reza.hidayat@edc.io",
+    department: "Repair Center",
+    active: true,
+  },
+  {
+    username: "putri.d",
+    fullName: "Putri Damayanti",
+    phone: "+62 811-3900-7718",
+    email: "putri.damayanti@edc.io",
+    department: "Installation Team",
+    active: false,
+  },
+  {
+    username: "aditya.w",
+    fullName: "Aditya Wibowo",
+    phone: "+62 822-7019-3404",
+    email: "aditya.wibowo@edc.io",
+    department: "Field Service - Semarang",
+    active: true,
+  },
+  {
+    username: "sinta.p",
+    fullName: "Sinta Permatasari",
+    phone: "+62 857-1800-4922",
+    email: "sinta.permatasari@edc.io",
+    department: "Field Service - Makassar",
+    active: true,
+  },
+  {
+    username: "haikal.z",
+    fullName: "Haikal Zain",
+    phone: "+62 812-6088-3114",
+    email: "haikal.zain@edc.io",
+    department: "Maintenance Support",
+    active: true,
+  },
+  {
+    username: "livia.c",
+    fullName: "Livia Cahyani",
+    phone: "+62 821-4450-9033",
+    email: "livia.cahyani@edc.io",
+    department: "Field Service - Yogyakarta",
+    active: false,
+  },
+  {
+    username: "dimas.g",
+    fullName: "Dimas Guntara",
+    phone: "+62 812-5133-6790",
+    email: "dimas.guntara@edc.io",
+    department: "Repair Center",
+    active: true,
+  },
+  {
+    username: "eka.t",
+    fullName: "Eka Triana",
+    phone: "+62 878-2105-8871",
+    email: "eka.triana@edc.io",
+    department: "Field Service - Palembang",
+    active: true,
+  },
+  {
+    username: "arif.b",
+    fullName: "Arif Budiman",
+    phone: "+62 813-2280-1417",
+    email: "arif.budiman@edc.io",
+    department: "Installation Team",
+    active: true,
+  },
+];
+
+export const SERVICE_POINTS: ServicePoint[] = [
+  {
+    id: "sp-jkt-pusat",
+    name: "SP Jakarta Pusat",
+    city: "Jakarta",
+    region: "Jabodetabek North",
+    address: "Jl. Cideng Barat No. 18, Gambir",
+    status: "Online",
+    load: 78,
+    openJobs: 24,
+    technicianCount: 9,
+  },
+  {
+    id: "sp-bandung",
+    name: "SP Bandung",
+    city: "Bandung",
+    region: "West Java",
+    address: "Jl. Asia Afrika No. 140, Lengkong",
+    status: "Online",
+    load: 54,
+    openJobs: 16,
+    technicianCount: 7,
+  },
+  {
+    id: "sp-surabaya",
+    name: "SP Surabaya",
+    city: "Surabaya",
+    region: "East Java",
+    address: "Jl. Panglima Sudirman No. 71, Genteng",
+    status: "Degraded",
+    load: 92,
+    openJobs: 31,
+    technicianCount: 8,
+  },
+  {
+    id: "sp-medan",
+    name: "SP Medan",
+    city: "Medan",
+    region: "North Sumatra",
+    address: "Jl. Diponegoro No. 22, Medan Baru",
+    status: "Online",
+    load: 38,
+    openJobs: 11,
+    technicianCount: 5,
+  },
+  {
+    id: "sp-denpasar",
+    name: "SP Denpasar",
+    city: "Denpasar",
+    region: "Bali Nusra",
+    address: "Jl. Teuku Umar Barat No. 88, Denpasar",
+    status: "Offline",
+    load: 0,
+    openJobs: 7,
+    technicianCount: 3,
+  },
+  {
+    id: "sp-semarang",
+    name: "SP Semarang",
+    city: "Semarang",
+    region: "Central Java",
+    address: "Jl. Pemuda No. 119, Sekayu",
+    status: "Online",
+    load: 61,
+    openJobs: 18,
+    technicianCount: 6,
+  },
+  {
+    id: "sp-makassar",
+    name: "SP Makassar",
+    city: "Makassar",
+    region: "Sulawesi",
+    address: "Jl. A. P. Pettarani No. 45, Rappocini",
+    status: "Online",
+    load: 47,
+    openJobs: 13,
+    technicianCount: 4,
+  },
+];
+
+export const TECHNICIAN_SERVICE_POINT_ASSIGNMENTS: Record<string, string> = {
+  "bagus.r": "sp-jkt-pusat",
+  "dewi.s": "sp-surabaya",
+  "rian.p": "sp-jkt-pusat",
+  "faiz.m": "sp-surabaya",
+  "anissa.k": "sp-bandung",
+  "wahyu.n": "sp-bandung",
+  "mira.l": "sp-medan",
+  "yoga.a": "sp-jkt-pusat",
+  "nabila.f": "sp-denpasar",
+  "reza.h": "sp-surabaya",
+  "putri.d": "sp-bandung",
+  "aditya.w": "sp-semarang",
+  "sinta.p": "sp-makassar",
+  "haikal.z": "sp-jkt-pusat",
+  "livia.c": "sp-bandung",
+  "dimas.g": "sp-surabaya",
+  "eka.t": "sp-medan",
+  "arif.b": "sp-semarang",
+};
 
 export const SIDEBAR_MENU: SidebarGroup[] = [
   {

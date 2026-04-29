@@ -10,6 +10,9 @@ export default [
   route("app", "routes/app.tsx", { id: "app-layout" }, [
     index("routes/dashboard.tsx", { id: "app-index" }),
     route("dashboard", "routes/dashboard.tsx", { id: "dashboard" }),
+    route("field/technicians", "routes/technicians.tsx", {
+      id: "technician-directory",
+    }),
     route(":parent/:child", "routes/placeholder.tsx", {
       id: "app-placeholder",
     }),
