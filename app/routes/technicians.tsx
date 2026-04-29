@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import {
   flexRender,
@@ -12,7 +12,6 @@ import {
   LuBriefcaseBusiness,
   LuChevronLeft,
   LuChevronRight,
-  LuChevronDown,
   LuChevronsLeft,
   LuChevronsRight,
   LuCheck,
@@ -29,6 +28,26 @@ import {
   TECHNICIAN_SERVICE_POINT_ASSIGNMENTS,
   TECHNICIANS,
 } from "~/data/mockData";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Select } from "~/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
 
 import type {
   Column,
@@ -55,51 +74,51 @@ export function meta() {
 
 function StatusBadge({ active }: { active: boolean }) {
   return (
-    <span
-      className={`inline-flex min-w-20 items-center justify-center rounded-md px-2.5 py-1 text-xs font-semibold ${
-        active ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-      }`}
+    <Badge
+      variant={active ? "success" : "destructive"}
+      className="min-w-20 justify-center px-2.5 py-1"
     >
       {active ? "Active" : "Inactive"}
-    </span>
+    </Badge>
   );
 }
 
 function ServicePointStatusBadge({ status }: { status: ServicePoint["status"] }) {
-  const colorMap: Record<ServicePoint["status"], string> = {
-    Online: "bg-emerald-100 text-emerald-700",
-    Degraded: "bg-amber-100 text-amber-700",
-    Offline: "bg-rose-100 text-rose-700",
+  const variantMap: Record<
+    ServicePoint["status"],
+    "success" | "warning" | "destructive"
+  > = {
+    Online: "success",
+    Degraded: "warning",
+    Offline: "destructive",
   };
 
   return (
-    <span
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ${colorMap[status]}`}
-    >
+    <Badge variant={variantMap[status]} className="text-[11px]">
       {status}
-    </span>
+    </Badge>
   );
 }
 
 function ServicePointCell({ servicePoint }: { servicePoint?: ServicePoint }) {
   if (!servicePoint) {
     return (
-      <span className="inline-flex rounded-md bg-[#DDE0EC]/70 px-2 py-1 text-xs font-semibold text-[#0E2748]/60">
+      <Badge variant="secondary" className="px-2 py-1">
         Unassigned
-      </span>
+      </Badge>
     );
   }
 
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-2">
-        <span className="truncate font-semibold text-[#0E2748]">
+        <span className="truncate font-semibold text-foreground">
           {servicePoint.name}
         </span>
         <ServicePointStatusBadge status={servicePoint.status} />
       </div>
-      <div className="mt-1 flex items-center gap-1 text-xs text-[#0E2748]/55">
-        <LuMapPin className="h-3 w-3 shrink-0 text-[#3F6FA8]" strokeWidth={1.75} />
+      <div className="mt-1 flex items-center gap-1 text-xs text-foreground/55">
+        <LuMapPin className="h-3 w-3 shrink-0 text-accent" strokeWidth={1.75} />
         <span className="truncate">
           {servicePoint.city} - {servicePoint.region}
         </span>
@@ -120,15 +139,15 @@ function IconPageButton({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
+    <Button
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-md border border-[#DDE0EC] bg-white text-[#0E2748] transition-colors hover:bg-[#DDE0EC]/40 disabled:cursor-not-allowed disabled:opacity-40"
+      variant="outline"
+      size="icon"
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -139,85 +158,26 @@ function RowsPerPageDropdown({
   value: number;
   onChange: (value: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    };
-
-    window.addEventListener("pointerdown", handlePointerDown);
-    return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, []);
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="flex h-10 min-w-36 items-center gap-2 rounded-md border border-[#DDE0EC] bg-white px-3 text-sm text-[#0E2748] transition-colors hover:border-[#3F6FA8] hover:bg-[#DDE0EC]/20"
+    <label className="relative block min-w-36">
+      <LuSlidersHorizontal
+        className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-accent"
+        strokeWidth={1.75}
+      />
+      <span className="sr-only">Rows per page</span>
+      <Select
+        value={String(value)}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full pl-9"
         data-testid="technician-page-size"
       >
-        <LuSlidersHorizontal
-          className="h-4 w-4 shrink-0 text-[#3F6FA8]"
-          strokeWidth={1.75}
-        />
-        <span className="whitespace-nowrap text-xs font-medium text-[#0E2748]/60">
-          Rows
-        </span>
-        <span className="ml-auto font-semibold text-[#0E2748]">{value}</span>
-        <LuChevronDown
-          className={`h-3.5 w-3.5 text-[#0E2748]/50 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
-          strokeWidth={2}
-        />
-      </button>
-
-      {open ? (
-        <div
-          role="listbox"
-          className="absolute right-0 top-11 z-50 w-36 overflow-hidden rounded-lg border border-[#DDE0EC] bg-white p-1 shadow-xl"
-        >
-          {PAGE_SIZE_OPTIONS.map((pageSize) => {
-            const active = pageSize === value;
-
-            return (
-              <button
-                key={pageSize}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => {
-                  onChange(pageSize);
-                  setOpen(false);
-                }}
-                className={`flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm font-semibold transition-colors ${
-                  active
-                    ? "bg-[#DDE0EC]/70 text-[#0E2748]"
-                    : "text-[#0E2748]/80 hover:bg-[#DDE0EC]/40"
-                }`}
-              >
-                <span className="flex h-4 w-4 items-center justify-center">
-                  {active ? (
-                    <LuCheck className="h-4 w-4 text-[#0E2748]" strokeWidth={2.5} />
-                  ) : null}
-                </span>
-                {pageSize}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+        {PAGE_SIZE_OPTIONS.map((pageSize) => (
+          <option key={pageSize} value={pageSize}>
+            Rows {pageSize}
+          </option>
+        ))}
+      </Select>
+    </label>
   );
 }
 
@@ -263,200 +223,186 @@ function ManageServicePointModal({
   }, [servicePointSearch, servicePoints]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#0E2748]/45 p-4">
-      <button
-        type="button"
-        className="absolute inset-0 cursor-default"
-        aria-label="Close manage service point"
-        onClick={onClose}
-      />
-      <form
-        className="relative flex max-h-[min(44rem,calc(100vh-2rem))] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[#DDE0EC] bg-white shadow-2xl"
-        onSubmit={(event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          form.handleSubmit();
-        }}
-      >
-        <div className="border-b border-[#DDE0EC] bg-[#F6F7F9] p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#3F6FA8]">
-                Manage Service Point
-              </p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight text-[#0E2748]">
-                {technician.fullName}
-              </h2>
-              <p className="mt-1 text-sm text-[#0E2748]/60">
-                @{technician.username} - {technician.department}
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#DDE0EC] bg-white text-[#0E2748] transition-colors hover:bg-[#DDE0EC]/50"
-            >
-              <LuX className="h-4 w-4" strokeWidth={1.75} />
-            </button>
-          </div>
-        </div>
-
-        <div className="overflow-y-auto p-5">
-          <label className="relative mb-4 block">
-            <span className="sr-only">Search service points</span>
-            <LuSearch
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#3F6FA8]"
-              strokeWidth={1.75}
-            />
-            <input
-              value={servicePointSearch}
-              onChange={(event) => setServicePointSearch(event.target.value)}
-              placeholder="Search service point, city, region, status..."
-              className="h-10 w-full rounded-md border border-[#DDE0EC] bg-white pl-9 pr-3 text-sm text-[#0E2748] outline-none transition-colors placeholder:text-[#0E2748]/40 focus:border-[#3F6FA8]"
-              data-testid="service-point-search-input"
-            />
-          </label>
-
-          <form.Field
-            name="servicePointId"
-            validators={{
-              onChange: ({ value }) =>
-                value ? undefined : "Service point is required",
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-3">
-                {filteredServicePoints.length ? (
-                  filteredServicePoints.map((servicePoint) => {
-                    const selected = field.state.value === servicePoint.id;
-                    const current = currentServicePointId === servicePoint.id;
-
-                    return (
-                      <button
-                        key={servicePoint.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        onClick={() => field.handleChange(servicePoint.id)}
-                        className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                          selected
-                            ? "border-[#3F6FA8] bg-[#3F6FA8]/5"
-                            : "border-[#DDE0EC] bg-white hover:border-[#3F6FA8]/60 hover:bg-[#F6F7F9]"
-                        }`}
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="flex min-w-0 gap-3">
-                            <span
-                              className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
-                                selected
-                                  ? "border-[#3F6FA8] bg-[#3F6FA8] text-white"
-                                  : "border-[#DDE0EC] bg-white"
-                              }`}
-                            >
-                              {selected ? (
-                                <LuCheck
-                                  className="h-3.5 w-3.5"
-                                  strokeWidth={2.5}
-                                />
-                              ) : null}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <h3 className="font-semibold text-[#0E2748]">
-                                  {servicePoint.name}
-                                </h3>
-                                <ServicePointStatusBadge
-                                  status={servicePoint.status}
-                                />
-                                {current ? (
-                                  <span className="rounded-md bg-[#0E2748] px-2 py-0.5 text-[11px] font-semibold text-white">
-                                    Current
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="mt-1 text-sm text-[#0E2748]/65">
-                                {servicePoint.region} - {servicePoint.city}
-                              </p>
-                              <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-[#0E2748]/55">
-                                <LuMapPin
-                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#3F6FA8]"
-                                  strokeWidth={1.75}
-                                />
-                                {servicePoint.address}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-3 gap-2 sm:w-72">
-                            <div className="rounded-md bg-[#F6F7F9] px-3 py-2">
-                              <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0E2748]/45">
-                                <LuActivity
-                                  className="h-3 w-3 text-[#3F6FA8]"
-                                  strokeWidth={1.75}
-                                />
-                                Load
-                              </p>
-                              <p className="mt-1 text-sm font-bold text-[#0E2748]">
-                                {servicePoint.load}%
-                              </p>
-                            </div>
-                            <div className="rounded-md bg-[#F6F7F9] px-3 py-2">
-                              <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0E2748]/45">
-                                <LuBriefcaseBusiness
-                                  className="h-3 w-3 text-[#3F6FA8]"
-                                  strokeWidth={1.75}
-                                />
-                                Jobs
-                              </p>
-                              <p className="mt-1 text-sm font-bold text-[#0E2748]">
-                                {servicePoint.openJobs}
-                              </p>
-                            </div>
-                            <div className="rounded-md bg-[#F6F7F9] px-3 py-2">
-                              <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-[#0E2748]/45">
-                                <LuUsers
-                                  className="h-3 w-3 text-[#3F6FA8]"
-                                  strokeWidth={1.75}
-                                />
-                                Tech
-                              </p>
-                              <p className="mt-1 text-sm font-bold text-[#0E2748]">
-                                {servicePoint.technicianCount}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
-                ) : (
-                  <div className="rounded-lg border border-dashed border-[#DDE0EC] bg-[#F6F7F9] px-4 py-10 text-center text-sm text-[#0E2748]/60">
-                    No service points match your search.
-                  </div>
-                )}
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="max-h-[min(44rem,calc(100vh-2rem))] max-w-3xl">
+        <form
+          className="flex max-h-[inherit] flex-col overflow-hidden"
+          onSubmit={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            form.handleSubmit();
+          }}
+        >
+          <DialogHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-accent">
+                  Manage Service Point
+                </p>
+                <DialogTitle>{technician.fullName}</DialogTitle>
+                <DialogDescription>
+                  @{technician.username} - {technician.department}
+                </DialogDescription>
               </div>
-            )}
-          </form.Field>
-        </div>
+              <Button
+                aria-label="Close"
+                onClick={onClose}
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+              >
+                <LuX className="h-4 w-4" strokeWidth={1.75} />
+              </Button>
+            </div>
+          </DialogHeader>
 
-        <div className="flex flex-col-reverse gap-2 border-t border-[#DDE0EC] bg-white p-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 items-center justify-center rounded-md border border-[#DDE0EC] bg-white px-4 text-sm font-semibold text-[#0E2748] transition-colors hover:bg-[#DDE0EC]/40"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-[#0E2748] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#3F6FA8]"
-          >
-            Save Service Point
-          </button>
-        </div>
-      </form>
-    </div>
+          <div className="overflow-y-auto p-5">
+            <label className="relative mb-4 block">
+              <span className="sr-only">Search service points</span>
+              <LuSearch
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-accent"
+                strokeWidth={1.75}
+              />
+              <Input
+                value={servicePointSearch}
+                onChange={(event) => setServicePointSearch(event.target.value)}
+                placeholder="Search service point, city, region, status..."
+                className="pl-9"
+                data-testid="service-point-search-input"
+              />
+            </label>
+
+            <form.Field
+              name="servicePointId"
+              validators={{
+                onChange: ({ value }) =>
+                  value ? undefined : "Service point is required",
+              }}
+            >
+              {(field) => (
+                <div className="grid gap-3">
+                  {filteredServicePoints.length ? (
+                    filteredServicePoints.map((servicePoint) => {
+                      const selected = field.state.value === servicePoint.id;
+                      const current = currentServicePointId === servicePoint.id;
+
+                      return (
+                        <Button
+                          key={servicePoint.id}
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => field.handleChange(servicePoint.id)}
+                          variant="outline"
+                          className={`h-auto w-full justify-start whitespace-normal rounded-lg p-4 text-left ${
+                            selected
+                              ? "border-accent bg-accent/5"
+                              : "border-border bg-white hover:border-accent/60 hover:bg-background"
+                          }`}
+                        >
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 gap-3">
+                              <span
+                                className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                                  selected
+                                    ? "border-accent bg-accent text-white"
+                                    : "border-border bg-white"
+                                }`}
+                              >
+                                {selected ? (
+                                  <LuCheck
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={2.5}
+                                  />
+                                ) : null}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="font-semibold text-foreground">
+                                    {servicePoint.name}
+                                  </h3>
+                                  <ServicePointStatusBadge
+                                    status={servicePoint.status}
+                                  />
+                                  {current ? (
+                                    <Badge className="text-[11px]">
+                                      Current
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <p className="mt-1 text-sm text-foreground/65">
+                                  {servicePoint.region} - {servicePoint.city}
+                                </p>
+                                <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-foreground/55">
+                                  <LuMapPin
+                                    className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  {servicePoint.address}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 sm:w-72">
+                              <div className="rounded-md bg-background px-3 py-2">
+                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                                  <LuActivity
+                                    className="h-3 w-3 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  Load
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-foreground">
+                                  {servicePoint.load}%
+                                </p>
+                              </div>
+                              <div className="rounded-md bg-background px-3 py-2">
+                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                                  <LuBriefcaseBusiness
+                                    className="h-3 w-3 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  Jobs
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-foreground">
+                                  {servicePoint.openJobs}
+                                </p>
+                              </div>
+                              <div className="rounded-md bg-background px-3 py-2">
+                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                                  <LuUsers
+                                    className="h-3 w-3 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  Tech
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-foreground">
+                                  {servicePoint.technicianCount}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </Button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border bg-background px-4 py-10 text-center text-sm text-foreground/60">
+                      No service points match your search.
+                    </div>
+                  )}
+                </div>
+              )}
+            </form.Field>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" onClick={onClose} variant="outline">
+              Cancel
+            </Button>
+            <Button type="submit">Save Service Point</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -563,7 +509,7 @@ export default function TechnicianDirectory() {
         header: "Username",
         size: 150,
         cell: (info) => (
-          <span className="font-semibold text-[#0E2748]">
+          <span className="font-semibold text-foreground">
             @{info.getValue<string>()}
           </span>
         ),
@@ -574,7 +520,7 @@ export default function TechnicianDirectory() {
         header: "Full Name",
         size: 190,
         cell: (info) => (
-          <span className="font-medium text-[#0E2748]">
+          <span className="font-medium text-foreground">
             {info.getValue<string>()}
           </span>
         ),
@@ -591,7 +537,7 @@ export default function TechnicianDirectory() {
         header: "Email",
         size: 240,
         cell: (info) => (
-          <span className="whitespace-nowrap text-[#3F6FA8]">
+          <span className="whitespace-nowrap text-accent">
             {info.getValue<string>()}
           </span>
         ),
@@ -631,16 +577,15 @@ export default function TechnicianDirectory() {
         enableGlobalFilter: false,
         enablePinning: true,
         cell: ({ row }) => (
-          <button
-            type="button"
+          <Button
             onClick={() => openManageServicePoint(row.original)}
-            className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#0E2748] px-3 text-xs font-semibold text-white transition-colors hover:bg-[#3F6FA8]"
+            size="sm"
             aria-label={`Manage service point for ${row.original.fullName}`}
             data-testid={`manage-service-point-${row.original.username}`}
           >
             <LuMapPinned className="mr-1.5 h-3.5 w-3.5" strokeWidth={1.75} />
             Manage Service Point
-          </button>
+          </Button>
         ),
       },
     ],
@@ -678,28 +623,28 @@ export default function TechnicianDirectory() {
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#3F6FA8]">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent">
             Field Operations
           </p>
-          <h1 className="text-3xl font-bold tracking-tight text-[#0E2748] md:text-4xl">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-4xl">
             Technician Directory
           </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-[#0E2748]/60">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-foreground/60">
             Manage technician contacts, active status, and service point
             assignments from one operational list.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:flex">
-          <div className="rounded-lg border border-[#DDE0EC] bg-white px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#0E2748]/50">
+          <div className="rounded-lg border border-border bg-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/50">
               Technicians
             </p>
-            <p className="mt-1 text-2xl font-bold text-[#0E2748]">
+            <p className="mt-1 text-2xl font-bold text-foreground">
               {TECHNICIANS.length}
             </p>
           </div>
-          <div className="rounded-lg border border-[#DDE0EC] bg-white px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-[#0E2748]/50">
+          <div className="rounded-lg border border-border bg-white px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/50">
               Active
             </p>
             <p className="mt-1 text-2xl font-bold text-emerald-700">
@@ -709,17 +654,17 @@ export default function TechnicianDirectory() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-[#DDE0EC] bg-white">
-        <div className="flex flex-col gap-3 border-b border-[#DDE0EC] p-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="rounded-xl border border-border bg-white">
+        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#DDE0EC]/60 text-[#3F6FA8]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-accent">
               <LuUsers className="h-5 w-5" strokeWidth={1.75} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-[#0E2748]">
+              <h2 className="text-base font-semibold text-foreground">
                 User List
               </h2>
-              <p className="text-xs text-[#0E2748]/60">
+              <p className="text-xs text-foreground/60">
                 Showing {filteredRows} matching rows
               </p>
             </div>
@@ -729,14 +674,14 @@ export default function TechnicianDirectory() {
             <label className="relative block min-w-0 sm:w-80">
               <span className="sr-only">Search technicians</span>
               <LuSearch
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#3F6FA8]"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-accent"
                 strokeWidth={1.75}
               />
-              <input
+              <Input
                 value={globalFilter}
                 onChange={(event) => setGlobalFilter(event.target.value)}
                 placeholder="Search username, email, department..."
-                className="h-10 w-full rounded-md border border-[#DDE0EC] bg-white pl-9 pr-3 text-sm text-[#0E2748] outline-none transition-colors placeholder:text-[#0E2748]/40 focus:border-[#3F6FA8]"
+                className="pl-9"
                 data-testid="technician-search-input"
               />
             </label>
@@ -749,20 +694,16 @@ export default function TechnicianDirectory() {
         </div>
 
         <div className="overflow-x-auto">
-          <table
-            className="w-full border-separate border-spacing-0 text-left"
-            style={{ minWidth: table.getTotalSize() }}
-          >
-            <thead className="bg-[#F6F7F9]">
+          <Table style={{ minWidth: table.getTotalSize() }}>
+            <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="hover:bg-background">
                   {headerGroup.headers.map((header) => {
                     const pinnedStyles = getPinnedColumnStyles(header.column);
 
                     return (
-                      <th
+                      <TableHead
                         key={header.id}
-                        className="border-b border-[#DDE0EC] px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-[#0E2748]/60"
                         style={{ ...pinnedStyles, background: "#F6F7F9" }}
                       >
                         {header.isPlaceholder
@@ -771,55 +712,51 @@ export default function TechnicianDirectory() {
                               header.column.columnDef.header,
                               header.getContext(),
                             )}
-                      </th>
+                      </TableHead>
                     );
                   })}
-                </tr>
+                </TableRow>
               ))}
-            </thead>
-            <tbody className="divide-y divide-[#DDE0EC]">
+            </TableHeader>
+            <TableBody>
               {table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="transition-colors hover:bg-[#F6F7F9]"
-                  >
+                  <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
-                      <td
+                      <TableCell
                         key={cell.id}
-                        className="px-4 py-4 text-sm text-[#0E2748]/70"
                         style={getPinnedColumnStyles(cell.column)}
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
                         )}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))
               ) : (
-                <tr>
-                  <td
+                <TableRow>
+                  <TableCell
                     colSpan={columns.length}
-                    className="px-4 py-12 text-center text-sm text-[#0E2748]/60"
+                    className="px-4 py-12 text-center text-sm text-foreground/60"
                   >
                     No technicians match your search.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-[#DDE0EC] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-[#0E2748]/60">
+        <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-foreground/60">
             Page{" "}
-            <span className="font-semibold text-[#0E2748]">
+            <span className="font-semibold text-foreground">
               {pageCount ? currentPage : 0}
             </span>{" "}
             of{" "}
-            <span className="font-semibold text-[#0E2748]">
+            <span className="font-semibold text-foreground">
               {pageCount || 0}
             </span>
           </p>
@@ -847,24 +784,21 @@ export default function TechnicianDirectory() {
                 item === "ellipsis" ? (
                   <span
                     key={`ellipsis-${index}`}
-                    className="flex h-9 w-9 items-center justify-center text-sm font-semibold text-[#0E2748]/40"
+                    className="flex h-9 w-9 items-center justify-center text-sm font-semibold text-foreground/40"
                   >
                     ...
                   </span>
                 ) : (
-                  <button
+                  <Button
                     key={item}
-                    type="button"
                     aria-current={item === currentPage ? "page" : undefined}
                     onClick={() => table.setPageIndex(item - 1)}
-                    className={`flex h-9 min-w-9 items-center justify-center rounded-md border px-3 text-sm font-semibold transition-colors ${
-                      item === currentPage
-                        ? "border-[#0E2748] bg-[#0E2748] text-white"
-                        : "border-[#DDE0EC] bg-white text-[#0E2748] hover:bg-[#DDE0EC]/40"
-                    }`}
+                    variant={item === currentPage ? "default" : "outline"}
+                    size="icon"
+                    className="min-w-9 px-3"
                   >
                     {item}
-                  </button>
+                  </Button>
                 ),
               )}
             </div>
