@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "~/lib/utils";
 
@@ -25,13 +26,15 @@ function Dialog({
   children,
 }: React.PropsWithChildren<DialogContextValue>) {
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <DialogContext.Provider value={{ open, onOpenChange }}>
       <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
         {children}
       </div>
-    </DialogContext.Provider>
+    </DialogContext.Provider>,
+    document.body,
   );
 }
 
@@ -46,7 +49,7 @@ function DialogContent({
     <>
       <button
         type="button"
-        className="absolute inset-0 cursor-default bg-primary/45"
+        className="fixed inset-0 cursor-default bg-primary/45"
         aria-label="Close dialog"
         onClick={() => onOpenChange?.(false)}
       />

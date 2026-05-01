@@ -215,6 +215,7 @@ function ManageServicePointModal({
         servicePoint.region,
         servicePoint.address,
         servicePoint.status,
+        servicePoint.cluster,
       ]
         .join(" ")
         .toLowerCase()
@@ -287,19 +288,19 @@ function ManageServicePointModal({
                       const current = currentServicePointId === servicePoint.id;
 
                       return (
-                        <Button
+                        <button
                           key={servicePoint.id}
+                          type="button"
                           role="radio"
                           aria-checked={selected}
                           onClick={() => field.handleChange(servicePoint.id)}
-                          variant="outline"
-                          className={`h-auto w-full justify-start whitespace-normal rounded-lg p-4 text-left ${
+                          className={`block w-full rounded-lg border p-4 text-left transition-colors ${
                             selected
                               ? "border-accent bg-accent/5"
                               : "border-border bg-white hover:border-accent/60 hover:bg-background"
                           }`}
                         >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="grid min-w-0 gap-4">
                             <div className="flex min-w-0 gap-3">
                               <span
                                 className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
@@ -332,6 +333,13 @@ function ManageServicePointModal({
                                 <p className="mt-1 text-sm text-foreground/65">
                                   {servicePoint.region} - {servicePoint.city}
                                 </p>
+                                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-accent/10 px-2 py-1 text-xs font-semibold text-accent">
+                                  <LuUsers
+                                    className="h-3.5 w-3.5"
+                                    strokeWidth={1.75}
+                                  />
+                                  {servicePoint.cluster}
+                                </div>
                                 <p className="mt-2 flex items-start gap-1.5 text-xs leading-5 text-foreground/55">
                                   <LuMapPin
                                     className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent"
@@ -342,38 +350,62 @@ function ManageServicePointModal({
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 sm:w-72">
-                              <div className="rounded-md bg-background px-3 py-2">
-                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                            <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                              <div className="min-w-0 rounded-md bg-background px-3 py-2">
+                                <p className="flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
                                   <LuActivity
                                     className="h-3 w-3 text-accent"
                                     strokeWidth={1.75}
                                   />
-                                  Load
+                                  <span className="truncate">Load</span>
                                 </p>
                                 <p className="mt-1 text-sm font-bold text-foreground">
                                   {servicePoint.load}%
                                 </p>
                               </div>
-                              <div className="rounded-md bg-background px-3 py-2">
-                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                              <div className="min-w-0 rounded-md bg-background px-3 py-2">
+                                <p className="flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
                                   <LuBriefcaseBusiness
                                     className="h-3 w-3 text-accent"
                                     strokeWidth={1.75}
                                   />
-                                  Jobs
+                                  <span className="truncate">Jobs</span>
                                 </p>
                                 <p className="mt-1 text-sm font-bold text-foreground">
                                   {servicePoint.openJobs}
                                 </p>
                               </div>
-                              <div className="rounded-md bg-background px-3 py-2">
-                                <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                              <div className="min-w-0 rounded-md bg-background px-3 py-2">
+                                <p className="flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
                                   <LuUsers
                                     className="h-3 w-3 text-accent"
                                     strokeWidth={1.75}
                                   />
-                                  Tech
+                                  <span className="truncate">Cluster</span>
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-foreground">
+                                  {servicePoint.clusterTechnicianCount}
+                                </p>
+                              </div>
+                              <div className="min-w-0 rounded-md bg-background px-3 py-2">
+                                <p className="flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                                  <LuMapPinned
+                                    className="h-3 w-3 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  <span className="truncate">Unmapped</span>
+                                </p>
+                                <p className="mt-1 text-sm font-bold text-foreground">
+                                  {servicePoint.unmappedTechnicianCount}
+                                </p>
+                              </div>
+                              <div className="min-w-0 rounded-md bg-background px-3 py-2">
+                                <p className="flex min-w-0 items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-foreground/45">
+                                  <LuUsers
+                                    className="h-3 w-3 text-accent"
+                                    strokeWidth={1.75}
+                                  />
+                                  <span className="truncate">Tech</span>
                                 </p>
                                 <p className="mt-1 text-sm font-bold text-foreground">
                                   {servicePoint.technicianCount}
@@ -381,7 +413,7 @@ function ManageServicePointModal({
                               </div>
                             </div>
                           </div>
-                        </Button>
+                        </button>
                       );
                     })
                   ) : (
