@@ -38,7 +38,7 @@ function createUserError(status: number, detail: string): Error {
  * forwarding follows the same SSR reasoning as `list-users.ts`.
  */
 const createUserFn = createServerFn({ method: 'POST' })
-  .inputValidator((input: CreateUserInput) => input)
+  .validator((input: CreateUserInput) => input)
   .handler(async ({ data }): Promise<UserRecord> => {
     const cookie = getRequestHeader('cookie')
     if (!cookie) throw new Error('Not authenticated.')
