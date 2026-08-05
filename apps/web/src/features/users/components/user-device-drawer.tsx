@@ -1,28 +1,52 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle,
+  ChevronDown,
   Clock,
+  Filter,
   Globe,
   Loader2,
+  LogIn,
+  LogOut,
   Monitor,
   Smartphone,
   Wifi,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx'
+import { Input } from '#/components/ui/input.tsx'
+import { Label } from '#/components/ui/label.tsx'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '#/components/ui/popover.tsx'
 import { SearchInput } from '#/components/ui/search-input.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { describeUserAgent, formatRelativeTime } from '../lib/format.ts'
 import type { UserRecord } from '../data/users.ts'
 import {
   userDevicesQueryOptions,
-  userLoginHistoryQueryOptions,
+  userLoginHistoryInfiniteQueryOptions,
   userSessionsQueryOptions,
-  type LoginHistoryRecord,
+  type LoginHistoryEventRecord,
+  type LoginHistoryFilters,
   type SessionRecord,
 } from '../api/user-devices.ts'
 import { RoleBadge } from './role-badge.tsx'
@@ -438,85 +462,459 @@ function DevicesTab({ userId }: { userId: string }) {
 // Login History Tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-function LoginHistoryTab({ userId }: { userId: string }) {
-  const { data: history = [], isPending, isError } = useQuery(
-    userLoginHistoryQueryOptions(userId),
+interface HistoryDayGroup {
+  key: string
+  title: string
+  /** Full date shown under "Today"/"Yesterday"; null when the title is a date. */
+  subtitle: string | null
+  isToday: boolean
+  items: Array<LoginHistoryEventRecord>
+}
+
+function formatDayLabel(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+/** Buckets newest-first events into calendar-day groups, preserving order. */
+function groupByDay(
+  items: Array<LoginHistoryEventRecord>,
+): Array<HistoryDayGroup> {
+  const startOfDay = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const today = startOfDay(new Date())
+  const dayMs = 24 * 60 * 60 * 1000
+
+  const map = new Map<string, HistoryDayGroup>()
+  for (const item of items) {
+    const date = new Date(item.loginAt)
+    const day = startOfDay(date)
+    const key = String(day)
+    let group = map.get(key)
+    if (!group) {
+      const isToday = day === today
+      const isYesterday = day === today - dayMs
+      group = {
+        key,
+        title: isToday ? 'Today' : isYesterday ? 'Yesterday' : formatDayLabel(date),
+        subtitle: isToday || isYesterday ? formatDayLabel(date) : null,
+        isToday,
+        items: [],
+      }
+      map.set(key, group)
+    }
+    group.items.push(item)
+  }
+  return [...map.values()]
+}
+
+function EventField({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+}) {
+  return (
+    <div className="min-w-0 lg:border-l lg:border-brand-100/80 lg:pl-4">
+      <p className="flex items-center gap-1.5 text-[11px] text-brand-900/40">
+        <Icon className="h-3.5 w-3.5 text-[#3F6FA8]" strokeWidth={1.75} />
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xs font-semibold text-brand-900">
+        {value}
+      </p>
+    </div>
   )
+}
 
-  if (isPending) {
-    return <TabLoader message="Loading login history..." />
-  }
-
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <AlertTriangle className="mb-2 h-8 w-8 text-rose-400" strokeWidth={1.5} />
-        <p className="text-sm font-medium text-rose-500">Failed to load login history.</p>
-      </div>
-    )
-  }
-
-  if (history.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Clock className="mb-2 h-8 w-8 text-brand-900/20" strokeWidth={1.5} />
-        <p className="text-sm text-brand-900/40">No login history records found.</p>
-      </div>
-    )
-  }
+function HistoryEventCard({ item }: { item: LoginHistoryEventRecord }) {
+  const isLogin = item.eventType === 'login'
+  const deviceName =
+    [item.brand, item.model].filter(Boolean).join(' ') ||
+    `Device ${item.deviceId.slice(0, 8)}`
+  const platformLabel = item.platform
+    ? item.platform.charAt(0).toUpperCase() + item.platform.slice(1)
+    : item.userAgent
+      ? describeUserAgent(item.userAgent)
+      : null
+  const deviceMeta = [
+    platformLabel,
+    item.appVersion ? `App v${item.appVersion}` : null,
+  ]
+    .filter(Boolean)
+    .join(' • ')
+  const time = new Date(item.loginAt).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 
   return (
-    <div className="relative pl-6 py-2">
-      {/* Timeline line */}
-      <div className="absolute top-2 bottom-2 left-[11px] w-0.5 bg-brand-100" />
-      <div className="space-y-4">
-        {history.map((entry: LoginHistoryRecord, index: number) => {
-          const device =
-            [entry.brand, entry.model].filter(Boolean).join(' ') ||
-            `Device ${entry.deviceId.slice(0, 8)}`
-          const ua = entry.userAgent ? describeUserAgent(entry.userAgent) : null
-          return (
-            <div key={entry.id} className="relative flex gap-4">
-              {/* Timeline dot */}
-              <div
+    <div className="rounded-2xl border border-brand-100 bg-white p-4 shadow-xs">
+      <div className="flex items-start gap-3.5">
+        <div
+          className={cn(
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+            isLogin ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500',
+          )}
+        >
+          {isLogin ? (
+            <LogIn className="h-5 w-5" strokeWidth={1.75} />
+          ) : (
+            <LogOut className="h-5 w-5" strokeWidth={1.75} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-brand-900">
+                {isLogin ? 'Login' : 'Logout'}
+              </p>
+              {/* Only successful events reach the history tables. */}
+              <span
                 className={cn(
-                  'relative z-10 mt-1.5 h-3.5 w-3.5 shrink-0 -translate-x-[5px] rounded-full border-2',
-                  index === 0
-                    ? 'border-[#3F6FA8] bg-[#3F6FA8] ring-4 ring-[#3F6FA8]/15'
-                    : 'border-brand-300 bg-white',
+                  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  isLogin
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-rose-100 text-rose-600',
                 )}
+              >
+                Success
+              </span>
+            </div>
+            <p className="text-xs whitespace-nowrap text-brand-900/50">
+              {formatRelativeTime(item.loginAt)}
+            </p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 lg:grid-cols-[1.4fr_1fr_1fr_0.9fr]">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-brand-900">
+                {deviceName}
+              </p>
+              {deviceMeta && (
+                <p className="mt-1 truncate text-xs text-brand-900/50">
+                  {deviceMeta}
+                </p>
+              )}
+            </div>
+            <EventField
+              icon={Globe}
+              label="IP Address"
+              value={item.ipAddress ?? '—'}
+            />
+            {/* Connection type isn't part of the history payload yet. */}
+            <EventField icon={Wifi} label="Connection" value="—" />
+            <EventField icon={Clock} label="Time" value={time} />
+          </div>
+          {item.appVersion && (
+            <div className="mt-2 flex justify-end">
+              <span className="rounded-full bg-brand-100/80 px-2 py-0.5 text-[10px] font-semibold text-brand-900/70">
+                v{item.appVersion}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LoginHistoryTab({ userId }: { userId: string }) {
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [eventType, setEventType] = useState<'login' | 'logout'>('login')
+  const [status, setStatus] = useState<'' | 'ACTIVE' | 'INACTIVE'>('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), 400)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  // All filtering happens server-side; these params ride along on every page
+  // request, and changing any of them resets the loaded pages (query key).
+  const filters = useMemo<LoginHistoryFilters>(
+    () => ({
+      search: debouncedSearch.trim() || undefined,
+      from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+      to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined,
+      eventType,
+      status: status || undefined,
+    }),
+    [debouncedSearch, from, to, eventType, status],
+  )
+
+  const {
+    data,
+    isPending,
+    isError,
+    isFetching,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery(userLoginHistoryInfiniteQueryOptions(userId, filters))
+
+  const items = useMemo(
+    () => data?.pages.flatMap((page) => page.items) ?? [],
+    [data],
+  )
+  const total = data?.pages.at(-1)?.total ?? 0
+  const groups = useMemo(() => groupByDay(items), [items])
+  const hasActiveFilters = Boolean(
+    filters.search || from || to || status || eventType !== 'login',
+  )
+
+  const formatRangeDate = (value: string) =>
+    formatDayLabel(new Date(`${value}T00:00:00`))
+  const rangeLabel =
+    from && to
+      ? `${formatRangeDate(from)} – ${formatRangeDate(to)}`
+      : from
+        ? `From ${formatRangeDate(from)}`
+        : to
+          ? `Until ${formatRangeDate(to)}`
+          : 'All dates'
+
+  return (
+    <div className="space-y-4">
+      {/* ── Toolbar: search, date range, filters ── */}
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchInput
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by device or IP address…"
+          isFetching={isFetching && !isPending && !isFetchingNextPage}
+          containerClassName="min-w-[220px] flex-1"
+        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="h-9 gap-2 border-brand-100 bg-white text-xs font-semibold text-brand-900"
+            >
+              <CalendarDays
+                className="h-4 w-4 text-[#3F6FA8]"
+                strokeWidth={1.75}
               />
-              <div className="min-w-0 flex-1 rounded-xl border border-brand-100 bg-white p-3.5 shadow-xs">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-brand-900 truncate">{device}</p>
-                    {ua && <p className="text-xs text-brand-900/60 mt-0.5">{ua}</p>}
-                    {entry.ipAddress && (
-                      <p className="mt-1 flex items-center gap-1 text-[11px] text-brand-900/40">
-                        <Globe className="h-3 w-3 text-[#3F6FA8]" />
-                        {entry.ipAddress}
-                      </p>
-                    )}
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-xs font-semibold text-brand-900/70 whitespace-nowrap">
-                      {formatRelativeTime(entry.loginAt)}
-                    </p>
-                    <p className="text-[10px] text-brand-900/40 mt-0.5">
-                      {new Date(entry.loginAt).toLocaleString()}
-                    </p>
-                    {entry.appVersion && (
-                      <span className="mt-1 inline-block rounded-full bg-brand-100/80 px-2 py-0.5 text-[10px] font-semibold text-brand-900/70">
-                        v{entry.appVersion}
-                      </span>
-                    )}
-                  </div>
-                </div>
+              {rangeLabel}
+              <ChevronDown
+                className="h-3.5 w-3.5 text-brand-900/50"
+                strokeWidth={1.75}
+              />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="theme-light w-72 space-y-3 border-brand-100 bg-white text-brand-900"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="history-from" className="text-xs text-brand-900/60">
+                From
+              </Label>
+              <Input
+                id="history-from"
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => setFrom(e.target.value)}
+                className="h-9 border-brand-100 bg-white text-xs text-brand-900"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="history-to" className="text-xs text-brand-900/60">
+                To
+              </Label>
+              <Input
+                id="history-to"
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => setTo(e.target.value)}
+                className="h-9 border-brand-100 bg-white text-xs text-brand-900"
+              />
+            </div>
+            {(from || to) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-full text-xs text-brand-900/60"
+                onClick={() => {
+                  setFrom('')
+                  setTo('')
+                }}
+              >
+                Clear range
+              </Button>
+            )}
+          </PopoverContent>
+        </Popover>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="h-9 gap-2 border-brand-100 bg-white text-xs font-semibold text-brand-900"
+            >
+              <Filter className="h-4 w-4 text-[#3F6FA8]" strokeWidth={1.75} />
+              Filters
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="theme-light w-56 border-brand-100 bg-white text-brand-900"
+          >
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-brand-500">
+              Event type
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={eventType}
+              onValueChange={(value) =>
+                setEventType(value as 'login' | 'logout')
+              }
+            >
+              <DropdownMenuRadioItem value="login">Login</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="logout">
+                Logout
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator className="bg-brand-100" />
+            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-brand-500">
+              Device status
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={status}
+              onValueChange={(value) =>
+                setStatus(value as '' | 'ACTIVE' | 'INACTIVE')
+              }
+            >
+              <DropdownMenuRadioItem value="">All</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="ACTIVE">
+                Active
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="INACTIVE">
+                Inactive
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* ── Timeline states ── */}
+      {isPending ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div key={index} className="md:flex md:gap-5">
+              <div className="w-[88px] shrink-0 pt-4 max-md:hidden">
+                <Skeleton className="h-3.5 w-16" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <Skeleton className="h-[108px] w-full rounded-2xl" />
               </div>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <AlertTriangle
+            className="mb-2 h-8 w-8 text-rose-400"
+            strokeWidth={1.5}
+          />
+          <p className="text-sm font-medium text-rose-500">
+            Failed to load login history.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => refetch()}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Clock className="mb-2 h-8 w-8 text-brand-900/20" strokeWidth={1.5} />
+          <p className="text-sm text-brand-900/40">
+            {hasActiveFilters
+              ? 'No activities match the current filters.'
+              : 'No login history records found.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="relative">
+            {/* Vertical timeline rail (hidden when labels stack on mobile) */}
+            <div className="absolute inset-y-2 left-[96px] w-0.5 bg-brand-100 max-md:hidden" />
+            <div>
+              {groups.map((group) => (
+                <div key={group.key} className="md:flex md:gap-5">
+                  <div className="relative w-[88px] shrink-0 pt-4 leading-tight max-md:mb-2 max-md:w-auto">
+                    <p
+                      className={cn(
+                        'text-xs font-bold',
+                        group.subtitle && 'uppercase tracking-wide',
+                        group.isToday ? 'text-[#3F6FA8]' : 'text-brand-900/70',
+                      )}
+                    >
+                      {group.title}
+                    </p>
+                    {group.subtitle && (
+                      <p className="mt-0.5 text-[11px] text-brand-900/50">
+                        {group.subtitle}
+                      </p>
+                    )}
+                    <span
+                      className={cn(
+                        'absolute top-[18px] -right-4 z-10 hidden h-3.5 w-3.5 rounded-full border-2 md:block',
+                        group.isToday
+                          ? 'border-[#3F6FA8] bg-[#3F6FA8] ring-4 ring-[#3F6FA8]/15'
+                          : 'border-brand-300 bg-white',
+                      )}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-3 pb-4">
+                    {group.items.map((item) => (
+                      <HistoryEventCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Footer: range summary + load more ── */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <p className="text-xs text-brand-900/50">
+              Showing 1 to {items.length} of {total} activities
+            </p>
+            {hasNextPage && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-brand-100 bg-white text-xs font-semibold text-brand-900"
+                disabled={isFetchingNextPage}
+                onClick={() => fetchNextPage()}
+              >
+                {isFetchingNextPage && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                )}
+                Load more
+                <ChevronDown
+                  className="h-3.5 w-3.5 text-brand-900/50"
+                  strokeWidth={1.75}
+                />
+              </Button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
