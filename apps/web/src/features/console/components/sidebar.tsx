@@ -44,8 +44,8 @@ function SubmenuLink({
 }) {
   return (
     <Link
-      to="/$"
-      params={{ _splat: sub.path }}
+      to={sub.directRoute ?? '/$'}
+      params={sub.directRoute ? undefined : { _splat: sub.path }}
       onClick={onNavigate}
       className={cn(
         'group/sub flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors',

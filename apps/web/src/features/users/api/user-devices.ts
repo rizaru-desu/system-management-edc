@@ -81,7 +81,7 @@ export interface SessionRecord {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const fetchUserDevices = createServerFn({ method: 'GET' })
-  .inputValidator((input: { userId: string }) => input)
+  .validator((input: { userId: string }) => input)
   .handler(async ({ data }): Promise<DeviceRecord[]> => {
     const cookie = getRequestHeader('cookie')
     if (!cookie) return []
@@ -98,7 +98,7 @@ const fetchUserDevices = createServerFn({ method: 'GET' })
   })
 
 const fetchUserLoginHistory = createServerFn({ method: 'GET' })
-  .inputValidator(
+  .validator(
     (input: {
       userId: string
       page: number
@@ -134,7 +134,7 @@ const fetchUserLoginHistory = createServerFn({ method: 'GET' })
   })
 
 const fetchUserSessions = createServerFn({ method: 'GET' })
-  .inputValidator((input: { userId: string }) => input)
+  .validator((input: { userId: string }) => input)
   .handler(async ({ data }): Promise<SessionRecord[]> => {
     const cookie = getRequestHeader('cookie')
     if (!cookie) return []

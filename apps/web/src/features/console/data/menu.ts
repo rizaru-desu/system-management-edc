@@ -64,6 +64,13 @@ export interface MenuSubItem {
   allowedRoles: Array<RoleKey>
   /** Renders a lock hint: the module exposes masked/sensitive data. */
   masked?: boolean
+  /**
+   * When set, the sidebar link navigates to this route directly instead of
+   * going through the `/_authed/$` catch-all splat. Use for paths that have a
+   * dedicated file-based route (e.g. `/users`) to avoid the splat-vs-route
+   * ambiguity warning from TanStack Router.
+   */
+  directRoute?: string
 }
 
 export interface MenuGroup {
@@ -191,6 +198,7 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         path: 'users',
         allowedRoles: ['System_Administrator'],
         masked: true,
+        directRoute: '/users',
       },
       {
         title: 'Service Points',
