@@ -16,6 +16,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "dev": "tsc --watch --preserveWatchOutput",
     "check-types": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "auth:generate": "better-auth generate --config ./better-auth.config.ts --output ./src/schema/auth.ts --yes",
