@@ -7,6 +7,7 @@ import {
   CheckCircle,
   Clock,
   Globe,
+  Loader2,
   Monitor,
   Smartphone,
   Wifi,
@@ -14,7 +15,6 @@ import {
 } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
 import { SearchInput } from '#/components/ui/search-input.tsx'
-import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { cn } from '#/lib/utils.ts'
 import { describeUserAgent, formatRelativeTime } from '../lib/format.ts'
 import type { UserRecord } from '../data/users.ts'
@@ -102,6 +102,22 @@ function DetailRow({ label, value }: { label: string; value: ReactNode }) {
   )
 }
 
+/**
+ * Shape-agnostic loading state shared by every tab, so schema changes to the
+ * underlying data never require touching the loading UI.
+ */
+function TabLoader({ message }: { message: string }) {
+  return (
+    <div className="flex min-h-[200px] flex-col items-center justify-center gap-2">
+      <Loader2
+        className="h-6 w-6 animate-spin text-muted-foreground"
+        strokeWidth={1.75}
+      />
+      <p className="text-sm text-brand-900/40">{message}</p>
+    </div>
+  )
+}
+
 function initialsOf(name: string): string {
   return (
     name
@@ -147,19 +163,7 @@ function DevicesTab({ userId }: { userId: string }) {
   }, [devices, filteredDevices, selectedDeviceId])
 
   if (isPending) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-2 h-full">
-        <div className="md:col-span-4 space-y-3">
-          <Skeleton className="h-10 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-        </div>
-        <div className="md:col-span-8 space-y-4">
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-64 w-full rounded-2xl" />
-        </div>
-      </div>
-    )
+    return <TabLoader message="Loading device details..." />
   }
 
   if (isError) {
@@ -440,13 +444,7 @@ function LoginHistoryTab({ userId }: { userId: string }) {
   )
 
   if (isPending) {
-    return (
-      <div className="space-y-3 p-4">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-xl" />
-        ))}
-      </div>
-    )
+    return <TabLoader message="Loading login history..." />
   }
 
   if (isError) {
@@ -533,13 +531,7 @@ function SessionsTab({ userId }: { userId: string }) {
   )
 
   if (isPending) {
-    return (
-      <div className="space-y-3 p-4">
-        {Array.from({ length: 3 }, (_, i) => (
-          <Skeleton key={i} className="h-16 w-full rounded-xl" />
-        ))}
-      </div>
-    )
+    return <TabLoader message="Loading sessions..." />
   }
 
   if (isError) {
