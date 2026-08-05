@@ -10,6 +10,7 @@ import {
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
+import { Card } from '#/components/ui/card.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { SearchInput } from '#/components/ui/search-input.tsx'
 import {
@@ -184,8 +185,8 @@ export function UsersPage() {
       caption: `${shareOfTotal(stats.admins)}% of all users`,
       meter: {
         percent: shareOfTotal(stats.admins),
-        fill: 'bg-[#3F6FA8]',
-        track: 'bg-[#3F6FA8]/15',
+        fill: 'bg-brand-500',
+        track: 'bg-brand-500/15',
       },
     },
   ]
@@ -195,13 +196,13 @@ export function UsersPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#3F6FA8]">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-500">
             Administration
           </p>
-          <h1 className="font-display mb-1 text-3xl font-bold tracking-tight text-[#0E2748] md:text-4xl">
+          <h1 className="font-display mb-1 text-3xl font-bold tracking-tight text-brand-900 md:text-4xl">
             Users &amp; Roles
           </h1>
-          <p className="text-sm text-[#0E2748]/60">
+          <p className="text-sm text-brand-900/60">
             Manage console accounts, role assignment and module access.
           </p>
         </div>
@@ -221,9 +222,9 @@ export function UsersPage() {
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         {statsQuery.isPending
           ? statCards.map((card) => (
-              <div
+              <Card
                 key={card.label}
-                className="rounded-2xl border border-[#DDE0EC] bg-white p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)]"
+                className="p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)]"
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-2.5">
@@ -233,29 +234,29 @@ export function UsersPage() {
                   <Skeleton className="h-9 w-9 rounded-xl" />
                 </div>
                 <Skeleton className="mt-3 h-3 w-32" />
-              </div>
+              </Card>
             ))
           : statCards.map((card) => (
-              <div
+              <Card
                 key={card.label}
-                className="relative overflow-hidden rounded-2xl border border-[#DDE0EC] bg-white p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)] transition-transform duration-200 hover:-translate-y-0.5"
+                className="relative overflow-hidden p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)] transition-transform duration-200 hover:-translate-y-0.5"
               >
                 {/* soft corner wash, echoing the login page's glow */}
-                <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#3F6FA8]/[0.07] blur-2xl" />
+                <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-brand-500/[0.07] blur-2xl" />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#3F6FA8]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-500">
                       {card.label}
                     </p>
-                    <p className="font-display mt-1.5 text-3xl font-bold leading-none tracking-tight text-[#0E2748] tabular-nums">
+                    <p className="font-display mt-1.5 text-3xl font-bold leading-none tracking-tight text-brand-900 tabular-nums">
                       {statsQuery.isError ? '—' : card.value.toLocaleString()}
                     </p>
                   </div>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#3F6FA8]/15 bg-gradient-to-br from-[#3F6FA8]/15 to-[#3F6FA8]/5 text-[#3F6FA8]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand-500/15 bg-gradient-to-br from-brand-500/15 to-brand-500/5 text-brand-500">
                     <card.icon className="h-4 w-4" strokeWidth={1.75} />
                   </span>
                 </div>
-                <p className="mt-2.5 text-[11px] text-[#0E2748]/55">
+                <p className="mt-2.5 text-[11px] text-brand-900/55">
                   {card.caption}
                 </p>
                 {card.meter && (
@@ -271,7 +272,7 @@ export function UsersPage() {
                     />
                   </div>
                 )}
-              </div>
+              </Card>
             ))}
       </div>
 
@@ -288,22 +289,13 @@ export function UsersPage() {
           value={roleFilter}
           onValueChange={(value) => setRoleFilter(value as 'all' | RoleKey)}
         >
-          <SelectTrigger className="w-[220px] border-[#DDE0EC] bg-white text-[#0E2748] dark:border-[#DDE0EC] dark:bg-white dark:hover:bg-white">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Filter by role" />
           </SelectTrigger>
-          <SelectContent className="theme-light border-[#DDE0EC] bg-white text-[#0E2748]">
-            <SelectItem
-              value="all"
-              className="focus:bg-[#DDE0EC]/40 focus:text-[#0E2748]"
-            >
-              All roles
-            </SelectItem>
+          <SelectContent>
+            <SelectItem value="all">All roles</SelectItem>
             {ROLES.map((role) => (
-              <SelectItem
-                key={role.key}
-                value={role.key}
-                className="focus:bg-[#DDE0EC]/40 focus:text-[#0E2748]"
-              >
+              <SelectItem key={role.key} value={role.key}>
                 {role.label}
               </SelectItem>
             ))}

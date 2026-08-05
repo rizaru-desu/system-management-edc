@@ -16,7 +16,10 @@ import {
   Smartphone,
 } from 'lucide-react'
 
+import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
+import { Card } from '#/components/ui/card.tsx'
+import { StatusPill } from '#/components/ui/status-pill.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,13 +44,13 @@ import type { UserRecord } from '../data/users.ts'
 import { RoleBadge } from './role-badge.tsx'
 
 
-/** Pill styling per stored provider id; unknown providers fall back neutral. */
-const SIGN_IN_BADGES: Record<string, { label: string; className: string }> = {
-  credential: {
-    label: 'Password',
-    className: 'bg-brand-100 text-brand-900/70',
-  },
-  ldap: { label: 'LDAP', className: 'bg-sky-100 text-sky-700' },
+/** Badge variant per stored provider id; unknown providers fall back neutral. */
+const SIGN_IN_BADGES: Record<
+  string,
+  { label: string; variant: 'soft' | 'sky' }
+> = {
+  credential: { label: 'Password', variant: 'soft' },
+  ldap: { label: 'LDAP', variant: 'sky' },
 }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
@@ -172,18 +175,12 @@ export function UsersTable({
               row.original.signInMethods.map((method) => {
                 const badge = SIGN_IN_BADGES[method] ?? {
                   label: method,
-                  className: 'bg-brand-100 text-brand-900/70',
+                  variant: 'soft' as const,
                 }
                 return (
-                  <span
-                    key={method}
-                    className={cn(
-                      'inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap',
-                      badge.className,
-                    )}
-                  >
+                  <Badge key={method} variant={badge.variant}>
                     {badge.label}
-                  </span>
+                  </Badge>
                 )
               })
             )}
@@ -196,22 +193,7 @@ export function UsersTable({
         cell: ({ row }) => {
           const active = row.original.status === 'active'
           const pill = (
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap',
-                active
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'cursor-help bg-brand-100 text-brand-900/50',
-              )}
-            >
-              <span
-                className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  active ? 'bg-emerald-500' : 'bg-brand-900/30',
-                )}
-              />
-              {active ? 'Active' : 'Inactive'}
-            </span>
+            <StatusPill active={active} className={cn(!active && 'cursor-help')} />
           )
           if (active) return pill
           // Hovering (or focusing) the Inactive pill reveals why the account
@@ -291,12 +273,8 @@ export function UsersTable({
                     <EllipsisVertical className="h-4 w-4" strokeWidth={1.75} />
                   </Button>
                 </DropdownMenuTrigger>
-                {/* The console is always light; the menu renders in a portal
-                  outside the shell, so pin light colors against the
-                  dark-theme tokens. */}
                 <DropdownMenuContent
                   align="end"
-                  className="theme-light border-brand-100 bg-white text-brand-900"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <DropdownMenuItem onSelect={() => onViewDevices(user)}>
@@ -347,7 +325,7 @@ export function UsersTable({
   const rangeEnd = pageIndex * pageSize + users.length
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-brand-100 bg-white">
+    <Card className="overflow-x-auto">
       <table className="w-full min-w-5xl text-left text-sm">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -441,10 +419,10 @@ export function UsersTable({
                 value={String(pageSize)}
                 onValueChange={(value) => table.setPageSize(Number(value))}
               >
-                <SelectTrigger className="h-8 w-[76px] border-brand-100 bg-white text-xs text-brand-900">
+                <SelectTrigger className="h-8 w-[76px] text-xs">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="theme-light border-brand-100 bg-white text-brand-900">
+                <SelectContent>
                   {PAGE_SIZE_OPTIONS.map((size) => (
                     <SelectItem key={size} value={String(size)}>
                       {size}
@@ -503,6 +481,6 @@ export function UsersTable({
           </div>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

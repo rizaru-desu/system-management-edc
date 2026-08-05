@@ -21,6 +21,10 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // White outline button for console toolbars (filters, date ranges,
+        // load-more) — always light regardless of shell theme.
+        toolbar:
+          "border border-brand-100 bg-white text-xs font-semibold text-brand-900 shadow-xs hover:bg-accent hover:text-accent-foreground",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
