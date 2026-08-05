@@ -6,9 +6,22 @@ import {
   useLegacyTable,
 } from '@tanstack/react-table/legacy'
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy'
-import { ChevronLeft, ChevronRight, Pencil, ShieldCheck, Smartphone } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  EllipsisVertical,
+  Pencil,
+  ShieldCheck,
+  Smartphone,
+} from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx'
 import {
   Select,
   SelectContent,
@@ -265,33 +278,50 @@ export function UsersTable({
           const user = row.original
           return (
             <div className="flex items-center justify-end gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onViewDevices(user)}
-                title="Manage devices"
-                className="text-primary hover:text-foreground"
-              >
-                <Smartphone className="h-4 w-4" strokeWidth={1.75} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onViewPermissions(user)}
-                title="View permissions"
-                className="text-primary hover:text-foreground"
-              >
-                <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => onEdit(user)}
-                title="Edit user"
-                className="text-primary hover:text-foreground"
-              >
-                <Pencil className="h-4 w-4" strokeWidth={1.75} />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Actions"
+                    className="text-primary hover:text-foreground"
+                    // Keep the trigger click from reaching the row.
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <EllipsisVertical className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
+                </DropdownMenuTrigger>
+                {/* The console is always light; the menu renders in a portal
+                  outside the shell, so pin light colors against the
+                  dark-theme tokens. */}
+                <DropdownMenuContent
+                  align="end"
+                  className="theme-light border-brand-100 bg-white text-brand-900"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DropdownMenuItem onSelect={() => onViewDevices(user)}>
+                    <Smartphone
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    Manage devices
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onViewPermissions(user)}>
+                    <ShieldCheck
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    View permissions
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onEdit(user)}>
+                    <Pencil
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    Edit user
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )
         },
@@ -378,8 +408,6 @@ export function UsersTable({
                 </td>
                 <td className="px-5 py-3.5">
                   <div className="flex justify-end gap-1">
-                    <Skeleton className="h-7 w-7 rounded-md" />
-                    <Skeleton className="h-7 w-7 rounded-md" />
                     <Skeleton className="h-7 w-7 rounded-md" />
                   </div>
                 </td>
