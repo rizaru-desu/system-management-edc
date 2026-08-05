@@ -20,6 +20,11 @@ import {
   checkUpdateQuerySchema,
 } from './dto/check-update-query.dto';
 import {
+  LoginHistoryPageResponseSwaggerDto,
+  LoginHistoryQuerySwaggerDto,
+  parseLoginHistoryQueryDto,
+} from './dto/login-history-query.dto';
+import {
   LogoutDeviceSwaggerDto,
   LogoutDeviceResponseSwaggerDto,
   parseLogoutDeviceDto,
@@ -199,15 +204,35 @@ export class MobileController {
   }
 
   /**
-   * Lists mobile login history for a given user.
+   * Lists mobile login history for a given user, newest first, with
+   * server-side pagination and filtering. Backward compatible: without query
+   * params the response still carries the legacy `data` array (first 50
+   * login events).
    */
   @Get('users/:userId/login-history')
   @RequirePermission('users', 'view')
-  @ApiOperation({ summary: 'List mobile login history for a user (admin)' })
-  @ApiResponse({ status: 200, description: 'Login history list' })
+  @ApiOperation({
+    summary: 'List mobile login history for a user (admin)',
+    description:
+      'Returns login (or logout) events newest first with server-side pagination. ' +
+      'Supports `page`, `limit`, `search` (device name, device ID, IP address), ' +
+      '`from`/`to` date range, `eventType` (login | logout), `status` (current ' +
+      'device status), and `deviceId`. The legacy `data` field is kept as an ' +
+      'alias of `items` for backward compatibility.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated login history page',
+    type: LoginHistoryPageResponseSwaggerDto,
+  })
+  @ApiResponse({ status: 400, description: 'Invalid query parameters' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  listLoginHistory(@Param('userId') userId: string) {
-    return this.mobileService.listLoginHistory(userId);
+  listLoginHistory(
+    @Param('userId') userId: string,
+    @Query() rawQuery: LoginHistoryQuerySwaggerDto,
+  ) {
+    const query = parseLoginHistoryQueryDto(rawQuery);
+    return this.mobileService.listLoginHistory(userId, query);
   }
 
   /**

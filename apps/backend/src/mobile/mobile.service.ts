@@ -2,12 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   getActiveMobileVersion,
   listUserDevices,
-  listUserLoginHistory,
+  listUserLoginHistoryPage,
   listUserSessions,
   logoutMobileDevice,
   registerOrUpdateMobileDevice,
 } from '@repo/db';
 import { CheckUpdateQueryDto } from './dto/check-update-query.dto';
+import { LoginHistoryQueryDto } from './dto/login-history-query.dto';
 import { LogoutDeviceDto } from './dto/logout-device.dto';
 import type { MobileVersionResponseDto } from './dto/mobile-version-response.dto';
 import { RegisterDeviceDto } from './dto/register-device.dto';
@@ -162,11 +163,33 @@ export class MobileService {
   }
 
   /**
-   * Lists the mobile login history for a user (admin use).
+   * Lists the mobile login history for a user (admin use), newest first, with
+   * server-side pagination and filtering. Without query params it returns the
+   * same rows as before pagination existed (first 50 login events); `data`
+   * remains as a legacy alias of `items` for pre-pagination consumers.
    */
-  async listLoginHistory(userId: string) {
-    const history = await listUserLoginHistory(userId, 50);
-    return { success: true, data: history };
+  async listLoginHistory(userId: string, query?: LoginHistoryQueryDto) {
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 50;
+    const { items, total } = await listUserLoginHistoryPage(userId, {
+      page,
+      limit,
+      search: query?.search,
+      from: query?.from,
+      to: query?.to,
+      eventType: query?.eventType,
+      status: query?.status,
+      deviceId: query?.deviceId,
+    });
+    return {
+      success: true,
+      data: items,
+      items,
+      total,
+      page,
+      limit,
+      hasNext: page * limit < total,
+    };
   }
 
   /**
