@@ -996,9 +996,13 @@ export function UserDeviceDrawer({
 
   return createPortal(
     <>
-      {/* Backdrop overlay (Global mask: covers entire viewport, keeps page visible behind) */}
+      {/* Backdrop overlay (Global mask: covers entire viewport, keeps page visible behind).
+        z-50 on purpose: all portal layers (dialogs, dropdowns, popovers) share z-50
+        and stack by DOM order, so menus opened from inside the drawer — whose
+        portals append to <body> later — paint above it. A higher z here would
+        bury them (they'd open invisibly behind the drawer). */}
       <div
-        className="fixed inset-0 z-[99] bg-black/35 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 z-50 bg-black/35 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -1006,7 +1010,7 @@ export function UserDeviceDrawer({
       {/* Drawer panel (Global Right Drawer: 80-90vw, max-width 1200px) */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-[100] flex w-full md:w-[85vw] max-w-[1200px] flex-col bg-white shadow-2xl',
+          'fixed inset-y-0 right-0 z-50 flex w-full md:w-[85vw] max-w-[1200px] flex-col bg-white shadow-2xl',
           'border-l border-brand-100',
           'animate-in slide-in-from-right duration-300 ease-out',
         )}
