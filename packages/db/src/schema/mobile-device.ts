@@ -96,6 +96,11 @@ export const mobileLoginHistory = pgTable(
     index("mobile_login_history_user_id_idx").on(table.userId),
     index("mobile_login_history_device_id_idx").on(table.deviceId),
     index("mobile_login_history_login_at_idx").on(table.loginAt),
+    // Serves the paginated per-user history listing (WHERE user_id ORDER BY login_at DESC).
+    index("mobile_login_history_user_login_at_idx").on(
+      table.userId,
+      table.loginAt,
+    ),
   ],
 );
 
@@ -121,6 +126,11 @@ export const mobileLogoutHistory = pgTable(
   (table) => [
     index("mobile_logout_history_user_id_idx").on(table.userId),
     index("mobile_logout_history_device_id_idx").on(table.deviceId),
+    // Serves the paginated per-user history listing (WHERE user_id ORDER BY logout_at DESC).
+    index("mobile_logout_history_user_logout_at_idx").on(
+      table.userId,
+      table.logoutAt,
+    ),
   ],
 );
 

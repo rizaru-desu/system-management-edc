@@ -1,0 +1,2 @@
+CREATE INDEX "mobile_login_history_user_login_at_idx" ON "mobile_login_history" USING btree ("user_id","login_at");--> statement-breakpoint
+CREATE INDEX "mobile_logout_history_user_logout_at_idx" ON "mobile_logout_history" USING btree ("user_id","logout_at");

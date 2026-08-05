@@ -1,4 +1,15 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  gte,
+  ilike,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "../client.js";
 import {
   mobileDevices,
@@ -281,6 +292,187 @@ export async function listUserLoginHistory(
     .where(eq(mobileLoginHistory.userId, userId))
     .orderBy(desc(mobileLoginHistory.loginAt))
     .limit(limit);
+}
+
+export interface ListUserLoginHistoryPageOptions {
+  page?: number;
+  limit?: number;
+  /** Matches device name (brand/model), device ID, or IP address (case-insensitive). */
+  search?: string;
+  from?: Date;
+  to?: Date;
+  /** Which history stream to read; defaults to "login" (the pre-pagination behavior). */
+  eventType?: "login" | "logout";
+  /** Filters by the device's *current* status in mobile_devices (e.g. ACTIVE). */
+  status?: string;
+  deviceId?: string;
+}
+
+export interface UserLoginHistoryEventRecord extends UserLoginHistoryRecord {
+  eventType: "login" | "logout";
+}
+
+export interface UserLoginHistoryPage {
+  items: UserLoginHistoryEventRecord[];
+  total: number;
+}
+
+/** Correlated EXISTS against the device registry's current status. */
+function deviceStatusFilter(
+  userIdColumn: typeof mobileLoginHistory.userId | typeof mobileLogoutHistory.userId,
+  deviceIdColumn: typeof mobileLoginHistory.deviceId | typeof mobileLogoutHistory.deviceId,
+  status: string,
+): SQL {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(mobileDevices)
+      .where(
+        and(
+          eq(mobileDevices.userId, userIdColumn),
+          eq(mobileDevices.deviceId, deviceIdColumn),
+          eq(mobileDevices.status, status),
+        ),
+      ),
+  );
+}
+
+/**
+ * Paginated, filterable variant of {@link listUserLoginHistory}, newest first.
+ * Both the page of items and the filtered total are fetched in a single round
+ * trip each (no per-row lookups); the device-status filter is a correlated
+ * EXISTS rather than an N+1 fetch.
+ */
+export async function listUserLoginHistoryPage(
+  userId: string,
+  options: ListUserLoginHistoryPageOptions = {},
+): Promise<UserLoginHistoryPage> {
+  const page = Math.max(1, Math.trunc(options.page ?? 1));
+  const limit = Math.max(1, Math.trunc(options.limit ?? 50));
+  const offset = (page - 1) * limit;
+  const eventType = options.eventType ?? "login";
+  const pattern = options.search?.trim()
+    ? `%${options.search.trim()}%`
+    : undefined;
+
+  if (eventType === "logout") {
+    const conditions: SQL[] = [eq(mobileLogoutHistory.userId, userId)];
+    if (options.deviceId) {
+      conditions.push(eq(mobileLogoutHistory.deviceId, options.deviceId));
+    }
+    if (options.from) {
+      conditions.push(gte(mobileLogoutHistory.logoutAt, options.from));
+    }
+    if (options.to) {
+      conditions.push(lte(mobileLogoutHistory.logoutAt, options.to));
+    }
+    if (pattern) {
+      // Logout events carry no device-name telemetry; match ID and IP only.
+      const search = or(
+        ilike(mobileLogoutHistory.deviceId, pattern),
+        ilike(mobileLogoutHistory.ipAddress, pattern),
+      );
+      if (search) conditions.push(search);
+    }
+    if (options.status) {
+      conditions.push(
+        deviceStatusFilter(
+          mobileLogoutHistory.userId,
+          mobileLogoutHistory.deviceId,
+          options.status,
+        ),
+      );
+    }
+    const where = and(...conditions);
+
+    const [rows, totalRows] = await Promise.all([
+      db
+        .select({
+          id: mobileLogoutHistory.id,
+          deviceId: mobileLogoutHistory.deviceId,
+          platform: sql<string | null>`null`,
+          brand: sql<string | null>`null`,
+          model: sql<string | null>`null`,
+          appVersion: sql<string | null>`null`,
+          ipAddress: mobileLogoutHistory.ipAddress,
+          userAgent: mobileLogoutHistory.userAgent,
+          loginAt: mobileLogoutHistory.logoutAt,
+        })
+        .from(mobileLogoutHistory)
+        .where(where)
+        .orderBy(desc(mobileLogoutHistory.logoutAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`cast(count(*) as int)` })
+        .from(mobileLogoutHistory)
+        .where(where),
+    ]);
+
+    return {
+      items: rows.map((row) => ({ ...row, eventType: "logout" as const })),
+      total: totalRows[0]?.count ?? 0,
+    };
+  }
+
+  const conditions: SQL[] = [eq(mobileLoginHistory.userId, userId)];
+  if (options.deviceId) {
+    conditions.push(eq(mobileLoginHistory.deviceId, options.deviceId));
+  }
+  if (options.from) {
+    conditions.push(gte(mobileLoginHistory.loginAt, options.from));
+  }
+  if (options.to) {
+    conditions.push(lte(mobileLoginHistory.loginAt, options.to));
+  }
+  if (pattern) {
+    const search = or(
+      ilike(mobileLoginHistory.brand, pattern),
+      ilike(mobileLoginHistory.model, pattern),
+      ilike(mobileLoginHistory.deviceId, pattern),
+      ilike(mobileLoginHistory.ipAddress, pattern),
+    );
+    if (search) conditions.push(search);
+  }
+  if (options.status) {
+    conditions.push(
+      deviceStatusFilter(
+        mobileLoginHistory.userId,
+        mobileLoginHistory.deviceId,
+        options.status,
+      ),
+    );
+  }
+  const where = and(...conditions);
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select({
+        id: mobileLoginHistory.id,
+        deviceId: mobileLoginHistory.deviceId,
+        platform: mobileLoginHistory.platform,
+        brand: mobileLoginHistory.brand,
+        model: mobileLoginHistory.model,
+        appVersion: mobileLoginHistory.appVersion,
+        ipAddress: mobileLoginHistory.ipAddress,
+        userAgent: mobileLoginHistory.userAgent,
+        loginAt: mobileLoginHistory.loginAt,
+      })
+      .from(mobileLoginHistory)
+      .where(where)
+      .orderBy(desc(mobileLoginHistory.loginAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`cast(count(*) as int)` })
+      .from(mobileLoginHistory)
+      .where(where),
+  ]);
+
+  return {
+    items: rows.map((row) => ({ ...row, eventType: "login" as const })),
+    total: totalRows[0]?.count ?? 0,
+  };
 }
 
 /**
