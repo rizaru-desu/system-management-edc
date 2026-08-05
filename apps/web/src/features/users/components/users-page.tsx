@@ -3,14 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import {
   KeyRound,
   ShieldCheck,
+  UserCheck,
   UserPlus,
-  UserRound,
-  UserRoundCheck,
+  Users,
 } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
+import { Progress } from '#/components/ui/progress.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { SearchInput } from '#/components/ui/search-input.tsx'
 import {
@@ -160,22 +161,26 @@ export function UsersPage() {
 
   const statCards = [
     {
-      icon: UserRound,
+      icon: Users,
       label: 'Total users',
       value: stats.total,
       caption: 'Registered console accounts',
+      accent: 'text-primary',
+      chip: 'bg-primary/10 text-primary',
       meter: null,
     },
     {
-      icon: UserRoundCheck,
-      label: 'Active',
+      icon: UserCheck,
+      label: 'Active users',
       value: stats.active,
       caption: `${shareOfTotal(stats.active)}% of all users`,
       // Emerald = status ("enabled"), same ramp as the table's Active pill.
+      accent: 'text-emerald-600',
+      chip: 'bg-emerald-500/10 text-emerald-600',
       meter: {
         percent: shareOfTotal(stats.active),
         fill: 'bg-emerald-500',
-        track: 'bg-emerald-100',
+        track: 'bg-emerald-500/15',
       },
     },
     {
@@ -183,10 +188,12 @@ export function UsersPage() {
       label: 'System admins',
       value: stats.admins,
       caption: `${shareOfTotal(stats.admins)}% of all users`,
+      accent: 'text-primary',
+      chip: 'bg-primary/10 text-primary',
       meter: {
         percent: shareOfTotal(stats.admins),
-        fill: 'bg-brand-500',
-        track: 'bg-brand-500/15',
+        fill: 'bg-primary',
+        track: 'bg-primary/15',
       },
     },
   ]
@@ -219,59 +226,72 @@ export function UsersPage() {
       </div>
 
       {/* Stats — whole-table counts, unaffected by search/filter */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         {statsQuery.isPending
           ? statCards.map((card) => (
               <Card
                 key={card.label}
-                className="p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)]"
+                className="flex min-h-[180px] flex-col justify-between rounded-xl border-border bg-card p-6 text-card-foreground shadow-sm"
               >
                 <div className="flex items-start justify-between">
                   <div className="space-y-2.5">
                     <Skeleton className="h-3 w-24" />
                     <Skeleton className="h-8 w-16" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
-                  <Skeleton className="h-9 w-9 rounded-xl" />
+                  <Skeleton className="h-10 w-10 rounded-xl" />
                 </div>
-                <Skeleton className="mt-3 h-3 w-32" />
+                <Skeleton className="h-3 w-28" />
               </Card>
             ))
           : statCards.map((card) => (
               <Card
                 key={card.label}
-                className="relative overflow-hidden p-4 shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_24px_rgba(14,39,72,0.06)] transition-transform duration-200 hover:-translate-y-0.5"
+                className="flex min-h-[180px] flex-col justify-between gap-4 rounded-xl border-border bg-card p-6 text-card-foreground shadow-sm"
               >
-                {/* soft corner wash, echoing the login page's glow */}
-                <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-brand-500/[0.07] blur-2xl" />
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-500">
+                    <p
+                      className={cn(
+                        'text-[11px] font-semibold uppercase tracking-[0.14em]',
+                        card.accent,
+                      )}
+                    >
                       {card.label}
                     </p>
-                    <p className="font-display mt-1.5 text-3xl font-bold leading-none tracking-tight text-brand-900 tabular-nums">
+                    <p className="font-display mt-2 text-3xl font-bold leading-none tracking-tight text-foreground tabular-nums">
                       {statsQuery.isError ? '—' : card.value.toLocaleString()}
                     </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {card.caption}
+                    </p>
                   </div>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-brand-500/15 bg-gradient-to-br from-brand-500/15 to-brand-500/5 text-brand-500">
-                    <card.icon className="h-4 w-4" strokeWidth={1.75} />
-                  </span>
-                </div>
-                <p className="mt-2.5 text-[11px] text-brand-900/55">
-                  {card.caption}
-                </p>
-                {card.meter && (
-                  <div
+                  <span
                     className={cn(
-                      'mt-2 h-1 overflow-hidden rounded-full',
-                      card.meter.track,
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                      card.chip,
                     )}
                   >
-                    <div
-                      className={cn('h-full rounded-full', card.meter.fill)}
-                      style={{ width: `${card.meter.percent}%` }}
+                    <card.icon className="h-5 w-5" strokeWidth={1.75} />
+                  </span>
+                </div>
+                <div>
+                  {card.meter ? (
+                    <Progress
+                      value={card.meter.percent}
+                      aria-label={`${card.label} as a share of all users`}
+                      className={cn('h-1.5', card.meter.track)}
+                      indicatorClassName={card.meter.fill}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div className="border-t border-border" aria-hidden="true" />
+                  )}
+                  {/* Trend deltas need a stats-history endpoint; the em dash is
+                    the honest placeholder until one exists. */}
+                  <p className="mt-2.5 text-xs text-muted-foreground">
+                    — vs last 7 days
+                  </p>
+                </div>
               </Card>
             ))}
       </div>
