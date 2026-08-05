@@ -56,7 +56,7 @@ const fetchRolePermissions = createServerFn({ method: 'GET' }).handler(
 )
 
 const saveRolePermissionsFn = createServerFn({ method: 'POST' })
-  .inputValidator((input: { matrix: RolePermissionMatrix }) => input)
+  .validator((input: { matrix: RolePermissionMatrix }) => input)
   .handler(async ({ data }): Promise<void> => {
     const cookie = getRequestHeader('cookie')
     if (!cookie) throw new Error('Not authenticated.')

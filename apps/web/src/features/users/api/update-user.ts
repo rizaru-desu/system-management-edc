@@ -38,7 +38,7 @@ function updateUserError(status: number, detail: string): Error {
  * SSR reasoning as `list-users.ts`.
  */
 const updateUserFn = createServerFn({ method: 'POST' })
-  .inputValidator((input: UpdateUserInput) => input)
+  .validator((input: UpdateUserInput) => input)
   .handler(async ({ data }): Promise<UserRecord> => {
     const cookie = getRequestHeader('cookie')
     if (!cookie) throw new Error('Not authenticated.')

@@ -77,7 +77,7 @@ export interface UsersListPage {
  * browser's fetch credentials are unavailable.
  */
 const fetchUsers = createServerFn({ method: 'GET' })
-  .inputValidator(
+  .validator(
     (input: {
       search?: string
       role?: string
