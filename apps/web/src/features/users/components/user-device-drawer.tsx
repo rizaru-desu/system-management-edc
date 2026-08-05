@@ -19,7 +19,11 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
+import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
+import { Card } from '#/components/ui/card.tsx'
+import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { StatusPill } from '#/components/ui/status-pill.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -67,28 +71,6 @@ interface UserDeviceDrawerProps {
 // Helper sub-components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
-  const isActive = status === 'ACTIVE'
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap',
-        isActive
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-brand-100 text-brand-900/50',
-      )}
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full',
-          isActive ? 'bg-emerald-500' : 'bg-brand-900/30',
-        )}
-      />
-      {isActive ? 'Active' : 'Inactive'}
-    </span>
-  )
-}
-
 function BoolBadge({
   value,
   trueLabel = 'Yes',
@@ -99,19 +81,14 @@ function BoolBadge({
   falseLabel?: string
 }) {
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
-        value ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700',
-      )}
-    >
+    <Badge variant={value ? 'danger' : 'success'}>
       {value ? (
         <AlertTriangle className="h-3 w-3" />
       ) : (
         <CheckCircle className="h-3 w-3" />
       )}
       {value ? trueLabel : falseLabel}
-    </span>
+    </Badge>
   )
 }
 
@@ -192,30 +169,28 @@ function DevicesTab({ userId }: { userId: string }) {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <AlertTriangle className="mb-2 h-9 w-9 text-rose-400" strokeWidth={1.5} />
-        <p className="text-sm font-medium text-rose-600">Failed to load registered devices.</p>
-        <p className="text-xs text-brand-900/40 mt-1">Please try refreshing or check connection.</p>
-      </div>
+      <EmptyState
+        icon={AlertTriangle}
+        tone="danger"
+        title="Failed to load registered devices."
+        description="Please try refreshing or check connection."
+      />
     )
   }
 
   if (devices.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100/50 text-brand-900/30">
-          <Smartphone className="h-7 w-7" strokeWidth={1.5} />
-        </div>
-        <p className="text-sm font-semibold text-brand-900/70">No Registered Devices</p>
-        <p className="text-xs text-brand-900/40 mt-1">
-          This user has not registered any mobile devices yet.
-        </p>
-      </div>
+      <EmptyState
+        icon={Smartphone}
+        iconChip
+        title="No Registered Devices"
+        description="This user has not registered any mobile devices yet."
+      />
     )
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-[500px] md:min-h-0 rounded-2xl border border-brand-100 bg-white overflow-hidden shadow-xs flex-1">
+    <Card className="flex flex-col md:flex-row h-full min-h-[500px] md:min-h-0 overflow-hidden shadow-xs flex-1">
       {/* ── Left Column (35% width) ── */}
       <div className="w-full md:w-[35%] shrink-0 border-b md:border-b-0 md:border-r border-brand-100 flex flex-col bg-brand-50/20 md:h-full min-h-0">
         {/* List Header */}
@@ -224,7 +199,7 @@ function DevicesTab({ userId }: { userId: string }) {
             <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-[#47618B]">
               Registered Devices
             </h3>
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#DDE0EC]/80 px-1.5 text-xs font-bold text-[#0E2748]">
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-brand-100/80 px-1.5 text-xs font-bold text-brand-900">
               {filteredDevices.length}
             </span>
           </div>
@@ -256,7 +231,7 @@ function DevicesTab({ userId }: { userId: string }) {
                   className={cn(
                     'w-full text-left p-3 rounded-xl border transition-all',
                     isSelected
-                      ? 'border-[#3F6FA8] bg-[#3F6FA8]/[0.07] shadow-xs ring-1 ring-[#3F6FA8]/20'
+                      ? 'border-brand-500 bg-brand-500/[0.07] shadow-xs ring-1 ring-brand-500/20'
                       : 'border-brand-100 bg-white hover:border-brand-300 hover:bg-brand-50/40',
                   )}
                 >
@@ -266,8 +241,8 @@ function DevicesTab({ userId }: { userId: string }) {
                         className={cn(
                           'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
                           isSelected
-                            ? 'border-[#3F6FA8]/30 bg-[#3F6FA8] text-white'
-                            : 'border-brand-100 bg-brand-50 text-[#3F6FA8]',
+                            ? 'border-brand-500/30 bg-brand-500 text-white'
+                            : 'border-brand-100 bg-brand-50 text-brand-500',
                         )}
                       >
                         <Smartphone className="h-4 w-4" strokeWidth={1.75} />
@@ -276,7 +251,7 @@ function DevicesTab({ userId }: { userId: string }) {
                         <p
                           className={cn(
                             'truncate text-xs font-semibold',
-                            isSelected ? 'text-[#0E2748]' : 'text-brand-900',
+                            isSelected ? 'text-brand-900' : 'text-brand-900',
                           )}
                         >
                           {name}
@@ -286,7 +261,7 @@ function DevicesTab({ userId }: { userId: string }) {
                         </p>
                       </div>
                     </div>
-                    <StatusBadge status={d.status} />
+                    <StatusPill active={d.status === 'ACTIVE'} />
                   </div>
                   <div className="mt-2.5 flex items-center justify-between text-[10px] text-brand-900/50 pt-2 border-t border-brand-100/50">
                     <span className="capitalize font-medium">{d.platform}</span>
@@ -306,10 +281,10 @@ function DevicesTab({ userId }: { userId: string }) {
         {selectedDevice ? (
           <div className="space-y-6">
             {/* Header / Display Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/80 via-white to-[#3F6FA8]/[0.04] p-5 shadow-xs">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-brand-50/80 via-white to-brand-500/[0.04] p-5 shadow-xs">
               <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                 <div className="flex items-start gap-4 min-w-0">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-[#3F6FA8]/20 bg-[#3F6FA8]/10 text-[#3F6FA8] shadow-xs">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-brand-500/20 bg-brand-500/10 text-brand-500 shadow-xs">
                     <Smartphone className="h-7 w-7" strokeWidth={1.75} />
                   </div>
                   <div className="min-w-0">
@@ -319,7 +294,7 @@ function DevicesTab({ userId }: { userId: string }) {
                           .filter(Boolean)
                           .join(' ') || selectedDevice.deviceId}
                       </h2>
-                      <StatusBadge status={selectedDevice.status} />
+                      <StatusPill active={selectedDevice.status === 'ACTIVE'} />
                     </div>
                     <p className="text-xs text-brand-900/50 mt-0.5 truncate">
                       {selectedDevice.manufacturer ?? 'Unknown Manufacturer'} • ID:{' '}
@@ -358,14 +333,14 @@ function DevicesTab({ userId }: { userId: string }) {
                   </p>
                 </div>
               </div>
-            </div>
+            </Card>
 
             {/* Information Section */}
             <div>
               <h4 className="text-xs font-bold uppercase tracking-wider text-brand-900/60 mb-3">
                 Device Information &amp; Telemetry
               </h4>
-              <div className="rounded-2xl border border-brand-100 bg-white p-4">
+              <Card className="p-4">
                 <DetailRow label="Device ID" value={selectedDevice.deviceId} />
                 <DetailRow label="Manufacturer" value={selectedDevice.manufacturer} />
                 <DetailRow label="Brand" value={selectedDevice.brand} />
@@ -444,17 +419,18 @@ function DevicesTab({ userId }: { userId: string }) {
                     )
                   }
                 />
-              </div>
+              </Card>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center py-20">
-            <Smartphone className="h-8 w-8 text-brand-900/20 mb-2" />
-            <p className="text-sm font-medium text-brand-900/50">Select a device from the list</p>
-          </div>
+          <EmptyState
+            icon={Smartphone}
+            description="Select a device from the list"
+            className="h-full py-20"
+          />
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -523,7 +499,7 @@ function EventField({
   return (
     <div className="min-w-0 lg:border-l lg:border-brand-100/80 lg:pl-4">
       <p className="flex items-center gap-1.5 text-[11px] text-brand-900/40">
-        <Icon className="h-3.5 w-3.5 text-[#3F6FA8]" strokeWidth={1.75} />
+        <Icon className="h-3.5 w-3.5 text-brand-500" strokeWidth={1.75} />
         {label}
       </p>
       <p className="mt-1 truncate text-xs font-semibold text-brand-900">
@@ -556,7 +532,7 @@ function HistoryEventCard({ item }: { item: LoginHistoryEventRecord }) {
   })
 
   return (
-    <div className="rounded-2xl border border-brand-100 bg-white p-4 shadow-xs">
+    <Card className="p-4 shadow-xs">
       <div className="flex items-start gap-3.5">
         <div
           className={cn(
@@ -577,16 +553,9 @@ function HistoryEventCard({ item }: { item: LoginHistoryEventRecord }) {
                 {isLogin ? 'Login' : 'Logout'}
               </p>
               {/* Only successful events reach the history tables. */}
-              <span
-                className={cn(
-                  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                  isLogin
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : 'bg-rose-100 text-rose-600',
-                )}
-              >
+              <Badge variant={isLogin ? 'success' : 'danger'} size="sm">
                 Success
-              </span>
+              </Badge>
             </div>
             <p className="text-xs whitespace-nowrap text-brand-900/50">
               {formatRelativeTime(item.loginAt)}
@@ -614,14 +583,12 @@ function HistoryEventCard({ item }: { item: LoginHistoryEventRecord }) {
           </div>
           {item.appVersion && (
             <div className="mt-2 flex justify-end">
-              <span className="rounded-full bg-brand-100/80 px-2 py-0.5 text-[10px] font-semibold text-brand-900/70">
-                v{item.appVersion}
-              </span>
+              <Badge size="sm">v{item.appVersion}</Badge>
             </div>
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -696,12 +663,9 @@ function LoginHistoryTab({ userId }: { userId: string }) {
         />
         <Popover>
           <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-9 gap-2 border-brand-100 bg-white text-xs font-semibold text-brand-900"
-            >
+            <Button variant="toolbar">
               <CalendarDays
-                className="h-4 w-4 text-[#3F6FA8]"
+                className="h-4 w-4 text-brand-500"
                 strokeWidth={1.75}
               />
               {rangeLabel}
@@ -711,10 +675,7 @@ function LoginHistoryTab({ userId }: { userId: string }) {
               />
             </Button>
           </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="theme-light w-72 space-y-3 border-brand-100 bg-white text-brand-900"
-          >
+          <PopoverContent align="end" className="w-72 space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="history-from" className="text-xs text-brand-900/60">
                 From
@@ -758,18 +719,12 @@ function LoginHistoryTab({ userId }: { userId: string }) {
         </Popover>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="h-9 gap-2 border-brand-100 bg-white text-xs font-semibold text-brand-900"
-            >
-              <Filter className="h-4 w-4 text-[#3F6FA8]" strokeWidth={1.75} />
+            <Button variant="toolbar">
+              <Filter className="h-4 w-4 text-brand-500" strokeWidth={1.75} />
               Filters
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="theme-light w-56 border-brand-100 bg-white text-brand-900"
-          >
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-brand-500">
               Event type
             </DropdownMenuLabel>
@@ -821,32 +776,25 @@ function LoginHistoryTab({ userId }: { userId: string }) {
           ))}
         </div>
       ) : isError ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <AlertTriangle
-            className="mb-2 h-8 w-8 text-rose-400"
-            strokeWidth={1.5}
-          />
-          <p className="text-sm font-medium text-rose-500">
-            Failed to load login history.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-3"
-            onClick={() => refetch()}
-          >
-            Try again
-          </Button>
-        </div>
+        <EmptyState
+          icon={AlertTriangle}
+          tone="danger"
+          title="Failed to load login history."
+          action={
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              Try again
+            </Button>
+          }
+        />
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Clock className="mb-2 h-8 w-8 text-brand-900/20" strokeWidth={1.5} />
-          <p className="text-sm text-brand-900/40">
-            {hasActiveFilters
+        <EmptyState
+          icon={Clock}
+          description={
+            hasActiveFilters
               ? 'No activities match the current filters.'
-              : 'No login history records found.'}
-          </p>
-        </div>
+              : 'No login history records found.'
+          }
+        />
       ) : (
         <>
           <div className="relative">
@@ -860,7 +808,7 @@ function LoginHistoryTab({ userId }: { userId: string }) {
                       className={cn(
                         'text-xs font-bold',
                         group.subtitle && 'uppercase tracking-wide',
-                        group.isToday ? 'text-[#3F6FA8]' : 'text-brand-900/70',
+                        group.isToday ? 'text-brand-500' : 'text-brand-900/70',
                       )}
                     >
                       {group.title}
@@ -874,7 +822,7 @@ function LoginHistoryTab({ userId }: { userId: string }) {
                       className={cn(
                         'absolute top-[18px] -right-4 z-10 hidden h-3.5 w-3.5 rounded-full border-2 md:block',
                         group.isToday
-                          ? 'border-[#3F6FA8] bg-[#3F6FA8] ring-4 ring-[#3F6FA8]/15'
+                          ? 'border-brand-500 bg-brand-500 ring-4 ring-brand-500/15'
                           : 'border-brand-300 bg-white',
                       )}
                     />
@@ -896,9 +844,8 @@ function LoginHistoryTab({ userId }: { userId: string }) {
             </p>
             {hasNextPage && (
               <Button
-                variant="outline"
+                variant="toolbar"
                 size="sm"
-                className="h-8 gap-1.5 border-brand-100 bg-white text-xs font-semibold text-brand-900"
                 disabled={isFetchingNextPage}
                 onClick={() => fetchNextPage()}
               >
@@ -934,19 +881,17 @@ function SessionsTab({ userId }: { userId: string }) {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <AlertTriangle className="mb-2 h-8 w-8 text-rose-400" strokeWidth={1.5} />
-        <p className="text-sm font-medium text-rose-500">Failed to load active sessions.</p>
-      </div>
+      <EmptyState
+        icon={AlertTriangle}
+        tone="danger"
+        title="Failed to load active sessions."
+      />
     )
   }
 
   if (sessions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Wifi className="mb-2 h-8 w-8 text-brand-900/20" strokeWidth={1.5} />
-        <p className="text-sm text-brand-900/40">No active sessions found.</p>
-      </div>
+      <EmptyState icon={Wifi} description="No active sessions found." />
     )
   }
 
@@ -958,13 +903,13 @@ function SessionsTab({ userId }: { userId: string }) {
         const ua = s.userAgent ? describeUserAgent(s.userAgent) : null
         const isNewest = s.id === mostRecent
         return (
-          <div
+          <Card
             key={s.id}
             className={cn(
-              'rounded-2xl border p-4 transition-all shadow-xs',
+              'p-4 transition-all shadow-xs',
               isNewest
-                ? 'border-[#3F6FA8]/40 bg-[#3F6FA8]/[0.04] ring-1 ring-[#3F6FA8]/20'
-                : 'border-brand-100 bg-white hover:border-brand-200',
+                ? 'border-brand-500/40 bg-brand-500/[0.04] ring-1 ring-brand-500/20'
+                : 'hover:border-brand-200',
             )}
           >
             <div className="flex items-start justify-between gap-3">
@@ -973,7 +918,7 @@ function SessionsTab({ userId }: { userId: string }) {
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
                     isNewest
-                      ? 'border-[#3F6FA8]/30 bg-[#3F6FA8] text-white'
+                      ? 'border-brand-500/30 bg-brand-500 text-white'
                       : 'border-brand-100 bg-brand-50 text-brand-900/40',
                   )}
                 >
@@ -985,15 +930,15 @@ function SessionsTab({ userId }: { userId: string }) {
                       {ua ?? 'Unknown Client / Browser'}
                     </p>
                     {isNewest && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#3F6FA8] px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <Badge variant="primary" size="sm">
                         <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
                         Current
-                      </span>
+                      </Badge>
                     )}
                   </div>
                   {s.ipAddress && (
                     <p className="flex items-center gap-1 text-xs text-brand-900/50 mt-0.5">
-                      <Globe className="h-3.5 w-3.5 text-[#3F6FA8]" />
+                      <Globe className="h-3.5 w-3.5 text-brand-500" />
                       {s.ipAddress}
                     </p>
                   )}
@@ -1008,7 +953,7 @@ function SessionsTab({ userId }: { userId: string }) {
                 </p>
               </div>
             </div>
-          </div>
+          </Card>
         )
       })}
     </div>
@@ -1088,7 +1033,7 @@ export function UserDeviceDrawer({
                 <span className="truncate">{user?.email ?? ''}</span>
                 {user?.lastActiveAt && (
                   <span className="flex items-center gap-1 text-[11px]">
-                    <Clock className="h-3 w-3 text-[#3F6FA8]" />
+                    <Clock className="h-3 w-3 text-brand-500" />
                     Active {formatRelativeTime(user.lastActiveAt)}
                   </span>
                 )}
@@ -1117,13 +1062,13 @@ export function UserDeviceDrawer({
                 className={cn(
                   'relative px-4 py-3 text-xs font-bold uppercase tracking-wider transition-colors',
                   activeTab === tab.key
-                    ? 'text-[#3F6FA8]'
+                    ? 'text-brand-500'
                     : 'text-brand-900/50 hover:text-brand-900/80',
                 )}
               >
                 {tab.label}
                 {activeTab === tab.key && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-[#3F6FA8]" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
                 )}
               </button>
             ))}
@@ -1131,7 +1076,7 @@ export function UserDeviceDrawer({
         </div>
 
         {/* Tab content (Scrollable area) */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#F6F7F9] flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-brand-50 flex flex-col min-h-0">
           {user && (
             <>
               {activeTab === 'devices' && <DevicesTab userId={user.id} />}
