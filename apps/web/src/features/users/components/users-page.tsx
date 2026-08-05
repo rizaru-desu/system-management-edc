@@ -10,6 +10,7 @@ import {
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
+import { SummarySparkline } from '#/components/dashboard/SummarySparkline.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { Progress } from '#/components/ui/progress.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
@@ -159,6 +160,10 @@ export function UsersPage() {
   const shareOfTotal = (value: number) =>
     stats.total > 0 ? Math.round((value / stats.total) * 100) : 0
 
+  // Decorative series for the Active Users sparkline — a real one needs a
+  // stats-history endpoint; until then this stands in as pure ornament.
+  const activeSpark = [4, 6, 5, 7, 6.5, 8, 7.5]
+
   const statCards = [
     {
       icon: Users,
@@ -168,6 +173,8 @@ export function UsersPage() {
       accent: 'text-primary',
       chip: 'bg-primary/10 text-primary',
       meter: null,
+      spark: null,
+      trend: null,
     },
     {
       icon: UserCheck,
@@ -177,11 +184,10 @@ export function UsersPage() {
       // Emerald = status ("enabled"), same ramp as the table's Active pill.
       accent: 'text-emerald-600',
       chip: 'bg-emerald-500/10 text-emerald-600',
-      meter: {
-        percent: shareOfTotal(stats.active),
-        fill: 'bg-emerald-500',
-        track: 'bg-emerald-500/15',
-      },
+      meter: null,
+      spark: activeSpark,
+      // Share-of-total stands in for the 7-day delta until history data exists.
+      trend: shareOfTotal(stats.active),
     },
     {
       icon: ShieldCheck,
@@ -195,6 +201,8 @@ export function UsersPage() {
         fill: 'bg-primary',
         track: 'bg-primary/15',
       },
+      spark: null,
+      trend: null,
     },
   ]
 
@@ -276,7 +284,12 @@ export function UsersPage() {
                   </span>
                 </div>
                 <div>
-                  {card.meter ? (
+                  {card.spark ? (
+                    <SummarySparkline
+                      data={card.spark}
+                      className="text-emerald-500"
+                    />
+                  ) : card.meter ? (
                     <Progress
                       value={card.meter.percent}
                       aria-label={`${card.label} as a share of all users`}
@@ -289,7 +302,16 @@ export function UsersPage() {
                   {/* Trend deltas need a stats-history endpoint; the em dash is
                     the honest placeholder until one exists. */}
                   <p className="mt-2.5 text-xs text-muted-foreground">
-                    — vs last 7 days
+                    {card.trend !== null ? (
+                      <>
+                        <span className="font-semibold text-emerald-600">
+                          ↑ {card.trend}%
+                        </span>{' '}
+                        vs last 7 days
+                      </>
+                    ) : (
+                      '— vs last 7 days'
+                    )}
                   </p>
                 </div>
               </Card>
