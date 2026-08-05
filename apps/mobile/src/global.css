@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #F6F7F9;
+  --surf: rgba(255, 255, 255, 0.9);
+  --bd: rgba(14, 39, 72, 0.14);
+  --tx: #0E2748;
+  --tx2: #42536E;
+  --tx3: #8593A8;
+  --pri: #3F6FA8;
+  --pri2: #345D8D;
+  --navy: #0E2748;
+  --navbg: rgba(255, 255, 255, 0.85);
+  --track: rgba(14, 39, 72, 0.09);
+  --font-display: 'Manrope', system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  --bg: #081226;
+  --surf: rgba(14, 29, 56, 0.92);
+  --bd: rgba(148, 178, 220, 0.14);
+  --tx: #E8EEF7;
+  --tx2: #A9BAD3;
+  --tx3: #6E82A3;
+  --pri: #6E9BD4;
+  --pri2: #5C8CC4;
+  --navy: #1B3A63;
+  --navbg: rgba(8, 18, 38, 0.9);
+  --track: rgba(148, 178, 220, 0.15);
+}

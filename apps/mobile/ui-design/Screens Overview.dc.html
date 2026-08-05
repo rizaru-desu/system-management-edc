@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#e8ebf0;font-family:'Manrope',system-ui,sans-serif}a{color:#3F6FA8;text-decoration:none}a:hover{color:#345D8D}</style>
+</helmet>
+<div style="padding:44px 48px 64px">
+<div style="display:flex;align-items:baseline;gap:14px">
+<div style="font-size:22px;font-weight:800;letter-spacing:-.4px;color:#0E2748">Fieldra — EDC Field Technician App</div>
+<div style="font-size:12px;font-weight:600;color:#8593A8">412dp · Manrope · Lucide-style icons · light + dark · every frame below is fully interactive</div>
+</div>
+<div style="font-size:14px;font-weight:800;color:#42536E;margin:32px 0 6px">Core flow</div>
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">01 · Splash</span><dc-import name="EDC App" screen="splash" frozen="{{ true }}" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">02 · Login</span><dc-import name="EDC App" screen="login" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">03 · Dashboard</span><dc-import name="EDC App" screen="dashboard" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">04 · Task list</span><dc-import name="EDC App" screen="tasks" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">05 · Task detail (checklist · photos · signature)</span><dc-import name="EDC App" screen="task" hint-size="460px,940px"></dc-import></div>
+</div>
+<div style="font-size:14px;font-weight:800;color:#42536E;margin:44px 0 6px">Settlement &amp; assets</div>
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">06 · Settlement dashboard</span><dc-import name="EDC App" screen="settlement" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">07 · Settlement process (stepper)</span><dc-import name="EDC App" screen="settle-process" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">08 · Receive asset (QR scan)</span><dc-import name="EDC App" screen="receive" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">09 · Open tasks (accept / reject)</span><dc-import name="EDC App" screen="open" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">10 · Profile</span><dc-import name="EDC App" screen="profile" hint-size="460px,940px"></dc-import></div>
+</div>
+<div style="font-size:14px;font-weight:800;color:#42536E;margin:44px 0 6px">Dark mode</div>
+<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">Dashboard · dark</span><dc-import name="EDC App" screen="dashboard" dark="{{ true }}" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">Task list · dark</span><dc-import name="EDC App" screen="tasks" dark="{{ true }}" hint-size="460px,940px"></dc-import></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:700;color:#8593A8">Task detail · dark</span><dc-import name="EDC App" screen="task" dark="{{ true }}" hint-size="460px,940px"></dc-import></div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>

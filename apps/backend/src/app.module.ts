@@ -1,0 +1,22 @@
+import { Module } from '@nestjs/common';
+import { AuthModule } from '@thallesp/nestjs-better-auth';
+import { auth } from '@repo/auth';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { MailModule } from './mail/mail.module';
+import { MobileModule } from './mobile/mobile.module';
+import { PermissionsModule } from './permissions/permissions.module';
+import { UsersModule } from './users/users.module';
+
+@Module({
+  imports: [
+    AuthModule.forRoot({ auth }),
+    UsersModule,
+    PermissionsModule,
+    MailModule,
+    MobileModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}

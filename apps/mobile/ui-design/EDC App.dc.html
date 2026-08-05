@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#e8ebf0;font-family:'Manrope',system-ui,sans-serif}
+a{color:#3F6FA8;text-decoration:none}a:hover{color:#345D8D}
+button{font-family:inherit;cursor:pointer}input,textarea{font-family:inherit}
+input::placeholder,textarea::placeholder{color:var(--tx3,#8593A8)}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:0;height:0}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}}
+@keyframes scan{0%{top:8%}50%{top:88%}100%{top:8%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+<div style="width:412px;height:892px;border-radius:36px;overflow:hidden;background:#F6F7F9;color:#0E2748;font-family:'Manrope',sans-serif;box-shadow:0 24px 80px rgba(14,39,72,.25),0 0 0 10px #0b1424,0 0 0 12px #2a3a52;position:relative;flex:none">
+<div style="{{ themeVars }}">
+<!-- STATUS BAR -->
+<div style="height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:700;color:{{ sbColor }};position:relative;z-index:5">
+<span>9:41</span>
+<div style="display:flex;align-items:center;gap:5px">
+<svg width="15" height="12" viewBox="0 0 16 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"></rect><rect x="4.5" y="4.5" width="3" height="7.5" rx="1"></rect><rect x="9" y="2" width="3" height="10" rx="1"></rect><rect x="13.5" y="0" width="2.5" height="12" rx="1" opacity=".35"></rect></svg>
+<svg width="15" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><circle cx="12" cy="19.5" r="1" fill="currentColor"></circle></svg>
+<div style="width:22px;height:11px;border:1.5px solid currentColor;border-radius:3.5px;padding:1.5px;opacity:.9"><div style="width:70%;height:100%;background:currentColor;border-radius:1.5px"></div></div>
+</div>
+</div>
+
+<!-- SPLASH -->
+<sc-if value="{{ isSplash }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Splash" onClick="{{ toLogin }}" style="position:absolute;inset:0;background:linear-gradient(160deg,#0E2748 0%,#1B3A63 55%,#3F6FA8 130%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;z-index:4">
+<div style="width:88px;height:88px;border-radius:24px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;animation:pulse 2.4s ease-in-out infinite;box-shadow:0 16px 40px rgba(0,0,0,.3)">
+<svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="rgba(255,255,255,.15)"></polygon></svg>
+</div>
+<div style="margin-top:22px;font-size:26px;font-weight:800;letter-spacing:-.5px">Fieldra</div>
+<div style="margin-top:6px;font-size:13px;font-weight:500;color:rgba(255,255,255,.65)">EDC Field Operations</div>
+<div style="position:absolute;bottom:44px;display:flex;flex-direction:column;align-items:center;gap:14px">
+<div style="width:22px;height:22px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite"></div>
+<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,.45)">Version 2.4.1 (build 891)</div>
+</div>
+</div>
+</sc-if>
+
+<!-- LOGIN -->
+<sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Login" style="flex:1;display:flex;flex-direction:column;padding:28px 24px 24px;overflow:auto;animation:fadeUp .35s ease">
+<div style="width:58px;height:58px;border-radius:17px;background:linear-gradient(150deg,#3F6FA8,#0E2748);display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(63,111,168,.35);margin-top:26px">
+<svg width="28" height="28" viewBox="0 0 24 24" fill="rgba(255,255,255,.2)" stroke="#fff" stroke-width="2" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+</div>
+<div style="margin-top:22px;font-size:25px;font-weight:800;letter-spacing:-.5px;color:var(--tx)">Welcome back</div>
+<div style="margin-top:5px;font-size:13.5px;font-weight:500;color:var(--tx2)">Sign in to your technician account</div>
+<div style="margin-top:28px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-direction:column;gap:7px">
+<label style="font-size:12px;font-weight:700;color:var(--tx2)">Username</label>
+<div style="display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:0 14px;height:50px;backdrop-filter:blur(10px)">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+<input value="{{ username }}" onChange="{{ onUser }}" placeholder="employee ID or email" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;color:var(--tx)">
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:7px">
+<label style="font-size:12px;font-weight:700;color:var(--tx2)">Password</label>
+<div style="display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:0 14px;height:50px;backdrop-filter:blur(10px)">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+<input type="{{ pwType }}" value="{{ password }}" onChange="{{ onPass }}" placeholder="••••••••" style="flex:1;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;color:var(--tx)">
+<button onClick="{{ togglePw }}" style="border:none;background:none;padding:4px;display:flex;color:var(--tx3)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+</div>
+</div>
+</div>
+<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
+<button onClick="{{ toggleRemember }}" style="display:flex;align-items:center;gap:8px;border:none;background:none;padding:0">
+<div style="width:19px;height:19px;border-radius:6px;border:1.5px solid {{ remBd }};background:{{ remBg }};display:flex;align-items:center;justify-content:center;transition:all .15s">
+<sc-if value="{{ remember }}" hint-placeholder-val="{{ true }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></sc-if>
+</div>
+<span style="font-size:12.5px;font-weight:600;color:var(--tx2)">Remember me</span>
+</button>
+<a href="#" style="font-size:12.5px;font-weight:700;color:var(--pri)">Forgot password?</a>
+</div>
+<button onClick="{{ doLogin }}" style="margin-top:24px;height:52px;border:none;border-radius:14px;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:15px;font-weight:700;box-shadow:0 10px 22px rgba(63,111,168,.35);letter-spacing:.2px" style-active="transform:scale(.98)">Sign In</button>
+<div style="margin-top:20px;display:flex;align-items:center;gap:12px"><div style="flex:1;height:1px;background:var(--bd)"></div><span style="font-size:11px;font-weight:600;color:var(--tx3)">OR</span><div style="flex:1;height:1px;background:var(--bd)"></div></div>
+<button onClick="{{ doLogin }}" style="margin-top:18px;align-self:center;display:flex;flex-direction:column;align-items:center;gap:8px;border:none;background:none">
+<div style="width:56px;height:56px;border-radius:50%;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(14,39,72,.08)">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--pri)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"></path><path d="M14 13.12c0 2.38 0 6.38-1 8.88"></path><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"></path><path d="M2 12a10 10 0 0 1 18-6"></path><path d="M2 16h.01"></path><path d="M21.8 16c.2-2 .131-5.354 0-6"></path><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"></path><path d="M8.65 22c.21-.66.45-1.32.57-2"></path><path d="M9 6.8a6 6 0 0 1 9 5.2v2"></path></svg>
+</div>
+<span style="font-size:12px;font-weight:600;color:var(--tx2)">Biometric login</span>
+</button>
+<div style="flex:1"></div>
+<div style="text-align:center;font-size:11px;font-weight:600;color:var(--tx3);margin-top:24px">Fieldra EDC · v2.4.1</div>
+</div>
+</sc-if>
+
+<!-- ===== MAIN SHELL ===== -->
+<sc-if value="{{ isMain }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0">
+<div style="flex:1;overflow:auto;min-height:0">
+
+<!-- DASHBOARD -->
+<sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Dashboard" style="padding:6px 16px 24px;animation:fadeUp .3s ease">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div>
+<div style="font-size:12.5px;font-weight:600;color:var(--tx2)">Good morning ☀</div>
+<div style="font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--tx);margin-top:1px">Andi Prasetyo</div>
+<div style="font-size:11.5px;font-weight:600;color:var(--tx3);margin-top:2px">Monday, 3 August 2026</div>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<button style="position:relative;width:40px;height:40px;border-radius:13px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx2);backdrop-filter:blur(10px)">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+<div style="position:absolute;top:9px;right:10px;width:8px;height:8px;border-radius:50%;background:#EF4444;border:1.5px solid var(--bg)"></div>
+</button>
+<button onClick="{{ toProfile }}" style="width:40px;height:40px;border-radius:13px;border:none;background:linear-gradient(140deg,#3F6FA8,#0E2748);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center">AP</button>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px">
+<sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:13px 14px;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05)">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<span style="font-size:11.5px;font-weight:700;color:var(--tx2)">{{ s.label }}</span>
+<div style="width:26px;height:26px;border-radius:9px;background:{{ s.bg }};display:flex;align-items:center;justify-content:center;color:{{ s.c }};font-size:12px;font-weight:800">{{ s.glyph }}</div>
+</div>
+<div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+<span style="font-size:24px;font-weight:800;letter-spacing:-.5px;color:var(--tx)">{{ s.value }}</span>
+<span style="font-size:10.5px;font-weight:700;color:{{ s.c }}">{{ s.delta }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:20px;font-size:13.5px;font-weight:800;color:var(--tx)">Quick actions</div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px">
+<button onClick="{{ toOpen }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;padding:0">
+<div style="width:52px;height:52px;border-radius:16px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--pri);box-shadow:0 4px 12px rgba(14,39,72,.05)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M9 12h6"></path><path d="M9 16h4"></path></svg></div>
+<span style="font-size:10px;font-weight:700;color:var(--tx2)">Open Task</span>
+</button>
+<button onClick="{{ toSettle }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;padding:0">
+<div style="width:52px;height:52px;border-radius:16px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--pri);box-shadow:0 4px 12px rgba(14,39,72,.05)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg></div>
+<span style="font-size:10px;font-weight:700;color:var(--tx2)">Settlement</span>
+</button>
+<button onClick="{{ toReceive }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;padding:0">
+<div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(150deg,var(--pri),var(--pri2));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 18px rgba(63,111,168,.35)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5" rx="1"></rect><rect x="16" y="3" width="5" height="5" rx="1"></rect><rect x="3" y="16" width="5" height="5" rx="1"></rect><path d="M21 16h-3a2 2 0 0 0-2 2v3"></path><path d="M21 21v.01"></path><path d="M12 7v3a2 2 0 0 1-2 2H7"></path><path d="M3 12h.01"></path><path d="M12 3h.01"></path><path d="M12 16v.01"></path><path d="M16 12h1"></path><path d="M21 12v.01"></path></svg></div>
+<span style="font-size:10px;font-weight:700;color:var(--tx2)">Scan QR</span>
+</button>
+<button onClick="{{ toReceive }}" style="display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;padding:0">
+<div style="width:52px;height:52px;border-radius:16px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--pri);box-shadow:0 4px 12px rgba(14,39,72,.05)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+<span style="font-size:10px;font-weight:700;color:var(--tx2)">Receive</span>
+</button>
+<button style="display:flex;flex-direction:column;align-items:center;gap:7px;border:none;background:none;padding:0">
+<div style="width:52px;height:52px;border-radius:16px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--pri);box-shadow:0 4px 12px rgba(14,39,72,.05)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg></div>
+<span style="font-size:10px;font-weight:700;color:var(--tx2)">History</span>
+</button>
+</div>
+<div style="margin-top:20px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05)">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div><div style="font-size:13.5px;font-weight:800;color:var(--tx)">Weekly performance</div><div style="font-size:11px;font-weight:600;color:var(--tx3);margin-top:2px">Tasks completed · this week</div></div>
+<div style="display:flex;align-items:baseline;gap:4px"><span style="font-size:22px;font-weight:800;color:var(--pri)">92%</span><span style="font-size:10.5px;font-weight:700;color:#22C55E">▲ 4%</span></div>
+</div>
+<div style="display:flex;align-items:flex-end;gap:9px;height:88px;margin-top:16px">
+<sc-for list="{{ chart }}" as="b" hint-placeholder-count="7">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+<div style="width:100%;border-radius:6px 6px 3px 3px;height:{{ b.h }}%;background:{{ b.bg }};transition:height .4s"></div>
+<span style="font-size:9.5px;font-weight:700;color:{{ b.lc }}">{{ b.d }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:20px">
+<span style="font-size:13.5px;font-weight:800;color:var(--tx)">Recent activity</span>
+<button onClick="{{ toTasks }}" style="border:none;background:none;font-size:11.5px;font-weight:700;color:var(--pri);padding:0">View all</button>
+</div>
+<div style="margin-top:10px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:4px 14px;backdrop-filter:blur(10px)">
+<sc-for list="{{ activity }}" as="a" hint-placeholder-count="3">
+<div style="display:flex;gap:12px;padding:11px 0;border-bottom:1px solid {{ a.bdr }}">
+<div style="display:flex;flex-direction:column;align-items:center;flex:none;padding-top:3px">
+<div style="width:9px;height:9px;border-radius:50%;background:{{ a.c }};box-shadow:0 0 0 3.5px {{ a.halo }}"></div>
+</div>
+<div style="flex:1;min-width:0">
+<div style="font-size:12.5px;font-weight:700;color:var(--tx);line-height:1.35">{{ a.t }}</div>
+<div style="font-size:10.5px;font-weight:600;color:var(--tx3);margin-top:2px">{{ a.time }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- TASK LIST -->
+<sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Task List" style="padding:6px 16px 24px;animation:fadeUp .3s ease;position:relative">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--tx)">Tasks</div>
+<span style="font-size:11px;font-weight:700;color:var(--tx2);background:var(--surf);border:1px solid var(--bd);border-radius:999px;padding:5px 11px">{{ taskCount }} active</span>
+</div>
+<div style="display:flex;gap:9px;margin-top:14px">
+<div style="flex:1;display:flex;align-items:center;gap:9px;background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:0 13px;height:44px;backdrop-filter:blur(10px)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+<input value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search merchant, task ID…" style="flex:1;border:none;outline:none;background:transparent;font-size:13px;font-weight:600;color:var(--tx);min-width:0">
+</div>
+<button style="width:44px;height:44px;border-radius:14px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx2)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg></button>
+</div>
+<div style="display:flex;gap:7px;margin-top:12px;overflow-x:auto;padding-bottom:2px">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="5">
+<button onClick="{{ c.on }}" style="flex:none;height:32px;padding:0 13px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.tc }};transition:all .15s">{{ c.label }}</button>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:11px;margin-top:14px">
+<sc-for list="{{ visTasks }}" as="t" hint-placeholder-count="3">
+<div onClick="{{ t.open }}" style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05);cursor:pointer" style-active="transform:scale(.985)">
+<div style="display:flex;align-items:center;gap:7px">
+<span style="font-size:10px;font-weight:800;letter-spacing:.3px;padding:4px 9px;border-radius:999px;background:{{ t.stBg }};color:{{ t.stC }}">{{ t.status }}</span>
+<span style="font-size:10px;font-weight:800;letter-spacing:.3px;padding:4px 9px;border-radius:999px;background:{{ t.prBg }};color:{{ t.prC }}">{{ t.prio }}</span>
+<div style="flex:1"></div>
+<span style="font-size:10.5px;font-weight:700;color:var(--tx3)">{{ t.id }}</span>
+</div>
+<div style="display:flex;gap:11px;margin-top:11px">
+<div style="width:40px;height:40px;border-radius:12px;background:{{ t.tyBg }};color:{{ t.tyC }};display:flex;align-items:center;justify-content:center;flex:none;font-size:15px;font-weight:800">{{ t.tyGlyph }}</div>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:800;color:var(--tx);letter-spacing:-.2px">{{ t.merchant }}</div>
+<div style="font-size:11px;font-weight:600;color:var(--tx2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.type }} · {{ t.addr }}</div>
+</div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:11px;font-size:10.5px;font-weight:700;color:var(--tx3)">
+<span style="display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>{{ t.dist }}</span>
+<span style="display:flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>{{ t.due }}</span>
+<div style="flex:1"></div>
+<div style="display:flex;gap:6px">
+<button onClick="{{ t.mapBtn }}" style="width:30px;height:30px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--pri)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg></button>
+<button onClick="{{ t.callBtn }}" style="width:30px;height:30px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--pri)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.81.37 1.6.72 2.33a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.75-1.29a2 2 0 0 1 2.11-.45c.73.35 1.52.6 2.33.72A2 2 0 0 1 22 16.92z"></path></svg></button>
+</div>
+</div>
+<sc-if value="{{ t.hasProg }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:11px">
+<div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:var(--tx3);margin-bottom:5px"><span>Progress</span><span style="color:var(--pri)">{{ t.progress }}%</span></div>
+<div style="height:5px;border-radius:99px;background:var(--track)"><div style="height:100%;border-radius:99px;background:linear-gradient(90deg,var(--pri),#5C8CC4);width:{{ t.progress }}%"></div></div>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ tasksEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;align-items:center;padding:56px 30px;text-align:center">
+<div style="width:64px;height:64px;border-radius:20px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx3)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>
+<div style="font-size:14.5px;font-weight:800;color:var(--tx);margin-top:16px">No tasks found</div>
+<div style="font-size:12px;font-weight:600;color:var(--tx3);margin-top:5px;line-height:1.5">Try a different keyword or clear the active filter.</div>
+<button onClick="{{ clearFilters }}" style="margin-top:16px;height:38px;padding:0 18px;border-radius:12px;border:1px solid var(--bd);background:var(--surf);color:var(--pri);font-size:12px;font-weight:700">Clear filters</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<!-- SETTLEMENT -->
+<sc-if value="{{ isSettleTab }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settlement" style="padding:6px 16px 24px;animation:fadeUp .3s ease">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<div style="font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--tx)">Settlement</div>
+<button onClick="{{ toReceive }}" style="display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:12px;border:none;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:11.5px;font-weight:700;box-shadow:0 6px 14px rgba(63,111,168,.3)">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="3" width="5" height="5" rx="1"></rect><rect x="16" y="3" width="5" height="5" rx="1"></rect><rect x="3" y="16" width="5" height="5" rx="1"></rect><path d="M16 16h5v5"></path></svg>Scan QR</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px">
+<sc-for list="{{ settleStats }}" as="s" hint-placeholder-count="4">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:10px 8px;text-align:center;backdrop-filter:blur(10px)">
+<div style="font-size:19px;font-weight:800;color:{{ s.c }}">{{ s.value }}</div>
+<div style="font-size:9px;font-weight:700;color:var(--tx3);margin-top:2px;letter-spacing:.2px">{{ s.label }}</div>
+</div>
+</sc-for>
+</div>
+<div style="display:flex;align-items:center;gap:9px;background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:0 13px;height:44px;margin-top:12px;backdrop-filter:blur(10px)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+<input placeholder="Search serial number, merchant…" style="flex:1;border:none;outline:none;background:transparent;font-size:13px;font-weight:600;color:var(--tx);min-width:0">
+</div>
+<div style="font-size:13px;font-weight:800;color:var(--tx);margin-top:18px">Assets to settle</div>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+<sc-for list="{{ assets }}" as="a" hint-placeholder-count="4">
+<div onClick="{{ a.open }}" style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05);cursor:pointer" style-active="transform:scale(.985)">
+<div style="width:44px;height:44px;border-radius:13px;background:rgba(63,111,168,.1);display:flex;align-items:center;justify-content:center;color:var(--pri);flex:none">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line><path d="M9 18h.01"></path><path d="M12 18h.01"></path><path d="M15 18h.01"></path></svg>
+</div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:7px"><span style="font-size:13px;font-weight:800;color:var(--tx)">{{ a.model }}</span><span style="font-size:9.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:{{ a.stBg }};color:{{ a.stC }}">{{ a.status }}</span></div>
+<div style="font-size:10.5px;font-weight:600;color:var(--tx3);margin-top:3px;font-family:ui-monospace,monospace">{{ a.sn }}</div>
+<div style="font-size:11px;font-weight:600;color:var(--tx2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.merchant }}</div>
+</div>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- PROFILE -->
+<sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Profile" style="padding:6px 16px 24px;animation:fadeUp .3s ease">
+<div style="font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--tx)">Profile</div>
+<div style="margin-top:14px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:18px;display:flex;gap:14px;align-items:center;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05)">
+<div style="width:60px;height:60px;border-radius:19px;background:linear-gradient(140deg,#3F6FA8,#0E2748);color:#fff;font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none">AP</div>
+<div style="flex:1;min-width:0">
+<div style="font-size:16.5px;font-weight:800;color:var(--tx);letter-spacing:-.2px">Andi Prasetyo</div>
+<div style="font-size:11.5px;font-weight:600;color:var(--tx2);margin-top:2px">Senior Field Technician</div>
+<div style="display:flex;gap:6px;margin-top:7px">
+<span style="font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:rgba(34,197,94,.13);color:#22C55E">● ON DUTY</span>
+<span style="font-size:9.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:rgba(63,111,168,.12);color:var(--pri)">EMP-10482</span>
+</div>
+</div>
+</div>
+<div style="margin-top:14px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:4px 16px;backdrop-filter:blur(10px)">
+<sc-for list="{{ profileRows }}" as="r" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid {{ r.bdr }}">
+<span style="font-size:12px;font-weight:600;color:var(--tx2)">{{ r.k }}</span>
+<span style="font-size:12.5px;font-weight:700;color:var(--tx)">{{ r.v }}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:14px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:4px 16px;backdrop-filter:blur(10px)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bd)">
+<div style="display:flex;align-items:center;gap:11px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg><span style="font-size:12.5px;font-weight:700;color:var(--tx)">Dark mode</span></div>
+<button onClick="{{ toggleDark }}" style="width:44px;height:26px;border-radius:999px;border:none;background:{{ dkTrack }};position:relative;transition:background .2s;padding:0">
+<div style="position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.25);transform:translateX({{ dkX }}px);transition:transform .2s"></div>
+</button>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bd)">
+<div style="display:flex;align-items:center;gap:11px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg><span style="font-size:12.5px;font-weight:700;color:var(--tx)">Language</span></div>
+<span style="font-size:12px;font-weight:700;color:var(--tx3)">English ›</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--bd)">
+<div style="display:flex;align-items:center;gap:11px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg><span style="font-size:12.5px;font-weight:700;color:var(--tx)">Help center</span></div>
+<span style="font-size:12px;font-weight:700;color:var(--tx3)">›</span>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0">
+<div style="display:flex;align-items:center;gap:11px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--tx2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><span style="font-size:12.5px;font-weight:700;color:var(--tx)">App version</span></div>
+<span style="font-size:12px;font-weight:700;color:var(--tx3)">2.4.1 (891)</span>
+</div>
+</div>
+<button onClick="{{ doLogout }}" style="margin-top:16px;width:100%;height:48px;border-radius:14px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#EF4444;font-size:13.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Log out</button>
+</div>
+</sc-if>
+
+</div>
+<!-- BOTTOM NAV -->
+<div style="flex:none;background:var(--navbg);border-top:1px solid var(--bd);backdrop-filter:blur(16px);display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px 20px;position:relative;z-index:5">
+<button onClick="{{ toDash }}" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ navDash }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+<span style="font-size:9.5px;font-weight:800">Dashboard</span>
+</button>
+<button onClick="{{ toTasks }}" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ navTasks }};position:relative">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="m9 14 2 2 4-4"></path></svg>
+<span style="font-size:9.5px;font-weight:800">Tasks</span>
+<div style="position:absolute;top:2px;right:24px;min-width:16px;height:16px;border-radius:999px;background:#EF4444;color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px">5</div>
+</button>
+<button onClick="{{ toSettle }}" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ navSettle }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path></svg>
+<span style="font-size:9.5px;font-weight:800">Settlement</span>
+</button>
+<button onClick="{{ toProfile }}" style="border:none;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:{{ navProfile }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+<span style="font-size:9.5px;font-weight:800">Profile</span>
+</button>
+</div>
+</div>
+</sc-if>
+
+<!-- TASK DETAIL -->
+<sc-if value="{{ isTask }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Task Detail" style="flex:1;display:flex;flex-direction:column;min-height:0;animation:fadeUp .3s ease">
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:6px 16px 12px">
+<button onClick="{{ backToTasks }}" style="width:38px;height:38px;border-radius:12px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+<div style="flex:1"><div style="font-size:15.5px;font-weight:800;color:var(--tx);letter-spacing:-.2px">{{ ct.type }}</div><div style="font-size:10.5px;font-weight:700;color:var(--tx3)">{{ ct.id }}</div></div>
+<span style="font-size:10px;font-weight:800;padding:5px 11px;border-radius:999px;background:{{ ct.stBg }};color:{{ ct.stC }}">{{ ct.status }}</span>
+</div>
+<div style="flex:1;overflow:auto;padding:0 16px 20px;min-height:0">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;overflow:hidden;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05)">
+<div style="height:110px;background:repeating-linear-gradient(45deg,rgba(63,111,168,.07),rgba(63,111,168,.07) 10px,rgba(63,111,168,.13) 10px,rgba(63,111,168,.13) 20px);position:relative;display:flex;align-items:center;justify-content:center">
+<span style="font-family:ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--tx3);background:var(--surf);padding:4px 10px;border-radius:8px;border:1px solid var(--bd)">google map preview</span>
+<div style="position:absolute;bottom:10px;right:10px;display:flex;align-items:center;gap:5px;background:var(--navy);color:#fff;font-size:10px;font-weight:800;padding:6px 11px;border-radius:999px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>{{ ct.dist }} away</div>
+</div>
+<div style="padding:14px 16px">
+<div style="font-size:15px;font-weight:800;color:var(--tx);letter-spacing:-.2px">{{ ct.merchant }}</div>
+<div style="font-size:11.5px;font-weight:600;color:var(--tx2);margin-top:3px;line-height:1.45">{{ ct.addr }}</div>
+<div style="display:flex;gap:8px;margin-top:12px">
+<div style="flex:1;background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:9px 11px"><div style="font-size:9.5px;font-weight:700;color:var(--tx3)">PIC</div><div style="font-size:12px;font-weight:700;color:var(--tx);margin-top:2px">{{ ct.pic }}</div></div>
+<div style="flex:1;background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:9px 11px"><div style="font-size:9.5px;font-weight:700;color:var(--tx3)">Phone</div><div style="font-size:12px;font-weight:700;color:var(--pri);margin-top:2px">{{ ct.phone }}</div></div>
+</div>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="font-size:13px;font-weight:800;color:var(--tx)">Device information</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px">
+<sc-for list="{{ devRows }}" as="d" hint-placeholder-count="4">
+<div style="background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:9px 11px"><div style="font-size:9.5px;font-weight:700;color:var(--tx3)">{{ d.k }}</div><div style="font-size:11.5px;font-weight:700;color:var(--tx);margin-top:2px;font-family:ui-monospace,monospace">{{ d.v }}</div></div>
+</sc-for>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="font-size:13px;font-weight:800;color:var(--tx)">Timeline</div>
+<div style="margin-top:12px;display:flex;flex-direction:column">
+<sc-for list="{{ timeline }}" as="tl" hint-placeholder-count="3">
+<div style="display:flex;gap:12px">
+<div style="display:flex;flex-direction:column;align-items:center;flex:none">
+<div style="width:11px;height:11px;border-radius:50%;background:{{ tl.c }};box-shadow:0 0 0 3px {{ tl.halo }};margin-top:3px"></div>
+<div style="width:2px;flex:1;background:{{ tl.line }};margin:5px 0"></div>
+</div>
+<div style="padding-bottom:16px;min-width:0">
+<div style="font-size:12px;font-weight:800;color:{{ tl.tc }}">{{ tl.t }}</div>
+<div style="font-size:10.5px;font-weight:600;color:var(--tx3);margin-top:2px">{{ tl.time }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800;color:var(--tx)">Checklist</span><span style="font-size:11px;font-weight:800;color:var(--pri)">{{ checkDone }}/{{ checkTotal }}</span></div>
+<div style="display:flex;flex-direction:column;gap:9px;margin-top:11px">
+<sc-for list="{{ checklist }}" as="c" hint-placeholder-count="5">
+<button onClick="{{ c.on }}" style="display:flex;align-items:center;gap:11px;border:1px solid {{ c.bd }};background:{{ c.bg }};border-radius:12px;padding:11px 12px;text-align:left;transition:all .15s">
+<div style="width:21px;height:21px;border-radius:7px;border:1.5px solid {{ c.boxBd }};background:{{ c.boxBg }};display:flex;align-items:center;justify-content:center;flex:none;transition:all .15s">
+<sc-if value="{{ c.done }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></sc-if>
+</div>
+<span style="font-size:12px;font-weight:700;color:{{ c.tc }};text-decoration:{{ c.deco }}">{{ c.t }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800;color:var(--tx)">Required photos</span><span style="font-size:11px;font-weight:800;color:var(--pri)">{{ photoDone }}/4</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px">
+<sc-for list="{{ photos }}" as="p" hint-placeholder-count="4">
+<button onClick="{{ p.on }}" style="height:92px;border-radius:13px;border:1.5px dashed {{ p.bd }};background:{{ p.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:all .15s;position:relative;overflow:hidden">
+<sc-if value="{{ p.done }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(63,111,168,.14),rgba(63,111,168,.14) 8px,rgba(63,111,168,.22) 8px,rgba(63,111,168,.22) 16px)"></div>
+<div style="position:absolute;top:7px;right:7px;width:20px;height:20px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+</sc-if>
+<sc-if value="{{ p.todo }}" hint-placeholder-val="{{ true }}">
+<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+</sc-if>
+<span style="font-size:10.5px;font-weight:700;color:var(--tx2);position:relative">{{ p.label }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800;color:var(--tx)">Merchant signature</span><button onClick="{{ clearSigT }}" style="border:none;background:none;font-size:11px;font-weight:700;color:var(--pri);padding:0">Clear</button></div>
+<div style="margin-top:10px;border:1.5px dashed var(--bd);border-radius:13px;background:var(--bg);position:relative;overflow:hidden">
+<canvas ref="{{ sigTRef }}" width="344" height="130" onPointerDown="{{ sigDownT }}" onPointerMove="{{ sigMove }}" onPointerUp="{{ sigUp }}" style="display:block;width:100%;height:130px;touch-action:none"></canvas>
+<sc-if value="{{ sigTEmpty }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:11px;font-weight:600;color:var(--tx3)">✍ Sign here</div></sc-if>
+</div>
+</div>
+<div style="margin-top:12px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;backdrop-filter:blur(10px)">
+<div style="font-size:13px;font-weight:800;color:var(--tx)">Notes</div>
+<textarea value="{{ notes }}" onChange="{{ onNotes }}" placeholder="Add work notes (optional)…" style="margin-top:10px;width:100%;height:70px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:10px 12px;font-size:12px;font-weight:600;color:var(--tx);outline:none;resize:none"></textarea>
+</div>
+<div style="display:flex;gap:9px;margin-top:16px">
+<button onClick="{{ rejectTask }}" style="width:48px;height:50px;border-radius:14px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#EF4444;display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+<button onClick="{{ saveDraft }}" style="flex:1;height:50px;border-radius:14px;border:1px solid var(--bd);background:var(--surf);color:var(--tx);font-size:13px;font-weight:800">Save draft</button>
+<button onClick="{{ completeTask }}" style="flex:1.4;height:50px;border-radius:14px;border:none;background:{{ completeBg }};color:#fff;font-size:13px;font-weight:800;box-shadow:0 8px 18px rgba(63,111,168,.3);transition:all .2s">Complete ✓</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- SUCCESS -->
+<sc-if value="{{ isSuccess }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Success" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;animation:fadeUp .35s ease">
+<div style="width:92px;height:92px;border-radius:50%;background:rgba(34,197,94,.13);display:flex;align-items:center;justify-content:center;animation:pulse 2s ease-in-out infinite">
+<div style="width:64px;height:64px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(34,197,94,.4)"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+</div>
+<div style="font-size:21px;font-weight:800;letter-spacing:-.4px;color:var(--tx);margin-top:24px">{{ successTitle }}</div>
+<div style="font-size:12.5px;font-weight:600;color:var(--tx2);margin-top:8px;line-height:1.55;max-width:280px">{{ successSub }}</div>
+<div style="margin-top:22px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px 18px;width:100%;max-width:300px;backdrop-filter:blur(10px)">
+<sc-for list="{{ successRows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;justify-content:space-between;padding:5px 0"><span style="font-size:11px;font-weight:600;color:var(--tx3)">{{ r.k }}</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">{{ r.v }}</span></div>
+</sc-for>
+</div>
+<sc-if value="{{ isReceiptFlow }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ toast2 }}" style="margin-top:14px;height:44px;padding:0 20px;border-radius:13px;border:1px solid var(--bd);background:var(--surf);color:var(--pri);font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:8px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>Generate receipt</button>
+</sc-if>
+<button onClick="{{ toDash }}" style="margin-top:12px;height:50px;padding:0 36px;border-radius:14px;border:none;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:13.5px;font-weight:800;box-shadow:0 10px 22px rgba(63,111,168,.35)">Back to dashboard</button>
+</div>
+</sc-if>
+
+<!-- SETTLEMENT PROCESS -->
+<sc-if value="{{ isSettleProc }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settlement Process" style="flex:1;display:flex;flex-direction:column;min-height:0;animation:fadeUp .3s ease">
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:6px 16px 10px">
+<button onClick="{{ toSettle }}" style="width:38px;height:38px;border-radius:12px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+<div style="flex:1"><div style="font-size:15.5px;font-weight:800;color:var(--tx)">Settlement</div><div style="font-size:10.5px;font-weight:700;color:var(--tx3)">{{ ca.sn }}</div></div>
+</div>
+<div style="flex:none;display:flex;align-items:center;padding:10px 24px 14px">
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;flex:{{ s.flex }}">
+<div style="display:flex;flex-direction:column;align-items:center;gap:5px;flex:none">
+<div style="width:30px;height:30px;border-radius:50%;background:{{ s.bg }};border:1.5px solid {{ s.bd }};color:{{ s.c }};display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;transition:all .2s">{{ s.glyph }}</div>
+<span style="font-size:8.5px;font-weight:800;color:{{ s.lc }};letter-spacing:.2px;white-space:nowrap">{{ s.label }}</span>
+</div>
+<sc-if value="{{ s.hasLine }}" hint-placeholder-val="{{ true }}"><div style="flex:1;height:2px;background:{{ s.line }};margin:0 6px 16px"></div></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="flex:1;overflow:auto;padding:0 16px 20px;min-height:0">
+<!-- step 0 receive -->
+<sc-if value="{{ sp0 }}" hint-placeholder-val="{{ true }}">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px)">
+<div style="display:flex;gap:12px;align-items:center">
+<div style="width:48px;height:48px;border-radius:14px;background:rgba(63,111,168,.1);display:flex;align-items:center;justify-content:center;color:var(--pri)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line></svg></div>
+<div><div style="font-size:14.5px;font-weight:800;color:var(--tx)">{{ ca.model }}</div><div style="font-size:11px;font-weight:600;color:var(--tx3);font-family:ui-monospace,monospace;margin-top:2px">{{ ca.sn }}</div></div>
+</div>
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">From merchant</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">{{ ca.merchant }}</span></div>
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">Pull reason</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">Program ended</span></div>
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">Received at</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">Today · 09:41</span></div>
+</div>
+<div style="margin-top:12px;display:flex;gap:9px;padding:11px 13px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:12px">
+<span style="color:#3B82F6;flex:none;padding-top:1px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+<span style="font-size:11px;font-weight:600;color:var(--tx2);line-height:1.5">Confirm the physical unit matches this record before proceeding to verification.</span>
+</div>
+</div>
+</sc-if>
+<!-- step 1 verification -->
+<sc-if value="{{ sp1 }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px)">
+<div style="font-size:13px;font-weight:800;color:var(--tx)">Serial number check</div>
+<div style="margin-top:10px;display:flex;align-items:center;gap:10px;background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.25);border-radius:12px;padding:11px 13px">
+<div style="width:22px;height:22px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center;flex:none"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+<div><div style="font-size:11.5px;font-weight:800;color:var(--tx);font-family:ui-monospace,monospace">{{ ca.sn }}</div><div style="font-size:10px;font-weight:700;color:#22C55E;margin-top:1px">Matches system record</div></div>
+</div>
+<div style="font-size:13px;font-weight:800;color:var(--tx);margin-top:16px">Unit condition</div>
+<div style="display:flex;gap:8px;margin-top:10px">
+<sc-for list="{{ condChips }}" as="c" hint-placeholder-count="3">
+<button onClick="{{ c.on }}" style="flex:1;height:38px;border-radius:999px;font-size:11.5px;font-weight:800;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.tc }};transition:all .15s">{{ c.label }}</button>
+</sc-for>
+</div>
+<div style="font-size:13px;font-weight:800;color:var(--tx);margin-top:16px">Accessories included</div>
+<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">
+<sc-for list="{{ accChips }}" as="c" hint-placeholder-count="4">
+<button onClick="{{ c.on }}" style="display:flex;align-items:center;gap:10px;border:1px solid {{ c.bd }};background:{{ c.bg }};border-radius:12px;padding:10px 12px;text-align:left">
+<div style="width:19px;height:19px;border-radius:6px;border:1.5px solid {{ c.boxBd }};background:{{ c.boxBg }};display:flex;align-items:center;justify-content:center;flex:none">
+<sc-if value="{{ c.done }}" hint-placeholder-val="{{ true }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></sc-if>
+</div>
+<span style="font-size:12px;font-weight:700;color:var(--tx)">{{ c.t }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+<!-- step 2 photos -->
+<sc-if value="{{ sp2 }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px)">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:800;color:var(--tx)">Photo documentation</span><span style="font-size:11px;font-weight:800;color:var(--pri)">{{ sPhotoDone }}/2</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px">
+<sc-for list="{{ sPhotos }}" as="p" hint-placeholder-count="2">
+<button onClick="{{ p.on }}" style="height:110px;border-radius:13px;border:1.5px dashed {{ p.bd }};background:{{ p.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;overflow:hidden">
+<sc-if value="{{ p.done }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(45deg,rgba(63,111,168,.14),rgba(63,111,168,.14) 8px,rgba(63,111,168,.22) 8px,rgba(63,111,168,.22) 16px)"></div>
+<div style="position:absolute;top:7px;right:7px;width:20px;height:20px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+</sc-if>
+<sc-if value="{{ p.todo }}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--tx3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+</sc-if>
+<span style="font-size:10.5px;font-weight:700;color:var(--tx2);position:relative">{{ p.label }}</span>
+</button>
+</sc-for>
+</div>
+<div style="margin-top:12px;font-size:10.5px;font-weight:600;color:var(--tx3);line-height:1.5">Photos are stored offline and synced automatically when connection is available.</div>
+</div>
+</sc-if>
+<!-- step 3 sign -->
+<sc-if value="{{ sp3 }}" hint-placeholder-val="{{ false }}">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px)">
+<div style="font-size:13px;font-weight:800;color:var(--tx)">Receiver information</div>
+<input value="{{ receiver }}" onChange="{{ onReceiver }}" placeholder="Receiver full name" style="margin-top:10px;width:100%;height:46px;border:1px solid var(--bd);border-radius:12px;background:var(--bg);padding:0 13px;font-size:13px;font-weight:600;color:var(--tx);outline:none">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-top:16px"><span style="font-size:13px;font-weight:800;color:var(--tx)">Receiver signature</span><button onClick="{{ clearSigS }}" style="border:none;background:none;font-size:11px;font-weight:700;color:var(--pri);padding:0">Clear</button></div>
+<div style="margin-top:10px;border:1.5px dashed var(--bd);border-radius:13px;background:var(--bg);position:relative;overflow:hidden">
+<canvas ref="{{ sigSRef }}" width="344" height="130" onPointerDown="{{ sigDownS }}" onPointerMove="{{ sigMove }}" onPointerUp="{{ sigUp }}" style="display:block;width:100%;height:130px;touch-action:none"></canvas>
+<sc-if value="{{ sigSEmpty }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:11px;font-weight:600;color:var(--tx3)">✍ Sign here</div></sc-if>
+</div>
+</div>
+</sc-if>
+</div>
+<div style="flex:none;display:flex;gap:9px;padding:12px 16px 24px">
+<sc-if value="{{ spHasBack }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ spBack }}" style="width:110px;height:50px;border-radius:14px;border:1px solid var(--bd);background:var(--surf);color:var(--tx);font-size:13px;font-weight:800">Back</button>
+</sc-if>
+<button onClick="{{ spNext }}" style="flex:1;height:50px;border-radius:14px;border:none;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:13px;font-weight:800;box-shadow:0 8px 18px rgba(63,111,168,.3)">{{ spNextLabel }}</button>
+</div>
+</div>
+</sc-if>
+
+<!-- RECEIVE ASSET -->
+<sc-if value="{{ isReceive }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Receive Asset" style="flex:1;display:flex;flex-direction:column;min-height:0;animation:fadeUp .3s ease">
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:6px 16px 12px">
+<button onClick="{{ toDash }}" style="width:38px;height:38px;border-radius:12px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+<div style="font-size:15.5px;font-weight:800;color:var(--tx)">Receive asset</div>
+</div>
+<div style="flex:1;overflow:auto;padding:0 16px 24px;min-height:0">
+<div style="display:flex;background:var(--surf);border:1px solid var(--bd);border-radius:13px;padding:4px;gap:4px">
+<button onClick="{{ modeScan }}" style="flex:1;height:36px;border-radius:10px;border:none;font-size:12px;font-weight:800;background:{{ scanTabBg }};color:{{ scanTabC }};transition:all .15s;box-shadow:{{ scanTabSh }}">Scan QR</button>
+<button onClick="{{ modeManual }}" style="flex:1;height:36px;border-radius:10px;border:none;font-size:12px;font-weight:800;background:{{ manTabBg }};color:{{ manTabC }};transition:all .15s;box-shadow:{{ manTabSh }}">Manual input</button>
+</div>
+<sc-if value="{{ isScanMode }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:14px;background:#0B1830;border-radius:16px;height:280px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+<div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.02),rgba(255,255,255,.02) 2px,transparent 2px,transparent 5px)"></div>
+<div style="width:180px;height:180px;position:relative">
+<div style="position:absolute;top:0;left:0;width:32px;height:32px;border-top:3px solid #5C8CC4;border-left:3px solid #5C8CC4;border-radius:8px 0 0 0"></div>
+<div style="position:absolute;top:0;right:0;width:32px;height:32px;border-top:3px solid #5C8CC4;border-right:3px solid #5C8CC4;border-radius:0 8px 0 0"></div>
+<div style="position:absolute;bottom:0;left:0;width:32px;height:32px;border-bottom:3px solid #5C8CC4;border-left:3px solid #5C8CC4;border-radius:0 0 0 8px"></div>
+<div style="position:absolute;bottom:0;right:0;width:32px;height:32px;border-bottom:3px solid #5C8CC4;border-right:3px solid #5C8CC4;border-radius:0 0 8px 0"></div>
+<div style="position:absolute;left:8px;right:8px;height:2px;background:linear-gradient(90deg,transparent,#5C8CC4,transparent);animation:scan 2.6s ease-in-out infinite;box-shadow:0 0 12px rgba(92,140,196,.8)"></div>
+</div>
+<div style="position:absolute;bottom:16px;font-size:11px;font-weight:700;color:rgba(255,255,255,.55)">Align the QR code inside the frame</div>
+</div>
+<button onClick="{{ mockScan }}" style="margin-top:12px;width:100%;height:46px;border-radius:13px;border:1px solid var(--bd);background:var(--surf);color:var(--pri);font-size:12.5px;font-weight:800">Simulate scan result</button>
+</sc-if>
+<sc-if value="{{ isManualMode }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:14px;display:flex;flex-direction:column;gap:7px">
+<label style="font-size:12px;font-weight:700;color:var(--tx2)">Serial number</label>
+<input value="{{ manualSn }}" onChange="{{ onManualSn }}" placeholder="e.g. SN-PAX-A920-00000" style="width:100%;height:48px;border:1px solid var(--bd);border-radius:14px;background:var(--surf);padding:0 14px;font-size:13px;font-weight:700;color:var(--tx);outline:none;font-family:ui-monospace,monospace">
+</div>
+</sc-if>
+<sc-if value="{{ scanned }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:14px;background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:16px;backdrop-filter:blur(10px);animation:fadeUp .3s ease">
+<div style="display:flex;align-items:center;gap:10px">
+<div style="width:22px;height:22px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+<span style="font-size:12.5px;font-weight:800;color:var(--tx)">Asset identified</span>
+</div>
+<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">Model</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">Verifone X990</span></div>
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">Serial</span><span style="font-size:11.5px;font-weight:800;color:var(--tx);font-family:ui-monospace,monospace">SN-VER-X990-55013</span></div>
+<div style="display:flex;justify-content:space-between;padding:9px 12px;background:var(--bg);border:1px solid var(--bd);border-radius:11px"><span style="font-size:11px;font-weight:600;color:var(--tx3)">Origin</span><span style="font-size:11.5px;font-weight:800;color:var(--tx)">Warehouse JKT-02</span></div>
+</div>
+<div style="font-size:12px;font-weight:800;color:var(--tx);margin-top:14px">Condition on receipt</div>
+<div style="display:flex;gap:8px;margin-top:9px">
+<sc-for list="{{ rcondChips }}" as="c" hint-placeholder-count="3">
+<button onClick="{{ c.on }}" style="flex:1;height:36px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.tc }}">{{ c.label }}</button>
+</sc-for>
+</div>
+<button onClick="{{ submitReceive }}" style="margin-top:16px;width:100%;height:50px;border-radius:14px;border:none;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:13px;font-weight:800;box-shadow:0 8px 18px rgba(63,111,168,.3)">Confirm receive</button>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- OPEN TASK -->
+<sc-if value="{{ isOpen }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Open Task" style="flex:1;display:flex;flex-direction:column;min-height:0;animation:fadeUp .3s ease">
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:6px 16px 12px">
+<button onClick="{{ toDash }}" style="width:38px;height:38px;border-radius:12px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg></button>
+<div style="flex:1"><div style="font-size:15.5px;font-weight:800;color:var(--tx)">Open tasks</div><div style="font-size:10.5px;font-weight:700;color:var(--tx3)">Unassigned in your area</div></div>
+</div>
+<div style="flex:1;overflow:auto;padding:0 16px 24px;min-height:0">
+<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:2px">
+<sc-for list="{{ openChips }}" as="c" hint-placeholder-count="4">
+<button onClick="{{ c.on }}" style="flex:none;height:32px;padding:0 13px;border-radius:999px;font-size:11.5px;font-weight:700;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.tc }}">{{ c.label }}</button>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:11px;margin-top:12px">
+<sc-for list="{{ visOpenTasks }}" as="t" hint-placeholder-count="3">
+<div style="background:var(--surf);border:1px solid var(--bd);border-radius:16px;padding:14px;backdrop-filter:blur(10px);box-shadow:0 4px 14px rgba(14,39,72,.05)">
+<div style="display:flex;align-items:center;gap:7px">
+<span style="font-size:10px;font-weight:800;padding:4px 9px;border-radius:999px;background:{{ t.tyBg }};color:{{ t.tyC }}">{{ t.type }}</span>
+<span style="font-size:10px;font-weight:800;padding:4px 9px;border-radius:999px;background:{{ t.prBg }};color:{{ t.prC }}">{{ t.prio }}</span>
+<div style="flex:1"></div>
+<span style="font-size:10.5px;font-weight:700;color:var(--tx3)">{{ t.dist }}</span>
+</div>
+<div style="font-size:14px;font-weight:800;color:var(--tx);margin-top:10px">{{ t.merchant }}</div>
+<div style="font-size:11px;font-weight:600;color:var(--tx2);margin-top:3px">{{ t.addr }}</div>
+<div style="font-size:10.5px;font-weight:700;color:var(--tx3);margin-top:8px">⏱ {{ t.due }}</div>
+<div style="display:flex;gap:8px;margin-top:12px">
+<button onClick="{{ t.reject }}" style="width:44px;height:42px;border-radius:12px;border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.07);color:#EF4444;display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+<button style="width:44px;height:42px;border-radius:12px;border:1px solid var(--bd);background:var(--bg);color:var(--pri);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg></button>
+<button onClick="{{ t.accept }}" style="flex:1;height:42px;border-radius:12px;border:none;background:linear-gradient(150deg,var(--pri),var(--pri2));color:#fff;font-size:12.5px;font-weight:800">Accept task</button>
+</div>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{ openEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;align-items:center;padding:56px 30px;text-align:center">
+<div style="width:64px;height:64px;border-radius:20px;background:var(--surf);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:24px">✓</div>
+<div style="font-size:14.5px;font-weight:800;color:var(--tx);margin-top:16px">All caught up</div>
+<div style="font-size:12px;font-weight:600;color:var(--tx3);margin-top:5px">No open tasks in this category right now.</div>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- TOAST -->
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;bottom:104px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:12px;font-weight:700;padding:11px 18px;border-radius:999px;box-shadow:0 10px 26px rgba(0,0,0,.3);white-space:nowrap;z-index:20;animation:fadeUp .25s ease">{{ toast }}</div>
+</sc-if>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:940},&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dashboard&quot;,&quot;options&quot;:[&quot;splash&quot;,&quot;login&quot;,&quot;dashboard&quot;,&quot;tasks&quot;,&quot;task&quot;,&quot;settlement&quot;,&quot;settle-process&quot;,&quot;receive&quot;,&quot;open&quot;,&quot;profile&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;primary&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#3F6FA8&quot;,&quot;options&quot;:[&quot;#3F6FA8&quot;,&quot;#0F7490&quot;,&quot;#6D5BD0&quot;,&quot;#B4552D&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;frozen&quot;:{&quot;editor&quot;:null,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const tabs = ['dashboard','tasks','settlement','profile'];
+    const s = props.screen;
+    let route = 'splash', tab = 'dashboard';
+    if (s) { if (tabs.includes(s)) { route = 'main'; tab = s; } else { route = s; } }
+    this.TASKS = [
+      {id:'TSK-2381', type:'Installation', merchant:'Toko Sinar Jaya', addr:'Jl. Kemang Raya No. 12, Jakarta Selatan', dist:'2.4 km', due:'Today · 10:30', prio:'High', status:'Pending', progress:0, pic:'Budi Santoso', phone:'+62 812-3456-7890', terminal:'PAX A920 Pro', tid:'88231045', mid:'000712345881', sn:'SN-PAX-A920-77812'},
+      {id:'TSK-2377', type:'Reinit', merchant:'Kopi Arunika', addr:'Jl. Senopati No. 48, Jakarta Selatan', dist:'4.1 km', due:'Today · 13:00', prio:'Medium', status:'On Progress', progress:45, pic:'Sari Wulandari', phone:'+62 813-9922-1044', terminal:'Verifone X990', tid:'88214470', mid:'000712340227', sn:'SN-VER-X990-55013'},
+      {id:'TSK-2379', type:'Technical Support', merchant:'Apotek Sehat Farma', addr:'Jl. Fatmawati No. 88, Cilandak', dist:'5.8 km', due:'Today · 15:30', prio:'High', status:'Pending', progress:0, pic:'Rina Melati', phone:'+62 811-2044-7788', terminal:'Ingenico Move/2500', tid:'88209912', mid:'000712338105', sn:'SN-ING-M25-31447'},
+      {id:'TSK-2371', type:'Rollout', merchant:'Minimart Berkah', addr:'Jl. Radio Dalam No. 5, Gandaria', dist:'7.2 km', due:'Tomorrow · 09:00', prio:'Low', status:'Pending', progress:0, pic:'Hendra Gunawan', phone:'+62 812-5501-3390', terminal:'PAX A920', tid:'88198834', mid:'000712331990', sn:'SN-PAX-A920-70233'},
+      {id:'TSK-2368', type:'Preventive Maintenance', merchant:'RM Sederhana Rasa', addr:'Jl. Panglima Polim No. 21', dist:'3.0 km', due:'Today · 08:00', prio:'Medium', status:'Completed', progress:100, pic:'Dewi Kartika', phone:'+62 815-6070-2211', terminal:'PAX A920', tid:'88190021', mid:'000712329944', sn:'SN-PAX-A920-68812'},
+      {id:'TSK-2365', type:'Installation', merchant:'Butik Melati Indah', addr:'Jl. Cipete Raya No. 33', dist:'6.5 km', due:'Yesterday · 16:00', prio:'Low', status:'Rejected', progress:0, pic:'Maya Puspita', phone:'+62 812-8873-0102', terminal:'Verifone X990', tid:'88187745', mid:'000712327716', sn:'SN-VER-X990-54120'}
+    ];
+    this.ASSETS = [
+      {model:'PAX A920 Pro', sn:'SN-PAX-A920-61550', merchant:'Toko Cahaya Abadi · Kebayoran', status:'Waiting'},
+      {model:'Verifone X990', sn:'SN-VER-X990-52240', merchant:'Warung Kopi Senja · Blok M', status:'In Progress'},
+      {model:'Ingenico Move/2500', sn:'SN-ING-M25-30918', merchant:'Apotek Kimia Sehat · Fatmawati', status:'Waiting'},
+      {model:'PAX A920', sn:'SN-PAX-A920-59981', merchant:'Toko Elektronik Jaya · Cipete', status:'Completed'}
+    ];
+    this.OPEN = [
+      {id:'OP-118', type:'Installation', merchant:'Bakso Pak Kumis', addr:'Jl. Bangka Raya No. 9, Mampang', dist:'1.8 km', due:'Respond within 42 min', prio:'High'},
+      {id:'OP-121', type:'Technical Support', merchant:'Laundry Bersih Kilat', addr:'Jl. Pela Mampang No. 14', dist:'2.9 km', due:'Respond within 2 h', prio:'Medium'},
+      {id:'OP-124', type:'Preventive Maintenance', merchant:'Toko Buku Cerdas', addr:'Jl. Antasari No. 51', dist:'5.1 km', due:'Respond by tomorrow', prio:'Low'}
+    ];
+    this.CHECK = ['Verify merchant identity & PIC','Install terminal & insert SIM','Test transaction (sale + void)','Run settlement test','Merchant training completed'];
+    this.PHOTOS = ['Storefront','Terminal serial no.','Test receipt','Installed unit'];
+    this.SPHOTOS = ['Unit front & screen','Serial number label'];
+    this.ACC = ['Power adaptor & cable','Charging dock','SIM card (returned)','Paper roll cover'];
+    this.state = {
+      route, tab, dark: !!props.dark, search:'', filter:'All', openFilter:'All',
+      remember:true, showPw:false, username:'andi.prasetyo', password:'password',
+      selIdx:0, checks:[false,false,false,false,false], photos:[false,false,false,false],
+      signedT:false, signedS:false, notes:'',
+      selAsset:0, spStep:0, cond:1, acc:[true,true,false,true], sPhotos:[false,false], receiver:'',
+      rmode:'scan', scanned:false, manualSn:'', rcond:0,
+      toast:'', successKind:'task'
+    };
+  }
+  componentDidMount() {
+    if (this.state.route==='splash' && !this.props.frozen && !this.props.screen) {
+      this._t = setTimeout(()=>this.setState({route:'login'}), 2200);
+    }
+  }
+  componentWillUnmount(){ clearTimeout(this._t); clearTimeout(this._tt); }
+  showToast(m){ this.setState({toast:m}); clearTimeout(this._tt); this._tt=setTimeout(()=>this.setState({toast:''}),2200); }
+  go(route, extra){ this.setState(Object.assign({route}, extra||{})); }
+  goTab(tab){ this.setState({route:'main', tab}); }
+  stMap(s){ return ({
+    'Pending':{c:'#3B82F6',bg:'rgba(59,130,246,.13)'},
+    'On Progress':{c:'#F59E0B',bg:'rgba(245,158,11,.15)'},
+    'Completed':{c:'#22C55E',bg:'rgba(34,197,94,.14)'},
+    'Rejected':{c:'#EF4444',bg:'rgba(239,68,68,.13)'},
+    'Cancelled':{c:'#64748B',bg:'rgba(100,116,139,.15)'},
+    'Waiting':{c:'#3B82F6',bg:'rgba(59,130,246,.13)'},
+    'In Progress':{c:'#F59E0B',bg:'rgba(245,158,11,.15)'}
+  })[s] || {c:'#64748B',bg:'rgba(100,116,139,.15)'}; }
+  prMap(p){ return ({High:{c:'#EF4444',bg:'rgba(239,68,68,.12)'},Medium:{c:'#F59E0B',bg:'rgba(245,158,11,.14)'},Low:{c:'#64748B',bg:'rgba(100,116,139,.14)'}})[p]; }
+  tyMap(t){ const m={'Installation':['IN','#3F6FA8'],'Reinit':['RE','#8B5CF6'],'Rollout':['RO','#0EA5E9'],'Technical Support':['TS','#F59E0B'],'Standby':['SB','#64748B'],'Preventive Maintenance':['PM','#22C55E']}; const x=m[t]||['TK','#3F6FA8']; return {g:x[0], c:x[1], bg:x[1].startsWith('#')?this.hexBg(x[1]):x[1]}; }
+  hexBg(h){ const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16); return `rgba(${r},${g},${b},.12)`; }
+  sigDown(e, key){
+    const cv = e.currentTarget; cv.setPointerCapture(e.pointerId);
+    this._draw = true; this._cv = cv;
+    const ctx = cv.getContext('2d'); const r = cv.getBoundingClientRect();
+    ctx.strokeStyle = this.state.dark ? '#cfe0f5' : '#1B3A63'; ctx.lineWidth = 2.2; ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.beginPath(); ctx.moveTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height);
+    if (!this.state[key]) this.setState({[key]:true});
+  }
+  renderVals() {
+    const S = this.state, P = this.props;
+    const dark = S.dark;
+    const pri = P.primary ?? '#3F6FA8';
+    const pri2 = dark ? '#5C8CC4' : '#345D8D';
+    const themeVars = dark ? {
+      '--bg':'#081226','--surf':'rgba(14,29,56,.92)','--bd':'rgba(148,178,220,.14)','--tx':'#E8EEF7','--tx2':'#A9BAD3','--tx3':'#6E82A3',
+      '--pri':pri==='#3F6FA8'?'#6E9BD4':pri,'--pri2':pri2,'--navy':'#1B3A63','--navbg':'rgba(8,18,38,.9)','--track':'rgba(148,178,220,.15)',
+      height:'100%',display:'flex',flexDirection:'column',background:'#081226',color:'#E8EEF7',transition:'background .3s'
+    } : {
+      '--bg':'#F6F7F9','--surf':'rgba(255,255,255,.9)','--bd':'rgba(14,39,72,.14)','--tx':'#0E2748','--tx2':'#42536E','--tx3':'#8593A8',
+      '--pri':pri,'--pri2':pri2,'--navy':'#0E2748','--navbg':'rgba(255,255,255,.85)','--track':'rgba(14,39,72,.09)',
+      height:'100%',display:'flex',flexDirection:'column',background:'#F6F7F9',color:'#0E2748',transition:'background .3s'
+    };
+    const route = S.route, tab = S.tab;
+    const isSplash = route==='splash';
+    const bdr = dark?'rgba(148,178,220,.1)':'rgba(14,39,72,.08)';
+    // tasks
+    const q = S.search.toLowerCase();
+    const typeShort = {'All':'All','Installation':'Installation','Reinit':'Reinit','Rollout':'Rollout','Technical Support':'Support','Preventive Maintenance':'PM','Standby':'Standby'};
+    const chipDefs = ['All','Installation','Reinit','Rollout','Technical Support','Preventive Maintenance'];
+    const mkChip = (label, key, activeKey, stateKey) => {
+      const act = key===activeKey;
+      return {label, on:()=>this.setState({[stateKey]:key}),
+        bg: act?`linear-gradient(150deg,${pri},${pri2})`:(dark?'rgba(14,29,56,.92)':'rgba(255,255,255,.9)'),
+        tc: act?'#fff':(dark?'#A9BAD3':'#42536E'), bd: act?'transparent':(dark?'rgba(148,178,220,.14)':'rgba(14,39,72,.14)')};
+    };
+    const chips = chipDefs.map(k=>mkChip(typeShort[k],k,S.filter,'filter'));
+    const decorate = t => {
+      const st=this.stMap(t.status), pr=this.prMap(t.prio), ty=this.tyMap(t.type);
+      return Object.assign({}, t, {
+        status:t.status.toUpperCase(), prio:t.prio.toUpperCase(),
+        stC:st.c, stBg:st.bg, prC:pr.c, prBg:pr.bg, tyGlyph:ty.g, tyC:ty.c, tyBg:ty.bg,
+        hasProg: t.progress>0,
+        open: ()=>{ const i=this.TASKS.indexOf(t); this.setState({route:'task', selIdx:i, checks:this.CHECK.map(()=>t.progress===100), photos:this.PHOTOS.map(()=>t.progress===100), signedT:false, notes:''}); if(this._cvT){const x=this._cvT.getContext('2d');x.clearRect(0,0,344,130);} },
+        mapBtn: e=>{e.stopPropagation(); this.showToast('Opening navigation…');},
+        callBtn: e=>{e.stopPropagation(); this.showToast('Calling '+t.pic+'…');}
+      });
+    };
+    const visTasks = this.TASKS.filter(t=> (S.filter==='All'||t.type===S.filter) && (!q || t.merchant.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))).map(decorate);
+    const ct = decorate(this.TASKS[S.selIdx] || this.TASKS[0]);
+    // checklist / photos
+    const checklist = this.CHECK.map((t,i)=>{ const done=S.checks[i]; return {t, done,
+      on:()=>{const c=S.checks.slice();c[i]=!c[i];this.setState({checks:c});},
+      bd: done?'rgba(34,197,94,.3)':(dark?'rgba(148,178,220,.14)':'rgba(14,39,72,.12)'),
+      bg: done?'rgba(34,197,94,.07)':'transparent',
+      boxBd: done?'#22C55E':(dark?'rgba(148,178,220,.35)':'rgba(14,39,72,.3)'), boxBg: done?'#22C55E':'transparent',
+      tc: done?(dark?'#A9BAD3':'#8593A8'):(dark?'#E8EEF7':'#0E2748'), deco: done?'line-through':'none'}; });
+    const mkPhoto = (label,i,arr,key) => { const done=arr[i]; return {label, done, todo:!done,
+      on:()=>{const p=arr.slice();p[i]=!p[i];this.setState({[key]:p}); if(!done) this.showToast('Photo captured');},
+      bd: done?'rgba(34,197,94,.45)':(dark?'rgba(148,178,220,.25)':'rgba(14,39,72,.2)'),
+      bg: done?'rgba(34,197,94,.05)':(dark?'rgba(148,178,220,.04)':'rgba(14,39,72,.02)')}; };
+    const photos = this.PHOTOS.map((l,i)=>mkPhoto(l,i,S.photos,'photos'));
+    const sPhotos = this.SPHOTOS.map((l,i)=>mkPhoto(l,i,S.sPhotos,'sPhotos'));
+    const checkDone = S.checks.filter(Boolean).length, photoDone = S.photos.filter(Boolean).length;
+    const canComplete = checkDone===this.CHECK.length && photoDone===4 && S.signedT;
+    // stats/dash
+    const stats = [
+      {label:"Today's tasks", value:'8', delta:'+2', c:'#3B82F6', bg:'rgba(59,130,246,.12)', glyph:'☰'},
+      {label:'Completed', value:'3', delta:'37%', c:'#22C55E', bg:'rgba(34,197,94,.12)', glyph:'✓'},
+      {label:'Pending', value:'5', delta:'due today', c:'#F59E0B', bg:'rgba(245,158,11,.13)', glyph:'◔'},
+      {label:'Assets held', value:'12', delta:'4 to settle', c:'#8B5CF6', bg:'rgba(139,92,246,.12)', glyph:'▣'}
+    ];
+    const chartData=[{d:'Mon',h:55},{d:'Tue',h:72},{d:'Wed',h:48},{d:'Thu',h:85},{d:'Fri',h:64},{d:'Sat',h:30},{d:'Sun',h:92}];
+    const chart = chartData.map((b,i)=>Object.assign({},b,{bg:i===6?`linear-gradient(180deg,${themeVars['--pri']},${pri2})`:(dark?'rgba(148,178,220,.16)':'rgba(14,39,72,.08)'), lc:i===6?themeVars['--pri']:(dark?'#6E82A3':'#8593A8')}));
+    const activity = [
+      {t:'Completed PM at RM Sederhana Rasa', time:'Today · 08:42', c:'#22C55E'},
+      {t:'Started reinit — Kopi Arunika', time:'Today · 08:10', c:'#F59E0B'},
+      {t:'Received asset SN-VER-X990-52240', time:'Today · 07:55', c:'#3B82F6'},
+      {t:'Accepted task TSK-2381 (Installation)', time:'Yesterday · 17:20', c:'#8B5CF6'}
+    ].map((a,i,arr)=>Object.assign({},a,{halo:this.hexBg(a.c), bdr: i===arr.length-1?'transparent':bdr}));
+    // settlement
+    const settleStats=[{label:'WAITING',value:'4',c:'#3B82F6'},{label:'IN PROGRESS',value:'2',c:'#F59E0B'},{label:'COMPLETED',value:'9',c:'#22C55E'},{label:'REJECTED',value:'1',c:'#EF4444'}];
+    const assets = this.ASSETS.map((a,i)=>{ const st=this.stMap(a.status); return Object.assign({},a,{stC:st.c,stBg:st.bg,status:a.status.toUpperCase(),
+      open:()=>this.setState({route:'settle-process',selAsset:i,spStep:0,cond:1,acc:[true,true,false,true],sPhotos:[false,false],receiver:'',signedS:false})}); });
+    const ca = this.ASSETS[S.selAsset];
+    const stepDefs=['Receive','Verify','Photos','Sign'];
+    const steps = stepDefs.map((label,i)=>{ const done=i<S.spStep, act=i===S.spStep; return {label:label.toUpperCase(), glyph: done?'✓':String(i+1),
+      bg: done?'#22C55E':(act?`linear-gradient(150deg,${pri},${pri2})`:'transparent'),
+      bd: done?'#22C55E':(act?'transparent':(dark?'rgba(148,178,220,.25)':'rgba(14,39,72,.2)')),
+      c: (done||act)?'#fff':(dark?'#6E82A3':'#8593A8'), lc: act?themeVars['--pri']:(dark?'#6E82A3':'#8593A8'),
+      hasLine: i<3, line: done?'#22C55E':(dark?'rgba(148,178,220,.15)':'rgba(14,39,72,.1)'), flex: i<3?'1':'none'}; });
+    const condDefs=['Good','Minor damage','Damaged'];
+    const mkCond = (arr, activeIdx, stateKey) => arr.map((label,i)=>{ const act=i===activeIdx; return {label,
+      on:()=>this.setState({[stateKey]:i}),
+      bg: act?`linear-gradient(150deg,${pri},${pri2})`:'transparent', tc: act?'#fff':(dark?'#A9BAD3':'#42536E'),
+      bd: act?'transparent':(dark?'rgba(148,178,220,.2)':'rgba(14,39,72,.16)')}; });
+    const accChips = this.ACC.map((t,i)=>{ const done=S.acc[i]; return {t, done,
+      on:()=>{const a=S.acc.slice();a[i]=!a[i];this.setState({acc:a});},
+      bd: done?'rgba(34,197,94,.3)':(dark?'rgba(148,178,220,.14)':'rgba(14,39,72,.12)'), bg: done?'rgba(34,197,94,.06)':'transparent',
+      boxBd: done?'#22C55E':(dark?'rgba(148,178,220,.35)':'rgba(14,39,72,.3)'), boxBg: done?'#22C55E':'transparent'}; });
+    const spNext = ()=>{
+      if (S.spStep<3) this.setState({spStep:S.spStep+1});
+      else if (!S.receiver) this.showToast('Enter receiver name');
+      else if (!S.signedS) this.showToast('Receiver signature required');
+      else this.setState({route:'settle-success', successKind:'settle'});
+    };
+    // open tasks
+    const openChipDefs=['All','Installation','Technical Support','Preventive Maintenance'];
+    const openChips = openChipDefs.map(k=>mkChip(typeShort[k],k,S.openFilter,'openFilter'));
+    const visOpenTasks = this.OPEN.filter(t=>S.openFilter==='All'||t.type===S.openFilter).map(t=>{ const pr=this.prMap(t.prio), ty=this.tyMap(t.type); return Object.assign({},t,{
+      prio:t.prio.toUpperCase(), prC:pr.c, prBg:pr.bg, tyC:ty.c, tyBg:ty.bg,
+      accept:()=>{this.showToast('Task accepted — added to your list'); this.goTab('tasks');},
+      reject:()=>this.showToast('Task declined')}); });
+    const profileRows = [['Employee ID','EMP-10482'],['Region','DKI Jakarta — South'],['Branch','Kebayoran Baru'],['Phone','+62 812-7745-0921'],['Email','andi.p@fieldra.co.id'],['Vehicle','B 6741 KZT · Honda Vario']].map((r,i,arr)=>({k:r[0],v:r[1],bdr:i===arr.length-1?'transparent':bdr}));
+    const isReceiptFlow = S.successKind==='settle';
+    const navC = t => tab===t && route==='main' ? themeVars['--pri'] : (dark?'#6E82A3':'#8593A8');
+    return {
+      themeVars, sbColor: (isSplash||dark)?'#fff':'#0E2748',
+      isSplash, isLogin:route==='login', isMain:route==='main',
+      isDash:route==='main'&&tab==='dashboard', isTasks:route==='main'&&tab==='tasks',
+      isSettleTab:route==='main'&&tab==='settlement', isProfile:route==='main'&&tab==='profile',
+      isTask:route==='task', isSuccess:route==='success'||route==='settle-success',
+      isSettleProc:route==='settle-process', isReceive:route==='receive', isOpen:route==='open',
+      toLogin:()=>{clearTimeout(this._t);this.go('login');},
+      doLogin:()=>this.goTab('dashboard'), doLogout:()=>this.go('login'),
+      toDash:()=>this.goTab('dashboard'), toTasks:()=>this.goTab('tasks'), toSettle:()=>this.goTab('settlement'), toProfile:()=>this.goTab('profile'),
+      toOpen:()=>this.go('open'), toReceive:()=>this.go('receive',{scanned:false,rmode:'scan'}),
+      backToTasks:()=>this.goTab('tasks'),
+      username:S.username, onUser:e=>this.setState({username:e.target.value}),
+      password:S.password, onPass:e=>this.setState({password:e.target.value}),
+      pwType:S.showPw?'text':'password', togglePw:()=>this.setState({showPw:!S.showPw}),
+      remember:S.remember, toggleRemember:()=>this.setState({remember:!S.remember}),
+      remBg:S.remember?themeVars['--pri']:'transparent', remBd:S.remember?themeVars['--pri']:(dark?'rgba(148,178,220,.35)':'rgba(14,39,72,.3)'),
+      stats, chart, activity, chips, visTasks, tasksEmpty:visTasks.length===0, taskCount:this.TASKS.filter(t=>t.status!=='Completed'&&t.status!=='Rejected').length,
+      search:S.search, onSearch:e=>this.setState({search:e.target.value}),
+      clearFilters:()=>this.setState({search:'',filter:'All'}),
+      ct, devRows:[{k:'TERMINAL',v:ct.terminal},{k:'TID',v:ct.tid},{k:'MID',v:ct.mid},{k:'SERIAL NUMBER',v:ct.sn}],
+      timeline:[
+        {t:'Task created', time:'Yesterday · 16:02', c:'#22C55E', halo:'rgba(34,197,94,.15)', tc:themeVars['--tx'], line:'#22C55E'},
+        {t:'Assigned to Andi Prasetyo', time:'Yesterday · 17:20', c:'#22C55E', halo:'rgba(34,197,94,.15)', tc:themeVars['--tx'], line: dark?'rgba(148,178,220,.15)':'rgba(14,39,72,.1)'},
+        {t:'Work in progress', time:'Pending arrival', c:dark?'#6E82A3':'#B9C4D4', halo:'transparent', tc:dark?'#6E82A3':'#8593A8', line:'transparent'}
+      ].map(x=>({t:x.t,time:x.time,c:x.c,halo:x.halo,tc:x.tc,line:x.line})),
+      checklist, checkDone, checkTotal:this.CHECK.length, photos, photoDone,
+      completeBg: canComplete?'linear-gradient(150deg,#22C55E,#16A34A)':`linear-gradient(150deg,${pri},${pri2})`,
+      completeTask:()=>{ if(canComplete) this.setState({route:'success',successKind:'task'}); else this.showToast('Finish checklist, photos & signature first'); },
+      saveDraft:()=>{this.showToast('Draft saved offline'); this.goTab('tasks');},
+      rejectTask:()=>{this.showToast('Task rejected'); this.goTab('tasks');},
+      notes:S.notes, onNotes:e=>this.setState({notes:e.target.value}),
+      sigTRef:el=>{this._cvT=el;}, sigSRef:el=>{this._cvS=el;},
+      sigDownT:e=>this.sigDown(e,'signedT'), sigDownS:e=>this.sigDown(e,'signedS'),
+      sigMove:e=>{ if(!this._draw||!this._cv)return; const cv=this._cv,ctx=cv.getContext('2d'),r=cv.getBoundingClientRect(); ctx.lineTo((e.clientX-r.left)*cv.width/r.width,(e.clientY-r.top)*cv.height/r.height); ctx.stroke(); },
+      sigUp:()=>{this._draw=false;},
+      sigTEmpty:!S.signedT, sigSEmpty:!S.signedS,
+      clearSigT:()=>{ if(this._cvT) this._cvT.getContext('2d').clearRect(0,0,344,130); this.setState({signedT:false}); },
+      clearSigS:()=>{ if(this._cvS) this._cvS.getContext('2d').clearRect(0,0,344,130); this.setState({signedS:false}); },
+      settleStats, assets, ca, steps,
+      sp0:S.spStep===0, sp1:S.spStep===1, sp2:S.spStep===2, sp3:S.spStep===3,
+      spHasBack:S.spStep>0, spBack:()=>this.setState({spStep:S.spStep-1}),
+      spNext, spNextLabel: S.spStep===3?'Submit settlement':'Continue',
+      condChips:mkCond(condDefs,S.cond,'cond'), accChips, sPhotos, sPhotoDone:S.sPhotos.filter(Boolean).length,
+      receiver:S.receiver, onReceiver:e=>this.setState({receiver:e.target.value}),
+      isScanMode:S.rmode==='scan', isManualMode:S.rmode==='manual',
+      modeScan:()=>this.setState({rmode:'scan'}), modeManual:()=>this.setState({rmode:'manual',scanned:true}),
+      scanTabBg:S.rmode==='scan'?`linear-gradient(150deg,${pri},${pri2})`:'transparent', scanTabC:S.rmode==='scan'?'#fff':(dark?'#A9BAD3':'#42536E'), scanTabSh:S.rmode==='scan'?'0 4px 10px rgba(63,111,168,.3)':'none',
+      manTabBg:S.rmode==='manual'?`linear-gradient(150deg,${pri},${pri2})`:'transparent', manTabC:S.rmode==='manual'?'#fff':(dark?'#A9BAD3':'#42536E'), manTabSh:S.rmode==='manual'?'0 4px 10px rgba(63,111,168,.3)':'none',
+      mockScan:()=>{this.setState({scanned:true}); this.showToast('QR detected');},
+      scanned:S.scanned, manualSn:S.manualSn, onManualSn:e=>this.setState({manualSn:e.target.value,scanned:e.target.value.length>3}),
+      rcondChips:mkCond(condDefs,S.rcond,'rcond'),
+      submitReceive:()=>{this.setState({route:'success',successKind:'receive'}); },
+      openChips, visOpenTasks, openEmpty:visOpenTasks.length===0,
+      successTitle: S.successKind==='settle'?'Settlement submitted':(S.successKind==='receive'?'Asset received':'Task completed'),
+      successSub: S.successKind==='settle'?'The asset has been settled and the receipt is ready to share with the receiver.':(S.successKind==='receive'?'The asset is now registered under your custody and synced to inventory.':'Great work. The report was saved and will sync when you are back online.'),
+      successRows: S.successKind==='settle'
+        ? [{k:'Asset',v:ca.model},{k:'Serial',v:ca.sn},{k:'Receiver',v:S.receiver||'—'},{k:'Time',v:'Today · 09:41'}]
+        : (S.successKind==='receive'
+          ? [{k:'Asset',v:'Verifone X990'},{k:'Serial',v:'SN-VER-X990-55013'},{k:'Condition',v:condDefs[S.rcond]},{k:'Time',v:'Today · 09:41'}]
+          : [{k:'Task',v:ct.id},{k:'Merchant',v:ct.merchant},{k:'Checklist',v:checkDone+'/'+this.CHECK.length+' done'},{k:'Duration',v:'48 min'}]),
+      isReceiptFlow, toast2:()=>this.showToast('Receipt PDF generated'),
+      profileRows, toggleDark:()=>this.setState({dark:!dark}),
+      dkTrack: dark?themeVars['--pri']:'rgba(14,39,72,.18)', dkX: dark?18:0,
+      navDash:navC('dashboard'), navTasks:navC('tasks'), navSettle:navC('settlement'), navProfile:navC('profile'),
+      toast:S.toast, hasToast:!!S.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

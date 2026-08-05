@@ -1,0 +1,46 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "ui": "tui",
+  "globalEnv": [
+    "DATABASE_URL",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "TRUSTED_ORIGINS",
+    "WEB_APP_URL",
+    "NODE_ENV",
+    "PORT",
+    "LDAP_URL",
+    "LDAP_BIND_DN",
+    "LDAP_BIND_PASSWORD",
+    "LDAP_SEARCH_BASE",
+    "LDAP_USERNAME_ATTRIBUTE",
+    "LDAP_EMAIL_DOMAINS"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**", "dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint", "^build"]
+    },
+    "check-types": {
+      "dependsOn": ["^check-types", "^build"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

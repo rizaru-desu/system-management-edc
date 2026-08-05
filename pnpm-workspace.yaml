@@ -1,2 +1,20 @@
-allowBuilds:
-  esbuild: true
+packages:
+  - "apps/*"
+  - "packages/*"
+
+overrides:
+  "@better-auth/core": "^1.6.23"
+  "better-auth": "^1.6.23"
+
+packageExtensions:
+  "@better-auth/cli":
+    dependencies:
+      "@better-auth/core": "^1.6.23"
+  better-auth-credentials-plugin:
+    dependencies:
+      "@better-auth/core": "^1.6.23"
+
+# Allow build scripts for native binary dependencies required by web/Vite
+onlyBuiltDependencies:
+  - "esbuild"
+  - "lightningcss"
