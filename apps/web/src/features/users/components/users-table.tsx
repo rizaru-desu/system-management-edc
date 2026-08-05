@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   EllipsisVertical,
+  Loader2,
   Pencil,
   ShieldCheck,
   Smartphone,
@@ -29,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { Skeleton } from '#/components/ui/skeleton.tsx'
 import {
   Tooltip,
   TooltipContent,
@@ -373,46 +373,19 @@ export function UsersTable({
           ))}
         </thead>
         <tbody>
-          {isPending &&
-            Array.from({ length: 5 }, (_, index) => (
-              <tr
-                key={index}
-                className="border-b border-brand-100 last:border-0"
+          {isPending && (
+            <tr>
+              <td
+                colSpan={columns.length}
+                className="px-5 py-12 text-center text-sm text-brand-900/50"
               >
-                <td className="px-5 py-3.5">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                    <div className="space-y-1.5">
-                      <Skeleton className="h-3.5 w-32" />
-                      <Skeleton className="h-3 w-44" />
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-3.5">
-                  <Skeleton className="h-5 w-24 rounded-md" />
-                </td>
-                <td className="px-5 py-3.5">
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </td>
-                <td className="px-5 py-3.5">
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </td>
-                <td className="px-5 py-3.5">
-                  <div className="space-y-1.5">
-                    <Skeleton className="h-3.5 w-20" />
-                    <Skeleton className="h-3 w-28" />
-                  </div>
-                </td>
-                <td className="px-5 py-3.5">
-                  <Skeleton className="h-3.5 w-20" />
-                </td>
-                <td className="px-5 py-3.5">
-                  <div className="flex justify-end gap-1">
-                    <Skeleton className="h-7 w-7 rounded-md" />
-                  </div>
-                </td>
-              </tr>
-            ))}
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                  Loading...
+                </div>
+              </td>
+            </tr>
+          )}
           {isError && (
             <tr>
               <td
