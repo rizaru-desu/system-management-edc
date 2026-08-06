@@ -12,6 +12,19 @@ export {
 } from './api/role-permissions.ts'
 export type { UserRecord, UserStatus } from './data/users.ts'
 export type { UserFormValues } from './components/user-form-modal.tsx'
+export { AssignServicePointsDrawer } from './components/assign-service-points-drawer.tsx'
+export { ServicePointTransfer } from './components/service-point-transfer.tsx'
+export {
+  SERVICE_POINT_CATALOGUE,
+  SERVICE_POINT_ROLES,
+  assignmentId,
+  seedAssignmentsForUser,
+} from './data/service-point-assignments.ts'
+export type {
+  AssignmentStatus,
+  ServicePointAssignment,
+  ServicePointRoleKey,
+} from './data/service-point-assignments.ts'
 export {
   PERMISSION_ACTIONS,
   PERMISSION_ACTION_LABELS,

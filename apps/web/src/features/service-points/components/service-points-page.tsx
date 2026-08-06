@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ListTree, ListX, MapPinPlus, RefreshCw } from 'lucide-react'
+import { ListTree, ListX, MapPinPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { cn } from '#/lib/utils.ts'
 import { SEED_SERVICE_POINTS } from '../data/service-points.ts'
 import type {
   ServicePointRecord,
@@ -32,9 +31,8 @@ import type { ServicePointFormValues } from './service-point-form-modal.tsx'
 import { ServicePointViewModal } from './service-point-view-modal.tsx'
 import { ServicePointsTable } from './service-points-table.tsx'
 
-/** Simulated fetch latency so the loading/refresh states are visible. */
+/** Simulated fetch latency so the loading state is visible. */
 const MOCK_LOAD_MS = 600
-const MOCK_REFRESH_MS = 500
 
 const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
 
@@ -70,7 +68,6 @@ export function ServicePointsPage() {
   // ── Mock data lifecycle ────────────────────────────────────────────────
   const [records, setRecords] = useState<Array<ServicePointRecord>>([])
   const [isPending, setIsPending] = useState(true)
-  const [isFetching, setIsFetching] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -82,14 +79,6 @@ export function ServicePointsPage() {
     }, MOCK_LOAD_MS)
     return () => clearTimeout(timer)
   }, [])
-
-  const refresh = () => {
-    if (isPending || isFetching) return
-    setIsFetching(true)
-    // A real refetch would reload from the backend; the mock just spins and
-    // keeps the in-memory records so unsaved demo edits survive.
-    setTimeout(() => setIsFetching(false), MOCK_REFRESH_MS)
-  }
 
   // ── Search & filter ────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
@@ -321,7 +310,6 @@ export function ServicePointsPage() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, code or region…"
-          isFetching={isFetching}
           containerClassName="min-w-[240px] sm:max-w-xs"
         />
         <Select
@@ -340,19 +328,6 @@ export function ServicePointsPage() {
           </SelectContent>
         </Select>
         <div className="ml-auto flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label="Refresh"
-            title="Refresh"
-            disabled={isPending || isFetching}
-            onClick={refresh}
-          >
-            <RefreshCw
-              className={cn('h-4 w-4', isFetching && 'animate-spin')}
-              strokeWidth={1.75}
-            />
-          </Button>
           <Button
             variant="outline"
             disabled={isPending || isFiltering}
