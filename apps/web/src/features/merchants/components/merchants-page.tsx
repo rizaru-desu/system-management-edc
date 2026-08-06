@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FileSpreadsheet, HousePlus, RefreshCw } from 'lucide-react'
+import { FileSpreadsheet, HousePlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { cn } from '#/lib/utils.ts'
 import { merchantsQueryOptions } from '../api/list-merchants.ts'
 import { useCreateMerchant } from '../api/create-merchant.ts'
 import { useDeleteMerchant } from '../api/delete-merchant.ts'
@@ -336,22 +335,6 @@ export function MerchantsPage() {
             ))}
           </SelectContent>
         </Select>
-        <div className="ml-auto">
-          <Button
-            variant="outline"
-            disabled={listQuery.isFetching}
-            onClick={() => listQuery.refetch()}
-          >
-            <RefreshCw
-              className={cn(
-                'h-4 w-4 text-primary',
-                listQuery.isFetching && 'animate-spin',
-              )}
-              strokeWidth={1.75}
-            />
-            Refresh
-          </Button>
-        </div>
       </div>
 
       {/* Merchant table */}
