@@ -100,6 +100,7 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
           'Operations_Specialist',
           'Contract_Manager',
         ],
+        directRoute: '/merchants',
       },
       {
         title: 'Onboarding',
