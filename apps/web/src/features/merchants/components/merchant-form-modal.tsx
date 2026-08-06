@@ -22,17 +22,24 @@ import {
 import { Switch } from '#/components/ui/switch.tsx'
 import { UnsavedChangesDialog } from '#/components/UnsavedChangesDialog.tsx'
 import { useUnsavedChanges } from '#/hooks/use-unsaved-changes.ts'
-import {
-  MERCHANT_SERVICE_POINTS,
-  MERCHANT_TYPES,
-  MERCHANT_TYPE_LABELS,
-} from '../data/merchants.ts'
-import type { MerchantRecord, MerchantType } from '../data/merchants.ts'
+import { MERCHANT_TYPE_OPTIONS } from '../data/merchants.ts'
+import type { MerchantRecord } from '../data/merchants.ts'
+
+/** Sentinel for "no type" — Radix Select items may not use an empty value. */
+const NO_TYPE = 'none'
+
+/** Service point choice served by the backend catalogue. */
+export interface ServicePointOption {
+  id: string
+  code: string
+  name: string
+}
 
 export interface MerchantFormValues {
   code: string
   name: string
-  type: MerchantType
+  /** Free-text type label; '' = not set. */
+  type: string
   picName: string
   phone: string
   email: string
@@ -52,8 +59,12 @@ interface MerchantFormModalProps {
   onOpenChange: (open: boolean) => void
   /** When set the modal edits this record; otherwise it creates a new one. */
   merchant: MerchantRecord | null
+  /** Live service point catalogue from the backend (never hardcoded). */
+  servicePointOptions: Array<ServicePointOption>
   /** Disables Save while the create/update mutation is in flight. */
   saving: boolean
+  /** Bumped by the page on every duplicate-code 409 from the backend. */
+  duplicateConflict: number
   onSubmit: (values: MerchantFormValues) => void
 }
 
@@ -71,7 +82,7 @@ interface FormErrors {
 const EMPTY: MerchantFormValues = {
   code: '',
   name: '',
-  type: 'retail',
+  type: '',
   picName: '',
   phone: '',
   email: '',
@@ -118,7 +129,9 @@ export function MerchantFormModal({
   open,
   onOpenChange,
   merchant,
+  servicePointOptions,
   saving,
+  duplicateConflict,
   onSubmit,
 }: MerchantFormModalProps) {
   const [values, setValues] = useState<MerchantFormValues>(EMPTY)
@@ -132,9 +145,9 @@ export function MerchantFormModal({
         ? {
             code: merchant.code,
             name: merchant.name,
-            type: merchant.type,
-            picName: merchant.picName,
-            phone: merchant.phone,
+            type: merchant.type ?? '',
+            picName: merchant.picName ?? '',
+            phone: merchant.phone ?? '',
             email: merchant.email ?? '',
             address: merchant.address ?? '',
             province: merchant.province ?? '',
@@ -161,6 +174,17 @@ export function MerchantFormModal({
   )
 
   const { guard, dialogProps } = useUnsavedChanges({ when: open && isDirty })
+
+  // A duplicate-code 409 from the backend highlights the code field inline
+  // while the toast carries the same message — the entered values survive.
+  useEffect(() => {
+    if (duplicateConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        code: 'Merchant code is already in use.',
+      }))
+    }
+  }, [duplicateConflict])
 
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
@@ -294,9 +318,9 @@ export function MerchantFormModal({
                   Merchant type
                 </Label>
                 <Select
-                  value={values.type}
+                  value={values.type || NO_TYPE}
                   onValueChange={(value) =>
-                    setField('type', value as MerchantType)
+                    setField('type', value === NO_TYPE ? '' : value)
                   }
                 >
                   <SelectTrigger
@@ -306,11 +330,23 @@ export function MerchantFormModal({
                     <SelectValue placeholder="Select a type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MERCHANT_TYPES.map((type) => (
+                    <SelectItem value={NO_TYPE}>No type</SelectItem>
+                    {MERCHANT_TYPE_OPTIONS.map((type) => (
                       <SelectItem key={type} value={type}>
-                        {MERCHANT_TYPE_LABELS[type]}
+                        {type}
                       </SelectItem>
                     ))}
+                    {/* An edited record may carry a type outside the
+                      suggested list (free text server-side) — keep it
+                      selectable so editing never silently drops it. */}
+                    {values.type &&
+                      !MERCHANT_TYPE_OPTIONS.includes(
+                        values.type as (typeof MERCHANT_TYPE_OPTIONS)[number],
+                      ) && (
+                        <SelectItem value={values.type}>
+                          {values.type}
+                        </SelectItem>
+                      )}
                   </SelectContent>
                 </Select>
               </div>
@@ -494,7 +530,7 @@ export function MerchantFormModal({
                   <SelectValue placeholder="Select the owning service point" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MERCHANT_SERVICE_POINTS.map((servicePoint) => (
+                  {servicePointOptions.map((servicePoint) => (
                     <SelectItem key={servicePoint.id} value={servicePoint.id}>
                       {servicePoint.name} ({servicePoint.code})
                     </SelectItem>

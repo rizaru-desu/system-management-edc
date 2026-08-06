@@ -12,16 +12,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { merchantsQueryOptions } from '../api/list-merchants.ts'
+import { servicePointsListQueryOptions } from '#/features/service-points/index.ts'
 import { useCreateMerchant } from '../api/create-merchant.ts'
+import type { MerchantPayload } from '../api/create-merchant.ts'
 import { useDeleteMerchant } from '../api/delete-merchant.ts'
-import { useSetMerchantStatus } from '../api/toggle-merchant-status.ts'
-import { useUpdateMerchant } from '../api/update-merchant.ts'
-import type { MerchantPayload } from '../api/mock-backend.ts'
 import {
-  MERCHANT_SERVICE_POINTS,
-  MERCHANT_TYPE_LABELS,
-} from '../data/merchants.ts'
+  isDuplicateCodeError,
+  merchantsListQueryOptions,
+} from '../api/list-merchants.ts'
+import type { MerchantSortField } from '../api/list-merchants.ts'
+import { merchantDetailQueryOptions } from '../api/merchant-detail.ts'
+import {
+  useSetMerchantStatus,
+  useUpdateMerchant,
+} from '../api/update-merchant.ts'
 import type { MerchantRecord, MerchantStatus } from '../data/merchants.ts'
 import { DeleteMerchantDialog } from './delete-merchant-dialog.tsx'
 import { ImportMerchantsModal } from './import-merchants-modal.tsx'
@@ -39,9 +43,9 @@ function payloadFromForm(values: MerchantFormValues): MerchantPayload {
   return {
     code: values.code,
     name: values.name,
-    type: values.type,
-    picName: values.picName,
-    phone: values.phone,
+    type: blankOrNull(values.type),
+    picName: blankOrNull(values.picName),
+    phone: blankOrNull(values.phone),
     email: blankOrNull(values.email),
     address: blankOrNull(values.address),
     province: blankOrNull(values.province),
@@ -55,46 +59,31 @@ function payloadFromForm(values: MerchantFormValues): MerchantPayload {
   }
 }
 
-/** The value a row is compared by when sorting on `column`. */
-function sortValue(record: MerchantRecord, column: MerchantSortColumn): string {
-  switch (column) {
-    case 'code':
-      return record.code
-    case 'name':
-      return record.name
-    case 'type':
-      return MERCHANT_TYPE_LABELS[record.type]
-    case 'picName':
-      return record.picName
-    case 'phone':
-      return record.phone
-    case 'servicePoint':
-      return record.servicePointName
-    case 'status':
-      return record.status
-    case 'createdAt':
-      return record.createdAt
-  }
+/** Table sort column → the backend list endpoint's sortBy field. */
+const SORT_FIELD_BY_COLUMN: Record<MerchantSortColumn, MerchantSortField> = {
+  code: 'merchantCode',
+  name: 'merchantName',
+  type: 'merchantType',
+  picName: 'picName',
+  phone: 'phoneNumber',
+  status: 'status',
+  createdAt: 'createdAt',
 }
 
 /**
- * Merchant Management → Merchants. UI-only for now: the list comes from a
- * mock in-memory backend (see api/mock-backend.ts) and search, status /
- * service point filters, sorting and pagination all run client-side over the
- * full catalogue. Every CRUD action goes through API-shaped mutation hooks
- * so wiring the real backend later only touches the api folder.
+ * Merchant Management → Merchants. Search, status/service point filters,
+ * sorting and pagination all run server-side (GET /merchants), and every
+ * CRUD action goes through the backend API; the mutation hooks own toasts
+ * and cache invalidation, so the table refreshes after every write.
  */
 export function MerchantsPage() {
-  const listQuery = useQuery(merchantsQueryOptions())
-  const records = useMemo(() => listQuery.data ?? [], [listQuery.data])
-
-  // ── Search & filters ───────────────────────────────────────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | MerchantStatus>(
     'all',
   )
   const [servicePointFilter, setServicePointFilter] = useState<string>('all')
-  // Debounced copy of `search` so the list isn't re-filtered per keystroke.
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
@@ -114,7 +103,7 @@ export function MerchantsPage() {
     setServicePointFilter('all')
   }
 
-  // ── Sorting (client-side; header clicks cycle asc → desc → off) ────────
+  // ── Sorting (server-side; header clicks cycle asc → desc → off) ────────
   const [sort, setSort] = useState<MerchantSort | null>(null)
 
   const handleSort = (column: MerchantSortColumn) => {
@@ -125,78 +114,55 @@ export function MerchantsPage() {
     })
   }
 
-  const visibleRows = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase()
-    const filtered = records.filter((record) => {
-      const matchesTerm =
-        term === '' ||
-        record.code.toLowerCase().includes(term) ||
-        record.name.toLowerCase().includes(term) ||
-        record.picName.toLowerCase().includes(term) ||
-        record.phone.toLowerCase().includes(term)
-      const matchesStatus =
-        statusFilter === 'all' || record.status === statusFilter
-      const matchesServicePoint =
-        servicePointFilter === 'all' ||
-        record.servicePointId === servicePointFilter
-      return matchesTerm && matchesStatus && matchesServicePoint
-    })
-    if (!sort) return filtered
-    const direction = sort.direction === 'asc' ? 1 : -1
-    return [...filtered].sort(
-      (a, b) =>
-        direction *
-        sortValue(a, sort.column).localeCompare(
-          sortValue(b, sort.column),
-          'en',
-          {
-            numeric: true,
-            sensitivity: 'base',
-          },
-        ),
-    )
-  }, [records, debouncedSearch, statusFilter, servicePointFilter, sort])
-
-  // ── Pagination (client-side over the filtered rows) ────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
   })
 
-  // Changing the search term or a filter changes the row set, so any page
-  // beyond the first may no longer exist — jump back to page one.
+  // Changing the search term, a filter or the sort changes the row set, so
+  // any page beyond the first may no longer exist — jump back to page one.
   useEffect(() => {
     setPagination((previous) =>
       previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
     )
-  }, [debouncedSearch, statusFilter, servicePointFilter])
+  }, [debouncedSearch, statusFilter, servicePointFilter, sort])
 
-  // Deleting rows can shrink the row set below the current page — clamp to
-  // the last page that still exists.
-  useEffect(() => {
-    setPagination((previous) => {
-      const lastPage = Math.max(
-        0,
-        Math.ceil(visibleRows.length / previous.pageSize) - 1,
-      )
-      return previous.pageIndex > lastPage
-        ? { ...previous, pageIndex: lastPage }
-        : previous
-    })
-  }, [visibleRows.length])
+  const listQuery = useQuery(
+    merchantsListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      servicePointId: servicePointFilter,
+      sortBy: sort ? SORT_FIELD_BY_COLUMN[sort.column] : undefined,
+      sortOrder: sort?.direction,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const merchants = listQuery.data?.merchants ?? []
+  const total = listQuery.data?.total ?? 0
 
-  const pageRows = useMemo(
+  // Service point options for the filter dropdown and the form select —
+  // the live catalogue from the backend, never hardcoded.
+  const servicePointsQuery = useQuery(
+    servicePointsListQueryOptions({ pageSize: 100 }),
+  )
+  const servicePointOptions = useMemo(
     () =>
-      visibleRows.slice(
-        pagination.pageIndex * pagination.pageSize,
-        (pagination.pageIndex + 1) * pagination.pageSize,
-      ),
-    [visibleRows, pagination],
+      (servicePointsQuery.data?.servicePoints ?? []).map((servicePoint) => ({
+        id: servicePoint.id,
+        code: servicePoint.code,
+        name: servicePoint.name,
+      })),
+    [servicePointsQuery.data],
   )
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<MerchantRecord | null>(null)
+  // Bumped on every duplicate-code 409 so the form modal highlights the
+  // code field without losing the entered values.
+  const [duplicateConflict, setDuplicateConflict] = useState(0)
   const [viewOpen, setViewOpen] = useState(false)
   const [viewing, setViewing] = useState<MerchantRecord | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -207,11 +173,13 @@ export function MerchantsPage() {
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: MerchantRecord) => {
     setEditing(record)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
@@ -230,7 +198,14 @@ export function MerchantsPage() {
     setStatusOpen(true)
   }
 
-  // ── CRUD (mock backend; the mutation hooks own toasts + cache updates) ─
+  // The view dialog re-reads the record so it always shows fresh data even
+  // when the cached list is stale (GET /merchants/:id).
+  const detailQuery = useQuery({
+    ...merchantDetailQueryOptions(viewing?.id ?? ''),
+    enabled: viewOpen && viewing !== null,
+  })
+
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
   const createMerchant = useCreateMerchant()
   const updateMerchant = useUpdateMerchant()
   const deleteMerchant = useDeleteMerchant()
@@ -239,10 +214,18 @@ export function MerchantsPage() {
   const saving = createMerchant.isPending || updateMerchant.isPending
 
   // The form stays open (with its submit disabled) until the save lands, so
-  // a rejected payload (e.g. duplicate code) keeps the user's input intact.
+  // a rejected payload keeps the user's input intact. A duplicate-code 409
+  // additionally highlights the code field inline.
   const handleSubmit = (values: MerchantFormValues) => {
     const payload = payloadFromForm(values)
-    const callbacks = { onSuccess: () => setFormOpen(false) }
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateCodeError(error)) {
+          setDuplicateConflict((previous) => previous + 1)
+        }
+      },
+    }
     if (editing) {
       updateMerchant.mutate({ id: editing.id, ...payload }, callbacks)
       return
@@ -303,6 +286,7 @@ export function MerchantsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search code, name, PIC or phone…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -328,7 +312,7 @@ export function MerchantsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All service points</SelectItem>
-            {MERCHANT_SERVICE_POINTS.map((servicePoint) => (
+            {servicePointOptions.map((servicePoint) => (
               <SelectItem key={servicePoint.id} value={servicePoint.id}>
                 {servicePoint.name}
               </SelectItem>
@@ -339,8 +323,8 @@ export function MerchantsPage() {
 
       {/* Merchant table */}
       <MerchantsTable
-        rows={pageRows}
-        total={visibleRows.length}
+        rows={merchants}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
         isPending={listQuery.isPending}
@@ -365,13 +349,19 @@ export function MerchantsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         merchant={editing}
+        servicePointOptions={servicePointOptions}
         saving={saving}
+        duplicateConflict={duplicateConflict}
         onSubmit={handleSubmit}
       />
       <MerchantViewModal
         open={viewOpen}
         onOpenChange={setViewOpen}
-        merchant={viewing}
+        merchant={
+          detailQuery.data && detailQuery.data.id === viewing?.id
+            ? detailQuery.data
+            : viewing
+        }
       />
       <DeleteMerchantDialog
         open={deleteOpen}

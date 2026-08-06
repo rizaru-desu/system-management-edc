@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '#/components/ui/dialog.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
-import { MERCHANT_TYPE_LABELS, formatDateTime } from '../data/merchants.ts'
+import { formatDateTime } from '../data/merchants.ts'
 import type { MerchantRecord } from '../data/merchants.ts'
 
 interface MerchantViewModalProps {
@@ -93,7 +93,7 @@ export function MerchantViewModal({
             <StatusPill active={merchant.status === 'active'} />
           </div>
           <DialogDescription className="text-[#0E2748]/60">
-            {MERCHANT_TYPE_LABELS[merchant.type]} merchant served by{' '}
+            {merchant.type ? `${merchant.type} merchant` : 'Merchant'} served by{' '}
             {merchant.servicePointName}.
           </DialogDescription>
         </DialogHeader>
@@ -103,7 +103,7 @@ export function MerchantViewModal({
             <SectionTitle>Merchant information</SectionTitle>
             <div className="grid gap-4 sm:grid-cols-2">
               <DetailRow icon={Store} label="Merchant type">
-                {MERCHANT_TYPE_LABELS[merchant.type]}
+                {merchant.type || '—'}
               </DetailRow>
               <DetailRow icon={UserRound} label="PIC name">
                 {merchant.picName || '—'}
