@@ -195,7 +195,9 @@ export function AssignServicePointsDrawer({
       {/* Drawer panel */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl md:w-[85vw] lg:max-w-[1060px]',
+          // The portal escapes the console's theme-light wrapper — re-scope it
+          // here so Button/Select variants keep their light-theme colors.
+          'theme-light fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-white shadow-2xl md:w-[85vw] lg:max-w-[1060px]',
           'border-l border-brand-100',
           'animate-in slide-in-from-right duration-300 ease-out',
         )}
