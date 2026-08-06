@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   KeyRound,
@@ -7,7 +7,6 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -34,8 +33,13 @@ import {
 } from '../api/role-permissions.ts'
 import { useUpdateUser } from '../api/update-user.ts'
 import { userStatsQueryOptions } from '../api/user-stats.ts'
+import { servicePointsListQueryOptions } from '#/features/service-points/index.ts'
 import { seedRolePermissions } from '../data/permissions.ts'
-import { seedAssignmentsForUser } from '../data/service-point-assignments.ts'
+import {
+  assignmentCountsQueryOptions,
+  useReplaceAssignments,
+  userAssignmentsQueryOptions,
+} from '../api/service-point-assignments.ts'
 import type { ServicePointAssignment } from '../data/service-point-assignments.ts'
 import type { UserRecord } from '../data/users.ts'
 import { AssignServicePointsDrawer } from './assign-service-points-drawer.tsx'
@@ -97,27 +101,33 @@ export function UsersPage() {
   const [devicesDrawerOpen, setDevicesDrawerOpen] = useState(false)
   const [devicesUser, setDevicesUser] = useState<UserRecord | null>(null)
 
-  // Service point assignment drawer (UI only). Saved drafts live in this
-  // session-local map; users without an entry fall back to the deterministic
-  // mock seed, so the table column always has a count to show. The future
-  // Assignment API replaces both.
-  const [assignmentOverrides, setAssignmentOverrides] = useState<
-    Record<string, Array<ServicePointAssignment>>
-  >({})
+  // Service point assignment drawer, backed by the assignment API.
   const [assignDrawerOpen, setAssignDrawerOpen] = useState(false)
   const [assignUser, setAssignUser] = useState<UserRecord | null>(null)
 
-  const assignmentsFor = useCallback(
-    (user: UserRecord) =>
-      assignmentOverrides[user.id] ?? seedAssignmentsForUser(user),
-    [assignmentOverrides],
-  )
+  // Counts for the "Service Points" column: one server round trip covering
+  // the current page's users (GET /users/:id/service-points per user,
+  // fanned out server-side). Unknown/failed entries render as an em dash.
+  const userIds = useMemo(() => users.map((user) => user.id), [users])
+  const assignmentCountsQuery = useQuery(assignmentCountsQueryOptions(userIds))
 
-  // Memoized so the drawer's draft-reseeding effect only fires on real
-  // changes, not on every page render.
+  // The drawer's data: the target user's stored assignments plus the full
+  // service point catalogue for the transfer's "available" panel.
+  const assignmentsQuery = useQuery({
+    ...userAssignmentsQueryOptions(assignUser?.id ?? ''),
+    enabled: assignDrawerOpen && assignUser !== null,
+  })
+  const catalogueQuery = useQuery({
+    ...servicePointsListQueryOptions({ pageSize: 100 }),
+    enabled: assignDrawerOpen,
+  })
+
+  // Memoized so the drawer's draft-reseeding effect (keyed on this array's
+  // identity) only fires when the fetched data actually changes — an inline
+  // `?? []` would mint a new identity every render.
   const assignUserAssignments = useMemo(
-    () => (assignUser ? assignmentsFor(assignUser) : []),
-    [assignUser, assignmentsFor],
+    () => assignmentsQuery.data ?? [],
+    [assignmentsQuery.data],
   )
 
   const openAssignDrawer = (user: UserRecord) => {
@@ -125,16 +135,22 @@ export function UsersPage() {
     setAssignDrawerOpen(true)
   }
 
+  const replaceAssignments = useReplaceAssignments()
+
+  // Only ACTIVE-toggled rows are sent; the backend's replace soft-unassigns
+  // everything omitted. The mutation owns toasts and cache updates.
   const handleSaveAssignments = (
     user: UserRecord,
     assignments: Array<ServicePointAssignment>,
   ) => {
-    setAssignmentOverrides((previous) => ({
-      ...previous,
-      [user.id]: assignments,
-    }))
-    toast.success(`Service point assignments for “${user.name}” updated.`, {
-      description: 'Mock data — changes reset on reload.',
+    replaceAssignments.mutate({
+      userId: user.id,
+      userName: user.name,
+      assignments: assignments.map((assignment) => ({
+        servicePointId: assignment.servicePointId,
+        roleAtServicePoint: assignment.roleAtServicePoint,
+        isDefault: assignment.isDefault,
+      })),
     })
   }
 
@@ -409,7 +425,9 @@ export function UsersPage() {
         onEdit={openEdit}
         onViewDevices={openDevicesDrawer}
         onAssignServicePoints={openAssignDrawer}
-        getAssignedServicePointCount={(user) => assignmentsFor(user).length}
+        getAssignedServicePointCount={(user) =>
+          assignmentCountsQuery.data?.[user.id] ?? null
+        }
       />
 
       <UserFormModal
@@ -440,6 +458,23 @@ export function UsersPage() {
         open={assignDrawerOpen}
         onClose={() => setAssignDrawerOpen(false)}
         assignments={assignUserAssignments}
+        assignmentsPending={assignmentsQuery.isPending || catalogueQuery.isPending}
+        assignmentsError={
+          assignmentsQuery.isError
+            ? assignmentsQuery.error instanceof Error
+              ? assignmentsQuery.error.message
+              : 'Failed to load assignments.'
+            : catalogueQuery.isError
+              ? catalogueQuery.error instanceof Error
+                ? catalogueQuery.error.message
+                : 'Failed to load service points.'
+              : null
+        }
+        onRetry={() => {
+          if (assignmentsQuery.isError) void assignmentsQuery.refetch()
+          if (catalogueQuery.isError) void catalogueQuery.refetch()
+        }}
+        catalogue={catalogueQuery.data?.servicePoints ?? []}
         onSave={handleSaveAssignments}
       />
     </div>

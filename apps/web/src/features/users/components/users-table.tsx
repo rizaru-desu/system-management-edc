@@ -111,8 +111,11 @@ interface UsersTableProps {
   onEdit: (user: UserRecord) => void
   onViewDevices: (user: UserRecord) => void
   onAssignServicePoints: (user: UserRecord) => void
-  /** Mock assignment count shown in the Service Points column. */
-  getAssignedServicePointCount: (user: UserRecord) => number
+  /**
+   * Assignment count shown in the Service Points column; null while the
+   * counts are still loading (or failed), rendered as an em dash.
+   */
+  getAssignedServicePointCount: (user: UserRecord) => number | null
 }
 
 export function UsersTable({
@@ -174,6 +177,9 @@ export function UsersTable({
         header: 'Service Points',
         cell: ({ row }) => {
           const count = getAssignedServicePointCount(row.original)
+          if (count === null) {
+            return <span className="text-xs text-brand-900/40">—</span>
+          }
           if (count === 0) {
             return <span className="text-xs text-brand-900/40">None</span>
           }

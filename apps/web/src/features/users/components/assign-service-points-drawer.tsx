@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MapPinned, X } from 'lucide-react'
+import { Loader2, MapPinned, TriangleAlert, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
+import { EmptyState } from '#/components/ui/empty-state.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
 import { cn } from '#/lib/utils.ts'
-import {
-  SERVICE_POINT_CATALOGUE,
-  assignmentId,
-} from '../data/service-point-assignments.ts'
+import type { ServicePointRecord } from '#/features/service-points/index.ts'
 import type {
   ServicePointAssignment,
   ServicePointRoleKey,
@@ -21,9 +19,19 @@ interface AssignServicePointsDrawerProps {
   user: UserRecord | null
   open: boolean
   onClose: () => void
-  /** The user's stored assignments; the drawer edits a draft copy. */
+  /** The user's stored ACTIVE assignments; the drawer edits a draft copy. */
   assignments: Array<ServicePointAssignment>
-  /** Called with the validated draft when Save is pressed (mock persistence). */
+  /** True while the assignments or the catalogue are still loading. */
+  assignmentsPending: boolean
+  /** Load-failure message; null when both queries are healthy. */
+  assignmentsError: string | null
+  onRetry: () => void
+  /** Service points offered in the transfer's "available" panel. */
+  catalogue: Array<ServicePointRecord>
+  /**
+   * Called with the rows still toggled active when Save is pressed — the
+   * backend's replace soft-unassigns everything omitted.
+   */
   onSave: (user: UserRecord, assignments: Array<ServicePointAssignment>) => void
 }
 
@@ -68,6 +76,10 @@ export function AssignServicePointsDrawer({
   open,
   onClose,
   assignments,
+  assignmentsPending,
+  assignmentsError,
+  onRetry,
+  catalogue,
   onSave,
 }: AssignServicePointsDrawerProps) {
   const [draft, setDraft] = useState<Array<ServicePointAssignment>>([])
@@ -111,7 +123,8 @@ export function AssignServicePointsDrawer({
         // assigned entries, this keeps the invariant under race-y clicks.
         .filter((servicePointId) => !existing.has(servicePointId))
         .map((servicePointId) => ({
-          id: assignmentId(user.id, servicePointId),
+          // Draft-only id; the backend mints the real one on save.
+          id: `draft-${servicePointId}`,
           userId: user.id,
           servicePointId,
           roleAtServicePoint: DEFAULT_ROLE,
@@ -166,18 +179,27 @@ export function AssignServicePointsDrawer({
   }
 
   const handleSave = () => {
-    if (draft.length === 0) {
-      setError('At least one service point is required.')
+    // Rows toggled inactive are unassigned on save (omitted from the PUT
+    // payload — the backend soft-unassigns whatever is missing).
+    const activeRows = draft.filter(
+      (assignment) => assignment.status === 'active',
+    )
+    if (activeRows.length === 0) {
+      setError('At least one active service point is required.')
       return
     }
-    const defaults = draft.filter((assignment) => assignment.isDefault)
+    const defaults = activeRows.filter((assignment) => assignment.isDefault)
     if (defaults.length !== 1) {
-      // Unreachable through the UI (defaults are repaired on every change);
-      // kept so a future regression surfaces as a message, not bad data.
-      setError('Mark exactly one service point as the default.')
+      setError(
+        draft.some(
+          (assignment) => assignment.isDefault && assignment.status === 'inactive',
+        )
+          ? 'The default service point must stay active — pick another default first.'
+          : 'Mark exactly one service point as the default.',
+      )
       return
     }
-    onSave(user, draft)
+    onSave(user, activeRows)
     onClose()
   }
 
@@ -254,22 +276,48 @@ export function AssignServicePointsDrawer({
 
         {/* Transfer + configuration (scrollable area) */}
         <div className="flex-1 overflow-y-auto bg-brand-50 p-4 md:p-6">
-          <ServicePointTransfer
-            catalogue={SERVICE_POINT_CATALOGUE}
-            assignments={draft}
-            onAdd={addServicePoints}
-            onRemove={removeAssignment}
-            onRemoveAll={removeAll}
-            onSetDefault={setDefault}
-            onRoleChange={setRole}
-            onStatusChange={setStatus}
-          />
-          <p className="mt-4 rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-brand-900/60">
-            Service point roles are contextual — they do not replace the
-            user&apos;s global application role. With a single assignment it is
-            the default automatically; with several, exactly one must be marked
-            default.
-          </p>
+          {assignmentsError !== null ? (
+            <EmptyState
+              icon={TriangleAlert}
+              tone="danger"
+              title={assignmentsError}
+              action={
+                <Button variant="outline" size="sm" onClick={onRetry}>
+                  Try again
+                </Button>
+              }
+            />
+          ) : assignmentsPending ? (
+            <div className="flex min-h-[240px] flex-col items-center justify-center gap-2">
+              <Loader2
+                className="h-6 w-6 animate-spin text-brand-500"
+                strokeWidth={1.75}
+              />
+              <p className="text-sm text-brand-900/40">
+                Loading assignments...
+              </p>
+            </div>
+          ) : (
+            <>
+              <ServicePointTransfer
+                catalogue={catalogue}
+                assignments={draft}
+                onAdd={addServicePoints}
+                onRemove={removeAssignment}
+                onRemoveAll={removeAll}
+                onSetDefault={setDefault}
+                onRoleChange={setRole}
+                onStatusChange={setStatus}
+              />
+              <p className="mt-4 rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-brand-900/60">
+                Service point roles are contextual — they do not replace the
+                user&apos;s global application role. With a single assignment
+                it is the default automatically; with several, exactly one
+                must be marked default. Switching a row inactive unassigns it
+                on save.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Footer */}
@@ -289,7 +337,11 @@ export function AssignServicePointsDrawer({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="button" onClick={handleSave}>
+            <Button
+              type="button"
+              disabled={assignmentsPending || assignmentsError !== null}
+              onClick={handleSave}
+            >
               Save assignments
             </Button>
           </div>

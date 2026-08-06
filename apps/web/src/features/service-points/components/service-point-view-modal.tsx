@@ -113,7 +113,7 @@ export function ServicePointViewModal({
             {servicePoint.email || '—'}
           </DetailRow>
           <DetailRow icon={Users} label="Assigned users">
-            {servicePoint.assignedUsers}
+            {servicePoint.assignedUsers ?? '—'}
           </DetailRow>
           <DetailRow icon={CalendarDays} label="Created at">
             <span className="tabular-nums">{servicePoint.createdAt}</span>
@@ -127,12 +127,12 @@ export function ServicePointViewModal({
           )}
         </div>
 
-        {/* Leader/PIC intentionally absent: both will come from the future
-          Service Point Assignment module (user ⇄ assignment ⇄ service point),
-          not from this master record. */}
+        {/* Leader/PIC intentionally absent: both come from the Service Point
+          Assignment module (user ⇄ assignment ⇄ service point), not from
+          this master record. */}
         <p className="rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-[#0E2748]/60">
-          Leader, PIC and user assignment will be managed through the upcoming
-          Service Point Assignment module.
+          Leader, PIC and user assignment are managed through Service Point
+          Assignments on the Users page.
         </p>
 
         <DialogFooter>
