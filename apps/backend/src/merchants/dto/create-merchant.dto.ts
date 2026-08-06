@@ -18,17 +18,23 @@ const optionalText = z
  */
 const PHONE_PATTERN = /^\+?[\d\s()-]*\d[\d\s()-]*$/;
 
+/** Format check shared with the Excel import's per-row validation. */
+export function isValidPhoneNumber(value: string): boolean {
+  const digits = value.replace(/\D/g, '').length;
+  return PHONE_PATTERN.test(value) && digits >= 7 && digits <= 20;
+}
+
+/** Format check shared with the Excel import's per-row validation. */
+export function isValidEmail(value: string): boolean {
+  return z.email().safeParse(value).success;
+}
+
 const phoneNumberSchema = z
   .string()
   .trim()
-  .regex(PHONE_PATTERN, 'phoneNumber has an invalid format')
-  .refine(
-    (value) => {
-      const digits = value.replace(/\D/g, '').length;
-      return digits >= 7 && digits <= 20;
-    },
-    { message: 'phoneNumber must contain 7–20 digits' },
-  )
+  .refine(isValidPhoneNumber, {
+    message: 'phoneNumber has an invalid format',
+  })
   .nullish()
   .or(z.literal(''))
   .transform((value) => (value ? value : null));

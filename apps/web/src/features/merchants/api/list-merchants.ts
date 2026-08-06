@@ -21,6 +21,8 @@ export interface BackendMerchant {
   postalCode: string | null
   latitude: number | null
   longitude: number | null
+  /** Distance (km) to the assigned service point, stamped by the import. */
+  distanceToServicePointKm: number | null
   servicePointId: string
   servicePointCode: string
   servicePointName: string
@@ -46,6 +48,7 @@ export function toMerchantRecord(row: BackendMerchant): MerchantRecord {
     postalCode: row.postalCode,
     latitude: row.latitude,
     longitude: row.longitude,
+    distanceToServicePointKm: row.distanceToServicePointKm ?? null,
     servicePointId: row.servicePointId,
     servicePointName: row.servicePointName,
     status: row.status === 'ACTIVE' ? 'active' : 'inactive',

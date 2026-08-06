@@ -62,13 +62,16 @@ export {
 } from "./queries/service-points.js";
 export {
   createMerchant,
+  findExistingMerchantCodes,
   findMerchantById,
+  insertMerchants,
   listMerchants,
   softDeleteMerchant,
   updateMerchant,
   upsertMerchantsByCode,
   type CreateMerchantResult,
   type DeleteMerchantResult,
+  type InsertMerchantsResult,
   type ListMerchantsOptions,
   type MerchantInput,
   type MerchantListPage,

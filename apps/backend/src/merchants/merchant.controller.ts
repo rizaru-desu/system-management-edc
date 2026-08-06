@@ -11,8 +11,14 @@ import {
 import type { MerchantListPage, MerchantRow } from '@repo/db';
 import { RequirePermission } from '../permissions/require-permission.decorator';
 import { parseCreateMerchantDto } from './dto/create-merchant.dto';
+import { parseImportMerchantsDto } from './dto/import-merchants.dto';
 import { parseMerchantFilterDto } from './dto/merchant-filter.dto';
 import { parseUpdateMerchantDto } from './dto/update-merchant.dto';
+import { MerchantImportService } from './merchant-import.service';
+import type {
+  MerchantImportPreview,
+  MerchantImportResult,
+} from './merchant-import.service';
 import { MerchantService } from './merchant.service';
 
 /**
@@ -23,11 +29,35 @@ import { MerchantService } from './merchant.service';
 @Controller('merchants')
 @RequirePermission('merchants', 'view')
 export class MerchantController {
-  constructor(private readonly merchantService: MerchantService) {}
+  constructor(
+    private readonly merchantService: MerchantService,
+    private readonly merchantImportService: MerchantImportService,
+  ) {}
 
   @Get()
   list(@Query() query: unknown): Promise<MerchantListPage> {
     return this.merchantService.list(parseMerchantFilterDto(query));
+  }
+
+  /**
+   * Validation + nearest-service-point assignment preview for the Excel
+   * import — nothing is written.
+   */
+  @Post('import/preview')
+  @RequirePermission('merchants', 'create')
+  previewImport(@Body() body: unknown): Promise<MerchantImportPreview> {
+    return this.merchantImportService.preview(
+      parseImportMerchantsDto(body).rows,
+    );
+  }
+
+  /** Commits the import: saves the valid, automatically assigned rows. */
+  @Post('import')
+  @RequirePermission('merchants', 'create')
+  import(@Body() body: unknown): Promise<MerchantImportResult> {
+    return this.merchantImportService.import(
+      parseImportMerchantsDto(body).rows,
+    );
   }
 
   @Get(':id')

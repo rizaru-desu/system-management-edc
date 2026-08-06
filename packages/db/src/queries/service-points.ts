@@ -18,6 +18,8 @@ export interface ServicePointRow {
   email: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Service area radius (km) for automatic merchant assignment; null = unlimited. */
+  coverageRadiusKm: number | null;
   notes: string | null;
   status: ServicePointStatus;
   /** Users linked via ACTIVE service point assignments. */
@@ -75,6 +77,7 @@ const rowColumns = {
   email: servicePoints.email,
   latitude: servicePoints.latitude,
   longitude: servicePoints.longitude,
+  coverageRadiusKm: servicePoints.coverageRadiusKm,
   notes: servicePoints.notes,
   status: servicePoints.status,
   assignedUsers: assignedUsersSql,
@@ -182,6 +185,8 @@ export interface ServicePointInput {
   email: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Service area radius (km) for automatic merchant assignment; null = unlimited. */
+  coverageRadiusKm: number | null;
   notes: string | null;
   status: ServicePointStatus;
 }

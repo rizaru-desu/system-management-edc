@@ -37,6 +37,8 @@ export interface MerchantRecord {
   postalCode: string | null
   latitude: number | null
   longitude: number | null
+  /** Distance (km) to the assigned service point, stamped by the import. */
+  distanceToServicePointKm: number | null
   servicePointId: string
   servicePointName: string
   status: MerchantStatus

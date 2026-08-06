@@ -1,4 +1,15 @@
-import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../client.js";
 import { merchants } from "../schema/merchant.js";
 import type {
@@ -28,6 +39,8 @@ export interface MerchantRow {
   postalCode: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Distance (km) to the assigned service point, stamped by the import. */
+  distanceToServicePointKm: number | null;
   servicePointId: string;
   servicePointCode: string;
   servicePointName: string;
@@ -81,6 +94,7 @@ const rowColumns = {
   postalCode: merchants.postalCode,
   latitude: merchants.latitude,
   longitude: merchants.longitude,
+  distanceToServicePointKm: merchants.distanceToServicePointKm,
   servicePointId: merchants.servicePointId,
   servicePointCode: servicePoints.code,
   servicePointName: servicePoints.name,
@@ -196,6 +210,8 @@ export interface MerchantInput {
   postalCode: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Distance (km) to the assigned service point; import-only, default null. */
+  distanceToServicePointKm?: number | null;
   servicePointId: string;
   status: MerchantStatus;
 }
@@ -434,4 +450,63 @@ export async function upsertMerchantsByCode(
   });
 
   return { created, updated };
+}
+
+/**
+ * The subset of `codes` already used by live merchants — one query for the
+ * import's bulk duplicate check (never per-row).
+ */
+export async function findExistingMerchantCodes(
+  codes: string[],
+): Promise<string[]> {
+  if (codes.length === 0) return [];
+  const rows = await db
+    .select({ merchantCode: merchants.merchantCode })
+    .from(merchants)
+    .where(and(inArray(merchants.merchantCode, codes), notDeleted));
+  return rows.map((row) => row.merchantCode);
+}
+
+export type InsertMerchantsResult =
+  | { ok: true; inserted: number }
+  | { ok: false; error: "duplicate-codes"; codes: string[] };
+
+/**
+ * Bulk insert for the Excel import: one transaction, one multi-row INSERT.
+ * Codes are re-checked against live rows inside the transaction (the caller
+ * validated already, but a concurrent create must not slip a duplicate in);
+ * the partial unique index on `merchant_code` backstops the remaining race.
+ */
+export async function insertMerchants(
+  inputs: MerchantInput[],
+): Promise<InsertMerchantsResult> {
+  if (inputs.length === 0) return { ok: true, inserted: 0 };
+
+  return db.transaction(async (tx) => {
+    const taken = await tx
+      .select({ merchantCode: merchants.merchantCode })
+      .from(merchants)
+      .where(
+        and(
+          inArray(
+            merchants.merchantCode,
+            inputs.map((input) => input.merchantCode),
+          ),
+          notDeleted,
+        ),
+      );
+    if (taken.length > 0) {
+      return {
+        ok: false as const,
+        error: "duplicate-codes" as const,
+        codes: taken.map((row) => row.merchantCode),
+      };
+    }
+
+    const inserted = await tx
+      .insert(merchants)
+      .values(inputs)
+      .returning({ id: merchants.id });
+    return { ok: true as const, inserted: inserted.length };
+  });
 }

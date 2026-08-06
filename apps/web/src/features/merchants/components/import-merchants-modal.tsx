@@ -16,6 +16,7 @@ import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -24,13 +25,20 @@ import {
 } from '#/components/ui/dialog.tsx'
 import { cn } from '#/lib/utils.ts'
 import {
+  previewMerchantImport,
+  useImportMerchants,
+} from '../api/import-merchants.ts'
+import type {
+  ImportAssignmentStatus,
+  ImportPreviewResult,
+  RawImportRow,
+} from '../api/import-merchants.ts'
+import {
   IMPORT_ACCEPTED_EXTENSIONS,
-  buildImportPreview,
   downloadMerchantTemplate,
   importFileError,
-  importMerchants,
+  parseMerchantWorkbook,
 } from '../lib/excel.ts'
-import type { ImportPreview } from '../lib/excel.ts'
 
 interface ImportMerchantsModalProps {
   open: boolean
@@ -51,7 +59,7 @@ function SummaryCard({
 }: {
   label: string
   value: number
-  tone?: 'default' | 'success' | 'danger'
+  tone?: 'default' | 'success' | 'danger' | 'info'
 }) {
   return (
     <Card className="border-[#DDE0EC] px-4 py-3">
@@ -63,6 +71,7 @@ function SummaryCard({
           'mt-1 text-2xl font-bold tabular-nums',
           tone === 'success' && 'text-emerald-600',
           tone === 'danger' && 'text-rose-600',
+          tone === 'info' && 'text-[#3F6FA8]',
           tone === 'default' && 'text-[#0E2748]',
         )}
       >
@@ -72,11 +81,29 @@ function SummaryCard({
   )
 }
 
+/** Assignment outcome chip of one preview row. */
+function AssignmentBadge({
+  status,
+}: {
+  status: ImportAssignmentStatus | null
+}) {
+  switch (status) {
+    case 'ASSIGNED':
+      return <Badge variant="success">Assigned</Badge>
+    case 'OUTSIDE_COVERAGE_RADIUS':
+      return <Badge variant="sky">Outside Coverage Radius</Badge>
+    case 'NO_ACTIVE_SERVICE_POINT':
+      return <Badge variant="muted">No Active Service Point</Badge>
+    default:
+      return <span className="text-[#0E2748]/40">—</span>
+  }
+}
+
 /**
- * Excel import flow (UI-only): pick a file, preview the parsed rows with
- * their validation outcome, then run a simulated import. The template is
- * generated client-side with SheetJS; real parsing and persistence move to
- * the backend import endpoint later.
+ * Excel import flow: pick a file, preview the backend's validation and
+ * automatic nearest-service-point assignment (computed from each row's
+ * latitude/longitude), then commit — the valid, automatically assigned rows
+ * are saved through POST /merchants/import.
  */
 export function ImportMerchantsModal({
   open,
@@ -84,23 +111,27 @@ export function ImportMerchantsModal({
 }: ImportMerchantsModalProps) {
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
-  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  // The parsed sheet rows behind the current preview — the commit posts
+  // these same rows so the backend re-validates exactly what was shown.
+  const [parsedRows, setParsedRows] = useState<Array<RawImportRow> | null>(null)
+  const [preview, setPreview] = useState<ImportPreviewResult | null>(null)
   const [previewing, setPreviewing] = useState(false)
-  const [importing, setImporting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const importMerchants = useImportMerchants()
+  const importing = importMerchants.isPending
   const busy = previewing || importing
 
   const reset = () => {
     setFile(null)
     setDragActive(false)
+    setParsedRows(null)
     setPreview(null)
     setPreviewing(false)
-    setImporting(false)
   }
 
   const handleOpenChange = (nextOpen: boolean) => {
-    // Keep the dialog up while a simulated request is in flight.
+    // Keep the dialog up while a request is in flight.
     if (!nextOpen && busy) return
     if (!nextOpen) reset()
     onOpenChange(nextOpen)
@@ -113,6 +144,7 @@ export function ImportMerchantsModal({
       return
     }
     setFile(candidate)
+    setParsedRows(null)
     setPreview(null)
   }
 
@@ -127,25 +159,35 @@ export function ImportMerchantsModal({
     if (!file) return
     setPreviewing(true)
     try {
-      setPreview(await buildImportPreview(file))
+      const parsed = await parseMerchantWorkbook(file)
+      if (!parsed.ok) {
+        toast.error(parsed.error)
+        return
+      }
+      setPreview(await previewMerchantImport(parsed.rows))
+      setParsedRows(parsed.rows)
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to validate the import file.',
+      )
     } finally {
       setPreviewing(false)
     }
   }
 
-  const handleImport = async () => {
-    if (!preview || preview.validRows === 0) return
-    setImporting(true)
-    try {
-      const imported = await importMerchants(preview)
-      toast.success(
-        `${imported} ${imported === 1 ? 'merchant' : 'merchants'} imported (simulation — no data was saved).`,
-      )
-      reset()
-      onOpenChange(false)
-    } finally {
-      setImporting(false)
-    }
+  const handleImport = () => {
+    if (!parsedRows || !preview || preview.summary.assigned === 0) return
+    importMerchants.mutate(
+      { rows: parsedRows },
+      {
+        onSuccess: () => {
+          reset()
+          onOpenChange(false)
+        },
+      },
+    )
   }
 
   const handleDownloadTemplate = async () => {
@@ -158,14 +200,18 @@ export function ImportMerchantsModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="theme-light max-h-[90vh] overflow-y-auto border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-3xl">
+      <DialogContent
+        disableOutsideClose
+        className="theme-light border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-4xl"
+      >
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
             Import merchants from Excel
           </DialogTitle>
           <DialogDescription className="text-[#0E2748]/60">
-            Upload a filled-in template, review the validation preview, then
-            import the valid rows.
+            Upload a filled-in template — each merchant is automatically
+            assigned to the nearest service point from its latitude and
+            longitude.
           </DialogDescription>
         </DialogHeader>
 
@@ -295,107 +341,155 @@ export function ImportMerchantsModal({
           </>
         ) : (
           <>
-            {/* Step 2 — validation preview (mock data, UI-only) */}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <SummaryCard label="Total rows" value={preview.totalRows} />
-              <SummaryCard
-                label="Valid rows"
-                value={preview.validRows}
-                tone="success"
-              />
-              <SummaryCard
-                label="Invalid rows"
-                value={preview.invalidRows}
-                tone="danger"
-              />
-            </div>
+            {/* Step 2 — validation + assignment preview */}
+            <DialogBody className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <SummaryCard
+                  label="Total rows"
+                  value={preview.summary.totalRows}
+                />
+                <SummaryCard
+                  label="Valid rows"
+                  value={preview.summary.validRows}
+                  tone="success"
+                />
+                <SummaryCard
+                  label="Invalid rows"
+                  value={preview.summary.invalidRows}
+                  tone="danger"
+                />
+                <SummaryCard
+                  label="Assigned automatically"
+                  value={preview.summary.assigned}
+                  tone="info"
+                />
+                <SummaryCard
+                  label="Need manual assignment"
+                  value={preview.summary.needManualAssignment}
+                />
+              </div>
 
-            <Card className="overflow-x-auto border-[#DDE0EC]">
-              <table className="w-full min-w-2xl text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[#DDE0EC] text-[11px] uppercase tracking-wider text-[#0E2748]/50">
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      Merchant Code
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      Merchant Name
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      PIC Name
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      Service Point
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      Status
-                    </th>
-                    <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      Validation Result
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.rows.map((row) => (
-                    <tr
-                      key={row.rowNumber}
-                      className="border-b border-[#DDE0EC] last:border-0"
-                    >
-                      <td className="px-4 py-2.5 font-medium whitespace-nowrap text-[#0E2748]/80 tabular-nums">
-                        {row.merchantCode || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-[#0E2748]/80">
-                        {row.merchantName || (
-                          <span className="text-[#0E2748]/40">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70">
-                        {row.picName || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70">
-                        {row.servicePoint || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70 capitalize">
-                        {row.status || '—'}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        {row.error === null ? (
-                          <Badge variant="success">
-                            <CircleCheck className="h-3 w-3" strokeWidth={2} />
-                            Valid
-                          </Badge>
-                        ) : (
-                          <span className="leading-tight">
-                            <Badge variant="danger">
-                              <CircleX className="h-3 w-3" strokeWidth={2} />
-                              Invalid
-                            </Badge>
-                            <span className="mt-1 block text-xs text-rose-600">
-                              {row.error}
-                            </span>
-                          </span>
-                        )}
-                      </td>
+              <Card className="overflow-x-auto border-[#DDE0EC]">
+                <table className="w-full min-w-3xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[#DDE0EC] text-[11px] uppercase tracking-wider text-[#0E2748]/50">
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Row
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Merchant Code
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Merchant Name
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Nearest Service Point
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Distance (KM)
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Assignment Status
+                      </th>
+                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
+                        Validation Result
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </Card>
+                  </thead>
+                  <tbody>
+                    {preview.rows.map((row) => (
+                      <tr
+                        key={row.rowNumber}
+                        className="border-b border-[#DDE0EC] last:border-0"
+                      >
+                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/50 tabular-nums">
+                          {row.rowNumber}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium whitespace-nowrap text-[#0E2748]/80 tabular-nums">
+                          {row.merchantCode || '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-[#0E2748]/80">
+                          {row.merchantName || (
+                            <span className="text-[#0E2748]/40">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70">
+                          {row.nearestServicePointName || (
+                            <span className="text-[#0E2748]/40">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70 tabular-nums">
+                          {row.distanceKm === null ? (
+                            <span className="text-[#0E2748]/40">—</span>
+                          ) : (
+                            row.distanceKm.toFixed(2)
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 whitespace-nowrap">
+                          <AssignmentBadge status={row.assignmentStatus} />
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {row.errors.length === 0 ? (
+                            <Badge variant="success">
+                              <CircleCheck
+                                className="h-3 w-3"
+                                strokeWidth={2}
+                              />
+                              Valid
+                            </Badge>
+                          ) : (
+                            <span className="leading-tight">
+                              <Badge variant="danger">
+                                <CircleX className="h-3 w-3" strokeWidth={2} />
+                                Invalid
+                              </Badge>
+                              {row.errors.map((error) => (
+                                <span
+                                  key={error}
+                                  className="mt-1 block text-xs text-rose-600"
+                                >
+                                  {error}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
 
-            {preview.invalidRows > 0 && (
-              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                {preview.invalidRows}{' '}
-                {preview.invalidRows === 1 ? 'row is' : 'rows are'} invalid and
-                will be skipped — fix them in the file and re-upload to import
-                everything.
-              </p>
-            )}
+              {preview.summary.needManualAssignment > 0 && (
+                <p className="rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-[#0E2748]/60">
+                  {preview.summary.needManualAssignment}{' '}
+                  {preview.summary.needManualAssignment === 1
+                    ? 'valid row is'
+                    : 'valid rows are'}{' '}
+                  outside the nearest service point&apos;s coverage radius (or
+                  no active service point exists) — the import skips them; add
+                  those merchants manually.
+                </p>
+              )}
+              {preview.summary.invalidRows > 0 && (
+                <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {preview.summary.invalidRows}{' '}
+                  {preview.summary.invalidRows === 1 ? 'row is' : 'rows are'}{' '}
+                  invalid and will be skipped — fix them in the file and
+                  re-upload to import everything.
+                </p>
+              )}
+            </DialogBody>
 
             <DialogFooter className="sm:justify-between">
               <Button
                 type="button"
                 variant="outline"
                 disabled={importing}
-                onClick={() => setPreview(null)}
+                onClick={() => {
+                  setPreview(null)
+                  setParsedRows(null)
+                }}
               >
                 Choose another file
               </Button>
@@ -410,7 +504,7 @@ export function ImportMerchantsModal({
                 </Button>
                 <Button
                   type="button"
-                  disabled={preview.validRows === 0 || importing}
+                  disabled={preview.summary.assigned === 0 || importing}
                   onClick={handleImport}
                 >
                   {importing && (
@@ -419,8 +513,8 @@ export function ImportMerchantsModal({
                       strokeWidth={1.75}
                     />
                   )}
-                  Import {preview.validRows}{' '}
-                  {preview.validRows === 1 ? 'merchant' : 'merchants'}
+                  Import {preview.summary.assigned}{' '}
+                  {preview.summary.assigned === 1 ? 'merchant' : 'merchants'}
                 </Button>
               </div>
             </DialogFooter>
