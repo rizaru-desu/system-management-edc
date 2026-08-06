@@ -16,6 +16,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedSplatRouteImport } from './routes/_authed/$'
+import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
@@ -54,6 +55,11 @@ const AuthedSplatRoute = AuthedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAppReleasesRoute = AuthedAppReleasesRouteImport.update({
+  id: '/app-releases',
+  path: '/app-releases',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authed/$': typeof AuthedSplatRoute
+  '/_authed/app-releases': typeof AuthedAppReleasesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/app-releases'
     | '/dashboard'
     | '/service-points'
     | '/users'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/app-releases'
     | '/dashboard'
     | '/service-points'
     | '/users'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/_authed/$'
+    | '/_authed/app-releases'
     | '/_authed/dashboard'
     | '/_authed/service-points'
     | '/_authed/users'
@@ -202,6 +214,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSplatRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/app-releases': {
+      id: '/_authed/app-releases'
+      path: '/app-releases'
+      fullPath: '/app-releases'
+      preLoaderRoute: typeof AuthedAppReleasesRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/dashboard': {
       id: '/_authed/dashboard'
       path: '/dashboard'
@@ -228,6 +247,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedSplatRoute: typeof AuthedSplatRoute
+  AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
@@ -235,6 +255,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSplatRoute: AuthedSplatRoute,
+  AuthedAppReleasesRoute: AuthedAppReleasesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,

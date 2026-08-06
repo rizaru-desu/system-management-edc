@@ -57,6 +57,13 @@
       "when": 1785951659659,
       "tag": "0007_furry_vanisher",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786006301319,
+      "tag": "0008_add_mobile_version_version_code",
+      "breakpoints": true
     }
   ]
 }
