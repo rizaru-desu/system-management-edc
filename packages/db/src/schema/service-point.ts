@@ -9,6 +9,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { createId } from "../id.js";
 import { user } from "./auth.js";
 
 export const SERVICE_POINT_STATUSES = ["ACTIVE", "INACTIVE"] as const;
@@ -42,7 +43,7 @@ export const servicePoints = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(createId),
     parentId: text("parent_id").references(
       (): AnyPgColumn => servicePoints.id,
     ),
@@ -90,7 +91,7 @@ export const servicePointAssignments = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(createId),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
