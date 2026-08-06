@@ -22,6 +22,8 @@ export interface BackendServicePoint {
   longitude: number | null
   notes: string | null
   status: 'ACTIVE' | 'INACTIVE'
+  /** Users linked via ACTIVE service point assignments. */
+  assignedUsers: number
   createdAt: string
   updatedAt: string
 }
@@ -47,9 +49,10 @@ export function toServicePointRecord(
     longitude: row.longitude,
     notes: row.notes,
     status: row.status.toLowerCase() as ServicePointStatus,
-    // No backend endpoint serves per-service-point user counts yet; null
-    // renders as an em dash in the table and view dialog.
-    assignedUsers: null,
+    // Live ACTIVE-assignment count computed by the backend row select; the
+    // null guard keeps older payload shapes rendering as an em dash.
+    assignedUsers:
+      typeof row.assignedUsers === 'number' ? row.assignedUsers : null,
     createdAt: new Date(row.createdAt).toISOString().slice(0, 10),
   }
 }

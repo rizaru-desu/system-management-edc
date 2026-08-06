@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../client.js";
-import { servicePoints } from "../schema/service-point.js";
+import {
+  servicePointAssignments,
+  servicePoints,
+} from "../schema/service-point.js";
 import type { ServicePointStatus } from "../schema/service-point.js";
 
 /** One live service point row in the shape the console consumes. */
@@ -17,6 +20,8 @@ export interface ServicePointRow {
   longitude: number | null;
   notes: string | null;
   status: ServicePointStatus;
+  /** Users linked via ACTIVE service point assignments. */
+  assignedUsers: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +52,18 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+/**
+ * ACTIVE-assignment count per service point — the console's "Assigned
+ * Users" column, kept in the row select so every read (list, tree, detail,
+ * post-write re-read) reports the same live number.
+ */
+const assignedUsersSql = sql<number>`coalesce((
+  select count(*)
+  from ${servicePointAssignments}
+  where ${servicePointAssignments.servicePointId} = ${servicePoints.id}
+    and ${servicePointAssignments.status} = 'ACTIVE'
+), 0)`.mapWith(Number);
+
 const rowColumns = {
   id: servicePoints.id,
   parentId: servicePoints.parentId,
@@ -60,6 +77,7 @@ const rowColumns = {
   longitude: servicePoints.longitude,
   notes: servicePoints.notes,
   status: servicePoints.status,
+  assignedUsers: assignedUsersSql,
   createdAt: servicePoints.createdAt,
   updatedAt: servicePoints.updatedAt,
 } as const;
@@ -261,11 +279,19 @@ export async function createServicePoint(
       return { ok: false as const, error: "parent-not-found" as const };
     }
 
-    const [row] = await tx
+    const [inserted] = await tx
       .insert(servicePoints)
       .values(input)
-      .returning(rowColumns);
-    if (!row) throw new Error("Insert returned no row.");
+      .returning({ id: servicePoints.id });
+    if (!inserted) throw new Error("Insert returned no row.");
+
+    // Re-select through the shared row select so the computed columns
+    // (assignedUsers) are populated exactly like every other read.
+    const [row] = await tx
+      .select(rowColumns)
+      .from(servicePoints)
+      .where(eq(servicePoints.id, inserted.id));
+    if (!row) throw new Error("Insert row vanished mid-transaction.");
     return { ok: true as const, servicePoint: row };
   });
 }
@@ -302,11 +328,17 @@ export async function updateServicePoint(
       }
     }
 
-    const [row] = await tx
+    await tx
       .update(servicePoints)
       .set(input)
-      .where(eq(servicePoints.id, id))
-      .returning(rowColumns);
+      .where(eq(servicePoints.id, id));
+
+    // Re-select through the shared row select so the computed columns
+    // (assignedUsers) are populated exactly like every other read.
+    const [row] = await tx
+      .select(rowColumns)
+      .from(servicePoints)
+      .where(eq(servicePoints.id, id));
     // Only reachable if the row vanished mid-transaction.
     if (!row) return { ok: false as const, error: "not-found" as const };
     return { ok: true as const, servicePoint: row };
