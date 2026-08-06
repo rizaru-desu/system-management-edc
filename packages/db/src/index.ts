@@ -27,6 +27,33 @@ export {
   type MobileVersionResponse,
 } from "./queries/mobile-version.js";
 export {
+  createServicePoint,
+  findServicePointById,
+  listAllServicePoints,
+  listServicePoints,
+  softDeleteServicePoint,
+  updateServicePoint,
+  upsertServicePointsByCode,
+  type CreateServicePointResult,
+  type DeleteServicePointResult,
+  type ListServicePointsOptions,
+  type ServicePointInput,
+  type ServicePointListPage,
+  type ServicePointRow,
+  type ServicePointSeed,
+  type UpdateServicePointResult,
+} from "./queries/service-points.js";
+export {
+  listUserServicePointAssignments,
+  replaceUserServicePointAssignments,
+  seedDefaultAssignmentByEmail,
+  type AssignmentEntry,
+  type DefaultAssignmentSeed,
+  type ReplaceUserAssignmentsResult,
+  type SeedAssignmentOutcome,
+  type UserAssignmentRow,
+} from "./queries/service-point-assignments.js";
+export {
   logoutMobileDevice,
   registerOrUpdateMobileDevice,
   listUserDevices,

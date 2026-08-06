@@ -15,6 +15,7 @@
     "start:prod": "node dist/main",
     "seed:admin": "nest build && node dist/scripts/seed-admin.js",
     "seed:mobile-version": "nest build && node dist/scripts/seed-mobile-version.js",
+    "seed:service-points": "nest build && node dist/scripts/seed-service-points.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

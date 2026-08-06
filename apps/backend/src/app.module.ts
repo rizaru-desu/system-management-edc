@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { MailModule } from './mail/mail.module';
 import { MobileModule } from './mobile/mobile.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
+import { ServicePointModule } from './service-points/service-point.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -15,6 +17,8 @@ import { UsersModule } from './users/users.module';
     PermissionsModule,
     MailModule,
     MobileModule,
+    ServicePointModule,
+    ServicePointAssignmentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
