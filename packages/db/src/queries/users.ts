@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, like, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, like, ne, or, sql } from "drizzle-orm";
 import { db } from "../client.js";
 import { account, session, user } from "../schema/auth.js";
 
@@ -274,10 +274,91 @@ export async function updateUserAccount(
   });
 }
 
+/** One day of the console-activity time series. */
+export interface UserActivityPoint {
+  /** UTC day, yyyy-mm-dd. */
+  date: string;
+  /** Distinct users with session activity that day. */
+  value: number;
+}
+
 export interface UserStats {
   total: number;
   active: number;
   admins: number;
+  /**
+   * Daily distinct-active-user counts for the last 7 days (oldest first,
+   * missing days zero-filled) — the Active Users card's sparkline.
+   */
+  activeSeries: UserActivityPoint[];
+  /**
+   * Current 7-day activity vs the 7 days before it, as a rounded percent
+   * delta; null when the previous window had no activity to compare against.
+   */
+  activeTrendPercent: number | null;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Days per comparison window (current week vs the week before). */
+const TREND_WINDOW_DAYS = 7;
+
+/**
+ * Distinct users with session activity per UTC day over the last 14 days
+ * (session `updatedAt` is the same activity signal the user list's "last
+ * active" column reads). Days without activity are zero-filled so the
+ * sparkline always spans the full week, and the two 7-day windows feed the
+ * trend delta.
+ */
+async function dailyActiveUserSeries(): Promise<{
+  activeSeries: UserActivityPoint[];
+  activeTrendPercent: number | null;
+}> {
+  const now = new Date();
+  const todayStart = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  const windowStart = new Date(
+    todayStart - (TREND_WINDOW_DAYS * 2 - 1) * DAY_MS,
+  );
+
+  const rows = await db
+    .select({
+      day: sql<string>`to_char(date_trunc('day', ${session.updatedAt}), 'YYYY-MM-DD')`,
+      value: sql<number>`count(distinct ${session.userId})`.mapWith(Number),
+    })
+    .from(session)
+    .where(gte(session.updatedAt, windowStart))
+    .groupBy(sql`1`);
+
+  const countsByDay = new Map(rows.map((row) => [row.day, row.value]));
+  const dayCount = (offsetFromStart: number): UserActivityPoint => {
+    const date = new Date(windowStart.getTime() + offsetFromStart * DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+    return { date, value: countsByDay.get(date) ?? 0 };
+  };
+
+  const previousWindow = Array.from({ length: TREND_WINDOW_DAYS }, (_, index) =>
+    dayCount(index),
+  );
+  const currentWindow = Array.from({ length: TREND_WINDOW_DAYS }, (_, index) =>
+    dayCount(TREND_WINDOW_DAYS + index),
+  );
+
+  const sum = (points: UserActivityPoint[]) =>
+    points.reduce((total, point) => total + point.value, 0);
+  const currentTotal = sum(currentWindow);
+  const previousTotal = sum(previousWindow);
+
+  return {
+    activeSeries: currentWindow,
+    activeTrendPercent:
+      previousTotal > 0
+        ? Math.round(((currentTotal - previousTotal) / previousTotal) * 100)
+        : null,
+  };
 }
 
 /**
@@ -288,22 +369,25 @@ export interface UserStats {
  */
 export async function countUserStats(adminRole: string): Promise<UserStats> {
   const escaped = escapeLike(adminRole);
-  const [row] = await db
-    .select({
-      total: sql<number>`count(*)`.mapWith(Number),
-      active: sql<number>`
-        count(*) filter (where ${user.banned} is not true)
-      `.mapWith(Number),
-      admins: sql<number>`
-        count(*) filter (where
-          ${user.role} = ${adminRole}
-          or ${user.role} like ${`${escaped},%`}
-          or ${user.role} like ${`%,${escaped}`}
-          or ${user.role} like ${`%,${escaped},%`}
-        )
-      `.mapWith(Number),
-    })
-    .from(user);
+  const [[row], series] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)`.mapWith(Number),
+        active: sql<number>`
+          count(*) filter (where ${user.banned} is not true)
+        `.mapWith(Number),
+        admins: sql<number>`
+          count(*) filter (where
+            ${user.role} = ${adminRole}
+            or ${user.role} like ${`${escaped},%`}
+            or ${user.role} like ${`%,${escaped}`}
+            or ${user.role} like ${`%,${escaped},%`}
+          )
+        `.mapWith(Number),
+      })
+      .from(user),
+    dailyActiveUserSeries(),
+  ]);
 
-  return row ?? { total: 0, active: 0, admins: 0 };
+  return { ...(row ?? { total: 0, active: 0, admins: 0 }), ...series };
 }

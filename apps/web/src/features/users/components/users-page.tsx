@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import {
-  KeyRound,
-  ShieldCheck,
-  UserCheck,
-  UserPlus,
-  Users,
-} from 'lucide-react'
+import { KeyRound, ShieldCheck, UserCheck, UserPlus, Users } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
+import { SummarySparkline } from '#/components/dashboard/SummarySparkline.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { Progress } from '#/components/ui/progress.tsx'
 import { Skeleton } from '#/components/ui/skeleton.tsx'
@@ -163,7 +158,13 @@ export function UsersPage() {
   // Whole-table counts from GET /users/stats: the cards keep showing global
   // totals no matter what search/role filter the table is using.
   const statsQuery = useQuery(userStatsQueryOptions())
-  const stats = statsQuery.data ?? { total: 0, active: 0, admins: 0 }
+  const stats = statsQuery.data ?? {
+    total: 0,
+    active: 0,
+    admins: 0,
+    activeSeries: [],
+    activeTrendPercent: null,
+  }
 
   const openCreate = () => {
     setEditing(null)
@@ -229,6 +230,8 @@ export function UsersPage() {
       accent: 'text-primary',
       chip: 'bg-primary/10 text-primary',
       meter: null,
+      spark: null,
+      trend: null,
     },
     {
       icon: UserCheck,
@@ -238,11 +241,10 @@ export function UsersPage() {
       // Emerald = status ("enabled"), same ramp as the table's Active pill.
       accent: 'text-emerald-600',
       chip: 'bg-emerald-500/10 text-emerald-600',
-      meter: {
-        percent: shareOfTotal(stats.active),
-        fill: 'bg-emerald-500',
-        track: 'bg-emerald-500/15',
-      },
+      meter: null,
+      // Real daily-active series + week-over-week delta from GET /users/stats.
+      spark: stats.activeSeries.length > 0 ? stats.activeSeries : null,
+      trend: stats.activeTrendPercent,
     },
     {
       icon: ShieldCheck,
@@ -256,6 +258,8 @@ export function UsersPage() {
         fill: 'bg-primary',
         track: 'bg-primary/15',
       },
+      spark: null,
+      trend: null,
     },
   ]
 
@@ -337,7 +341,13 @@ export function UsersPage() {
                   </span>
                 </div>
                 <div>
-                  {card.meter ? (
+                  {card.spark ? (
+                    <SummarySparkline
+                      data={card.spark}
+                      label={`${card.label}: daily active users over the last 7 days`}
+                      className="text-emerald-500"
+                    />
+                  ) : card.meter ? (
                     <Progress
                       value={card.meter.percent}
                       aria-label={`${card.label} as a share of all users`}
@@ -345,12 +355,31 @@ export function UsersPage() {
                       indicatorClassName={card.meter.fill}
                     />
                   ) : (
-                    <div className="border-t border-border" aria-hidden="true" />
+                    <div
+                      className="border-t border-border"
+                      aria-hidden="true"
+                    />
                   )}
-                  {/* Trend deltas need a stats-history endpoint; the em dash is
-                    the honest placeholder until one exists. */}
+                  {/* Week-over-week delta from the stats series; the em dash
+                    covers cards without one (and an empty previous week). */}
                   <p className="mt-2.5 text-xs text-muted-foreground">
-                    — vs last 7 days
+                    {card.trend !== null ? (
+                      <>
+                        <span
+                          className={cn(
+                            'font-semibold',
+                            card.trend >= 0
+                              ? 'text-emerald-600'
+                              : 'text-rose-600',
+                          )}
+                        >
+                          {card.trend >= 0 ? '↑' : '↓'} {Math.abs(card.trend)}%
+                        </span>{' '}
+                        vs previous 7 days
+                      </>
+                    ) : (
+                      '— vs previous 7 days'
+                    )}
                   </p>
                 </div>
               </Card>
@@ -436,7 +465,9 @@ export function UsersPage() {
         open={assignDrawerOpen}
         onClose={() => setAssignDrawerOpen(false)}
         assignments={assignUserAssignments}
-        assignmentsPending={assignmentsQuery.isPending || catalogueQuery.isPending}
+        assignmentsPending={
+          assignmentsQuery.isPending || catalogueQuery.isPending
+        }
         assignmentsError={
           assignmentsQuery.isError
             ? assignmentsQuery.error instanceof Error
