@@ -10,6 +10,7 @@ export {
   type ListUsersOptions,
   type UpdateUserAccountInput,
   type UpdateUserAccountResult,
+  type UserActivityPoint,
   type UserListItem,
   type UserListPage,
   type UserStats,
