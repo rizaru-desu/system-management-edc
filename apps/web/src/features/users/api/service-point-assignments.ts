@@ -4,6 +4,7 @@ import { getRequestHeader } from '@tanstack/react-start/server'
 import { toast } from 'sonner'
 
 import { ApiError, apiClient } from '#/lib/api-client.ts'
+import { servicePointsQueryKey } from '#/features/service-points/index.ts'
 import {
   fromBackendRole,
   toBackendRole,
@@ -185,8 +186,10 @@ const replaceAssignmentsFn = createServerFn({ method: 'POST' })
 
 /**
  * Mutation for the assignment drawer's Save. The fresh set lands in the
- * user's assignment cache on success; the counts column invalidates either
- * way so it always mirrors the stored truth.
+ * user's assignment cache on success; settling invalidates that list, the
+ * users table's counts column, AND the service point queries — their
+ * "Assigned Users" numbers come from the same assignment rows, so the
+ * Service Point page updates without a reload.
  */
 export function useReplaceAssignments() {
   const queryClient = useQueryClient()
@@ -215,6 +218,7 @@ export function useReplaceAssignments() {
           queryKey: userAssignmentsQueryKey(input.userId),
         }),
         queryClient.invalidateQueries({ queryKey: assignmentCountsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: servicePointsQueryKey }),
       ]),
   })
 }

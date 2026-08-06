@@ -19,7 +19,7 @@ interface AssignServicePointsDrawerProps {
   user: UserRecord | null
   open: boolean
   onClose: () => void
-  /** The user's stored ACTIVE assignments; the drawer edits a draft copy. */
+  /** The user's stored ACTIVE assignments (from GET, once loaded). */
   assignments: Array<ServicePointAssignment>
   /** True while the assignments or the catalogue are still loading. */
   assignmentsPending: boolean
@@ -29,8 +29,8 @@ interface AssignServicePointsDrawerProps {
   /** Service points offered in the transfer's "available" panel. */
   catalogue: Array<ServicePointRecord>
   /**
-   * Called with the rows still toggled active when Save is pressed — the
-   * backend's replace soft-unassigns everything omitted.
+   * Called with the rows still toggled active when Save is pressed. An empty
+   * list is valid — the backend's replace unassigns everything.
    */
   onSave: (user: UserRecord, assignments: Array<ServicePointAssignment>) => void
 }
@@ -51,8 +51,8 @@ function initialsOf(name: string): string {
 
 /**
  * Exactly one default among 1+ assignments, by construction: the first
- * assignment becomes default automatically, and removing the default row
- * promotes the first remaining one.
+ * active assignment becomes default automatically, and removing the default
+ * row promotes the first remaining one.
  */
 function withDefaultRepaired(
   assignments: Array<ServicePointAssignment>,
@@ -65,52 +65,33 @@ function withDefaultRepaired(
   }))
 }
 
+interface AssignmentEditorProps {
+  user: UserRecord
+  /** Read once, on mount — the editor owns the draft from then on. */
+  initialAssignments: Array<ServicePointAssignment>
+  catalogue: Array<ServicePointRecord>
+  onSave: (user: UserRecord, assignments: Array<ServicePointAssignment>) => void
+  onClose: () => void
+}
+
 /**
- * Right-side drawer (same shell as the device drawer) for managing a user's
- * service point assignments — a many-to-many link, edited here as this user's
- * side of the relation. UI only: the draft lives in local state and Save
- * hands it back to the page's mock store.
+ * The drawer's editable body + footer. Mounted only after the stored
+ * assignments have loaded, keyed by user id — the draft comes from a state
+ * *initializer*, so there is no effect-based re-seeding that could race the
+ * query (empty first paint) or wipe in-progress edits on a background
+ * refetch.
  */
-export function AssignServicePointsDrawer({
+function AssignmentEditor({
   user,
-  open,
-  onClose,
-  assignments,
-  assignmentsPending,
-  assignmentsError,
-  onRetry,
+  initialAssignments,
   catalogue,
   onSave,
-}: AssignServicePointsDrawerProps) {
-  const [draft, setDraft] = useState<Array<ServicePointAssignment>>([])
+  onClose,
+}: AssignmentEditorProps) {
+  const [draft, setDraft] = useState<Array<ServicePointAssignment>>(() =>
+    withDefaultRepaired(initialAssignments.map((entry) => ({ ...entry }))),
+  )
   const [error, setError] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Re-seed the draft whenever the drawer opens for a (possibly different)
-  // user, so abandoned edits from a previous session never leak in. The page
-  // memoizes `assignments`, so it only changes identity on a real update.
-  useEffect(() => {
-    if (open) {
-      setDraft(withDefaultRepaired(assignments.map((entry) => ({ ...entry }))))
-      setError(null)
-    }
-  }, [open, user, assignments])
-
-  // Lock background page scrolling while the drawer is open.
-  useEffect(() => {
-    if (!open) return
-    const originalOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = originalOverflow
-    }
-  }, [open])
-
-  if (!open || !mounted || !user) return null
 
   const addServicePoints = (servicePointIds: Array<string>) => {
     setDraft((previous) => {
@@ -143,9 +124,13 @@ export function AssignServicePointsDrawer({
         previous.filter((assignment) => assignment.id !== id),
       ),
     )
+    setError(null)
   }
 
-  const removeAll = () => setDraft([])
+  const removeAll = () => {
+    setDraft([])
+    setError(null)
+  }
 
   const setDefault = (id: string) => {
     // Radio semantics: marking one default clears the previous one.
@@ -180,28 +165,113 @@ export function AssignServicePointsDrawer({
 
   const handleSave = () => {
     // Rows toggled inactive are unassigned on save (omitted from the PUT
-    // payload — the backend soft-unassigns whatever is missing).
+    // payload — the backend soft-unassigns whatever is missing). An empty
+    // set is valid and clears every assignment, matching the backend
+    // contract; Remove All + Save is the supported way to unassign a user.
     const activeRows = draft.filter(
       (assignment) => assignment.status === 'active',
     )
-    if (activeRows.length === 0) {
-      setError('At least one active service point is required.')
-      return
-    }
-    const defaults = activeRows.filter((assignment) => assignment.isDefault)
-    if (defaults.length !== 1) {
-      setError(
-        draft.some(
-          (assignment) => assignment.isDefault && assignment.status === 'inactive',
+    if (activeRows.length > 0) {
+      const defaults = activeRows.filter((assignment) => assignment.isDefault)
+      if (defaults.length !== 1) {
+        setError(
+          draft.some(
+            (assignment) =>
+              assignment.isDefault && assignment.status === 'inactive',
+          )
+            ? 'The default service point must stay active — pick another default first.'
+            : 'Mark exactly one service point as the default.',
         )
-          ? 'The default service point must stay active — pick another default first.'
-          : 'Mark exactly one service point as the default.',
-      )
-      return
+        return
+      }
     }
     onSave(user, activeRows)
     onClose()
   }
+
+  return (
+    <>
+      {/* Transfer + configuration (scrollable area) */}
+      <div className="flex-1 overflow-y-auto bg-brand-50 p-4 md:p-6">
+        <ServicePointTransfer
+          catalogue={catalogue}
+          assignments={draft}
+          onAdd={addServicePoints}
+          onRemove={removeAssignment}
+          onRemoveAll={removeAll}
+          onSetDefault={setDefault}
+          onRoleChange={setRole}
+          onStatusChange={setStatus}
+        />
+        <p className="mt-4 rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-brand-900/60">
+          Service point roles are contextual — they do not replace the
+          user&apos;s global application role. With a single assignment it is
+          the default automatically; with several, exactly one must be marked
+          default. Switching a row inactive (or removing all rows) unassigns
+          on save.
+        </p>
+      </div>
+
+      {/* Footer */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-brand-100 bg-white px-6 py-4">
+        <div className="min-w-0 text-xs">
+          {error ? (
+            <p className="text-rose-600">{error}</p>
+          ) : (
+            <p className="text-brand-900/50">
+              {draft.length}{' '}
+              {draft.length === 1 ? 'service point' : 'service points'}{' '}
+              assigned
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={handleSave}>
+            Save assignments
+          </Button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Right-side drawer (same shell as the device drawer) for managing a user's
+ * service point assignments — a many-to-many link, edited here as this user's
+ * side of the relation. The shell renders the load/error states; the editor
+ * mounts only once the stored assignments are in hand.
+ */
+export function AssignServicePointsDrawer({
+  user,
+  open,
+  onClose,
+  assignments,
+  assignmentsPending,
+  assignmentsError,
+  onRetry,
+  catalogue,
+  onSave,
+}: AssignServicePointsDrawerProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Lock background page scrolling while the drawer is open.
+  useEffect(() => {
+    if (!open) return
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [open])
+
+  if (!open || !mounted || !user) return null
 
   return createPortal(
     <>
@@ -274,9 +344,8 @@ export function AssignServicePointsDrawer({
           </div>
         </div>
 
-        {/* Transfer + configuration (scrollable area) */}
-        <div className="flex-1 overflow-y-auto bg-brand-50 p-4 md:p-6">
-          {assignmentsError !== null ? (
+        {assignmentsError !== null ? (
+          <div className="flex-1 overflow-y-auto bg-brand-50 p-4 md:p-6">
             <EmptyState
               icon={TriangleAlert}
               tone="danger"
@@ -287,65 +356,26 @@ export function AssignServicePointsDrawer({
                 </Button>
               }
             />
-          ) : assignmentsPending ? (
-            <div className="flex min-h-[240px] flex-col items-center justify-center gap-2">
-              <Loader2
-                className="h-6 w-6 animate-spin text-brand-500"
-                strokeWidth={1.75}
-              />
-              <p className="text-sm text-brand-900/40">
-                Loading assignments...
-              </p>
-            </div>
-          ) : (
-            <>
-              <ServicePointTransfer
-                catalogue={catalogue}
-                assignments={draft}
-                onAdd={addServicePoints}
-                onRemove={removeAssignment}
-                onRemoveAll={removeAll}
-                onSetDefault={setDefault}
-                onRoleChange={setRole}
-                onStatusChange={setStatus}
-              />
-              <p className="mt-4 rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-brand-900/60">
-                Service point roles are contextual — they do not replace the
-                user&apos;s global application role. With a single assignment
-                it is the default automatically; with several, exactly one
-                must be marked default. Switching a row inactive unassigns it
-                on save.
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-brand-100 bg-white px-6 py-4">
-          <div className="min-w-0 text-xs">
-            {error ? (
-              <p className="text-rose-600">{error}</p>
-            ) : (
-              <p className="text-brand-900/50">
-                {draft.length}{' '}
-                {draft.length === 1 ? 'service point' : 'service points'}{' '}
-                assigned
-              </p>
-            )}
           </div>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={assignmentsPending || assignmentsError !== null}
-              onClick={handleSave}
-            >
-              Save assignments
-            </Button>
+        ) : assignmentsPending ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-2 bg-brand-50">
+            <Loader2
+              className="h-6 w-6 animate-spin text-brand-500"
+              strokeWidth={1.75}
+            />
+            <p className="text-sm text-brand-900/40">Loading assignments...</p>
           </div>
-        </div>
+        ) : (
+          // Keyed by user so switching targets always starts a fresh draft.
+          <AssignmentEditor
+            key={user.id}
+            user={user}
+            initialAssignments={assignments}
+            catalogue={catalogue}
+            onSave={onSave}
+            onClose={onClose}
+          />
+        )}
       </div>
     </>,
     document.body,
