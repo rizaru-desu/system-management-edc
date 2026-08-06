@@ -149,6 +149,12 @@ export function MerchantViewModal({
             <div className="grid gap-4 sm:grid-cols-2">
               <DetailRow icon={Network} label="Service point">
                 {merchant.servicePointName}
+                {merchant.distanceToServicePointKm !== null && (
+                  <span className="mt-0.5 block text-xs text-[#0E2748]/50 tabular-nums">
+                    {merchant.distanceToServicePointKm.toFixed(2)} km away
+                    (auto-assigned)
+                  </span>
+                )}
               </DetailRow>
               <DetailRow icon={CalendarDays} label="Created date">
                 <span className="tabular-nums">

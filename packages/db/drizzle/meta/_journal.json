@@ -78,6 +78,13 @@
       "when": 1786029929376,
       "tag": "0010_add_merchants",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786037242355,
+      "tag": "0011_add_coverage_radius_and_import_distance",
+      "breakpoints": true
     }
   ]
 }

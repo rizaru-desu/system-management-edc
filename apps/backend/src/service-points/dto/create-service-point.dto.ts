@@ -46,6 +46,17 @@ export const servicePointBaseSchema = z.object({
     .max(180)
     .nullish()
     .transform((value) => value ?? null),
+  /**
+   * Service area radius (km) for the merchant import's automatic
+   * assignment; null/omitted = unlimited (nearest service point always
+   * wins).
+   */
+  coverageRadiusKm: z
+    .number()
+    .positive()
+    .max(20_000)
+    .nullish()
+    .transform((value) => value ?? null),
   notes: optionalText,
   status: z.enum(SERVICE_POINT_STATUSES),
 });

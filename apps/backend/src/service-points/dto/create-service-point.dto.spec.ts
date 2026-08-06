@@ -15,6 +15,7 @@ describe('parseCreateServicePointDto', () => {
       email: null,
       latitude: null,
       longitude: null,
+      coverageRadiusKm: null,
       notes: null,
       status: 'ACTIVE',
     });

@@ -59,6 +59,12 @@ export const merchants = pgTable(
     postalCode: text("postal_code"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
+    /**
+     * Distance (km, 2dp) to the assigned service point, stamped by the
+     * Excel import's automatic nearest-service-point assignment; null for
+     * manually created/assigned merchants.
+     */
+    distanceToServicePointKm: doublePrecision("distance_to_service_point_km"),
     servicePointId: text("service_point_id")
       .notNull()
       .references(() => servicePoints.id),

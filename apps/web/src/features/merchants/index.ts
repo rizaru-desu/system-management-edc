@@ -36,10 +36,21 @@ export {
 } from './api/update-merchant.ts'
 export { useDeleteMerchant } from './api/delete-merchant.ts'
 export {
+  previewMerchantImport,
+  useImportMerchants,
+} from './api/import-merchants.ts'
+export type {
+  ImportAssignmentStatus,
+  ImportPreviewResult,
+  ImportResult,
+  ImportRowReport,
+  ImportSummary,
+  RawImportRow,
+} from './api/import-merchants.ts'
+export {
   MERCHANT_TEMPLATE_COLUMNS,
-  buildImportPreview,
   downloadMerchantTemplate,
   importFileError,
-  importMerchants,
+  parseMerchantWorkbook,
 } from './lib/excel.ts'
-export type { ImportPreview, ImportPreviewRow } from './lib/excel.ts'
+export type { ParseWorkbookResult } from './lib/excel.ts'

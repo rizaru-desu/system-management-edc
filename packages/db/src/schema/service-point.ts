@@ -56,6 +56,11 @@ export const servicePoints = pgTable(
     email: text("email"),
     latitude: doublePrecision("latitude"),
     longitude: doublePrecision("longitude"),
+    /**
+     * Service area radius in kilometres for automatic merchant assignment;
+     * null = unlimited (the nearest service point always wins).
+     */
+    coverageRadiusKm: doublePrecision("coverage_radius_km"),
     notes: text("notes"),
     status: text("status")
       .$type<ServicePointStatus>()

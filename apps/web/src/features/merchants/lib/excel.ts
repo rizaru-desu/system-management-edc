@@ -2,8 +2,13 @@
  * Excel helpers for the merchant import flow, built on SheetJS (`xlsx`).
  * The library is loaded on demand so it stays out of the main console bundle.
  */
+import type { RawImportRow } from '../api/import-merchants.ts'
 
-/** Header row of the import template, in sheet column order. */
+/**
+ * Header row of the import template, in sheet column order. Service Point is
+ * deliberately absent — the backend assigns the nearest service point from
+ * the mandatory Latitude/Longitude columns.
+ */
 export const MERCHANT_TEMPLATE_COLUMNS = [
   'Merchant Code',
   'Merchant Name',
@@ -18,9 +23,36 @@ export const MERCHANT_TEMPLATE_COLUMNS = [
   'Postal Code',
   'Latitude',
   'Longitude',
-  'Service Point',
   'Status',
 ] as const
+
+type TemplateColumn = (typeof MERCHANT_TEMPLATE_COLUMNS)[number]
+
+/** Template header → the backend import row field it feeds. */
+const COLUMN_KEYS: Record<TemplateColumn, keyof RawImportRow> = {
+  'Merchant Code': 'merchantCode',
+  'Merchant Name': 'merchantName',
+  'Merchant Type': 'merchantType',
+  'PIC Name': 'picName',
+  'Phone Number': 'phoneNumber',
+  Email: 'email',
+  Address: 'address',
+  Province: 'province',
+  City: 'city',
+  District: 'district',
+  'Postal Code': 'postalCode',
+  Latitude: 'latitude',
+  Longitude: 'longitude',
+  Status: 'status',
+}
+
+/** Columns that must exist in the sheet for the file to count as the template. */
+const REQUIRED_COLUMNS: Array<TemplateColumn> = [
+  'Merchant Code',
+  'Merchant Name',
+  'Latitude',
+  'Longitude',
+]
 
 /** One example row so the expected formats are visible in the template. */
 const TEMPLATE_EXAMPLE_ROW = [
@@ -37,8 +69,7 @@ const TEMPLATE_EXAMPLE_ROW = [
   '15224',
   -6.2711,
   106.7146,
-  'SP-BTR-001',
-  'active',
+  'ACTIVE',
 ]
 
 /** Generates and downloads `merchant-import-template.xlsx`. */
@@ -62,6 +93,8 @@ export async function downloadMerchantTemplate(): Promise<void> {
 
 export const IMPORT_MAX_FILE_SIZE = 10 * 1024 * 1024
 export const IMPORT_ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'] as const
+/** Mirrors the backend's per-request row ceiling. */
+export const IMPORT_MAX_ROWS = 1000
 
 /** Extension + size gate for the upload area; null when the file is fine. */
 export function importFileError(file: File): string | null {
@@ -77,122 +110,85 @@ export function importFileError(file: File): string | null {
   return null
 }
 
-/** One parsed row of the preview table plus its validation outcome. */
-export interface ImportPreviewRow {
-  rowNumber: number
-  merchantCode: string
-  merchantName: string
-  picName: string
-  servicePoint: string
-  status: string
-  /** null = the row passed validation. */
-  error: string | null
-}
+export type ParseWorkbookResult =
+  { ok: true; rows: Array<RawImportRow> } | { ok: false; error: string }
 
-export interface ImportPreview {
-  rows: Array<ImportPreviewRow>
-  totalRows: number
-  validRows: number
-  invalidRows: number
+/** A cell in the shape the backend accepts; anything exotic → string. */
+function toCell(value: unknown): string | number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string' || typeof value === 'number') return value
+  return String(value)
 }
 
 /**
- * UI-only preview: real parsing/validation happens server-side once the
- * backend import endpoint exists, so any selected file resolves to this mock
- * result — a realistic mix of valid rows and typical validation errors.
+ * Parses the first sheet of an uploaded workbook into backend import rows.
+ * Headers are matched against the template (trimmed, case-insensitive), the
+ * required columns are enforced up front, and fully empty rows are dropped.
+ * Field-level validation (coordinates, formats, duplicates) stays with the
+ * backend so the preview and the commit judge rows identically.
  */
-const MOCK_PREVIEW_ROWS: Array<ImportPreviewRow> = [
-  {
-    rowNumber: 2,
-    merchantCode: 'MCH-TGS-101',
-    merchantName: 'Indomaret Jombang Raya',
-    picName: 'Slamet Riyadi',
-    servicePoint: 'SP-CPT-001',
-    status: 'active',
-    error: null,
-  },
-  {
-    rowNumber: 3,
-    merchantCode: 'MCH-BSD-102',
-    merchantName: 'Alfamidi Foresta',
-    picName: 'Ratna Dewi',
-    servicePoint: 'SP-BSD-001',
-    status: 'active',
-    error: null,
-  },
-  {
-    rowNumber: 4,
-    merchantCode: 'MCH-TGS-001',
-    merchantName: 'Indomaret Pondok Aren',
-    picName: 'Budi Santoso',
-    servicePoint: 'SP-BTR-001',
-    status: 'active',
-    error: 'Merchant code MCH-TGS-001 already exists.',
-  },
-  {
-    rowNumber: 5,
-    merchantCode: 'MCH-SRP-103',
-    merchantName: 'Janji Jiwa Gading Serpong',
-    picName: 'Fajar Hidayat',
-    servicePoint: 'SP-SRP-001',
-    status: 'active',
-    error: null,
-  },
-  {
-    rowNumber: 6,
-    merchantCode: 'MCH-PML-104',
-    merchantName: '',
-    picName: 'Dian Pertiwi',
-    servicePoint: 'SP-PML-001',
-    status: 'active',
-    error: 'Merchant name is required.',
-  },
-  {
-    rowNumber: 7,
-    merchantCode: 'MCH-BTR-105',
-    merchantName: 'Roti O Bintaro',
-    picName: 'Galih Permadi',
-    servicePoint: 'SP-BTR-001',
-    status: 'inactive',
-    error: null,
-  },
-  {
-    rowNumber: 8,
-    merchantCode: 'MCH-CPT-106',
-    merchantName: 'Ayam Geprek Bensu Ciputat',
-    picName: 'Novi Rahmawati',
-    servicePoint: 'SP-XYZ-999',
-    status: 'active',
-    error: 'Service point SP-XYZ-999 was not found.',
-  },
-  {
-    rowNumber: 9,
-    merchantCode: 'MCH-BSD-107',
-    merchantName: 'Kimukatsu The Breeze',
-    picName: 'Arif Kurniawan',
-    servicePoint: 'SP-BSD-001',
-    status: 'active',
-    error: null,
-  },
-]
+export async function parseMerchantWorkbook(
+  file: File,
+): Promise<ParseWorkbookResult> {
+  const XLSX = await import('xlsx')
 
-/** Simulated latency mirroring the mock backend, so spinners are visible. */
-const delay = (ms = 700) => new Promise((resolve) => setTimeout(resolve, ms))
-
-export async function buildImportPreview(_file: File): Promise<ImportPreview> {
-  await delay()
-  const rows = MOCK_PREVIEW_ROWS.map((row) => ({ ...row }))
-  const validRows = rows.filter((row) => row.error === null).length
-  return {
-    rows,
-    totalRows: rows.length,
-    validRows,
-    invalidRows: rows.length - validRows,
+  let sheetRows: Array<Record<string, unknown>>
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer())
+    const sheetName = workbook.SheetNames[0]
+    const sheet = sheetName ? workbook.Sheets[sheetName] : undefined
+    if (!sheet) return { ok: false, error: 'The file contains no worksheet.' }
+    sheetRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: null,
+    })
+  } catch {
+    return {
+      ok: false,
+      error: 'The file could not be read as an Excel workbook.',
+    }
   }
-}
 
-/** Simulated import — resolves after a short delay without touching data. */
-export async function importMerchants(preview: ImportPreview): Promise<number> {
-  await delay(900)
-  return preview.validRows
+  if (sheetRows.length === 0) {
+    return { ok: false, error: 'The sheet has no data rows below the header.' }
+  }
+
+  // Header validation: sheet_to_json keys the objects by the header row.
+  const headerByNormalized = new Map<string, string>()
+  for (const header of Object.keys(sheetRows[0])) {
+    headerByNormalized.set(header.trim().toLowerCase(), header)
+  }
+  const missing = REQUIRED_COLUMNS.filter(
+    (column) => !headerByNormalized.has(column.toLowerCase()),
+  )
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: `The file does not match the import template — missing columns: ${missing.join(', ')}.`,
+    }
+  }
+
+  const rows: Array<RawImportRow> = []
+  for (const sheetRow of sheetRows) {
+    const row = {} as RawImportRow
+    let hasValue = false
+    for (const column of MERCHANT_TEMPLATE_COLUMNS) {
+      const header = headerByNormalized.get(column.toLowerCase())
+      const cell = toCell(header === undefined ? null : sheetRow[header])
+      row[COLUMN_KEYS[column]] = cell
+      if (cell !== null && String(cell).trim() !== '') hasValue = true
+    }
+    if (hasValue) rows.push(row)
+  }
+
+  if (rows.length === 0) {
+    return { ok: false, error: 'The sheet has no data rows below the header.' }
+  }
+  if (rows.length > IMPORT_MAX_ROWS) {
+    return {
+      ok: false,
+      error: `The sheet has ${rows.length} rows — at most ${IMPORT_MAX_ROWS} per import.`,
+    }
+  }
+
+  return { ok: true, rows }
 }
