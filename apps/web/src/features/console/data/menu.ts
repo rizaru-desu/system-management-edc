@@ -201,9 +201,10 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         directRoute: '/users',
       },
       {
-        title: 'Service Points',
+        title: 'Service Point',
         path: 'service-points',
         allowedRoles: ['System_Administrator', 'Operations_Specialist'],
+        directRoute: '/service-points',
       },
       {
         title: 'Audit Logs',
