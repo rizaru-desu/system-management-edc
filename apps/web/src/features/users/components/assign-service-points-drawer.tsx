@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Loader2, MapPinned, TriangleAlert, X } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
+import { UnsavedChangesDialog } from '#/components/UnsavedChangesDialog.tsx'
+import { useUnsavedChanges } from '#/hooks/use-unsaved-changes.ts'
 import { cn } from '#/lib/utils.ts'
 import type { ServicePointRecord } from '#/features/service-points/index.ts'
 import type {
@@ -71,7 +73,12 @@ interface AssignmentEditorProps {
   initialAssignments: Array<ServicePointAssignment>
   catalogue: Array<ServicePointRecord>
   onSave: (user: UserRecord, assignments: Array<ServicePointAssignment>) => void
+  /** Unguarded close for the save path (the draft is committed by then). */
   onClose: () => void
+  /** Guarded close for Cancel — asks first while the draft has edits. */
+  onRequestClose: () => void
+  /** Reports draft-vs-stored dirtiness up to the drawer shell's guard. */
+  onDirtyChange: (dirty: boolean) => void
 }
 
 /**
@@ -87,11 +94,31 @@ function AssignmentEditor({
   catalogue,
   onSave,
   onClose,
+  onRequestClose,
+  onDirtyChange,
 }: AssignmentEditorProps) {
   const [draft, setDraft] = useState<Array<ServicePointAssignment>>(() =>
     withDefaultRepaired(initialAssignments.map((entry) => ({ ...entry }))),
   )
   const [error, setError] = useState<string | null>(null)
+
+  // Same normalization as the draft initializer, so an untouched editor
+  // always compares clean.
+  const initialDraft = useMemo(
+    () =>
+      withDefaultRepaired(initialAssignments.map((entry) => ({ ...entry }))),
+    [initialAssignments],
+  )
+  const isDirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(initialDraft),
+    [draft, initialDraft],
+  )
+
+  useEffect(() => {
+    onDirtyChange(isDirty)
+    // Unmounting (close, user switch) always leaves the shell's guard clean.
+    return () => onDirtyChange(false)
+  }, [isDirty, onDirtyChange])
 
   const addServicePoints = (servicePointIds: Array<string>) => {
     setDraft((previous) => {
@@ -207,8 +234,8 @@ function AssignmentEditor({
           Service point roles are contextual — they do not replace the
           user&apos;s global application role. With a single assignment it is
           the default automatically; with several, exactly one must be marked
-          default. Switching a row inactive (or removing all rows) unassigns
-          on save.
+          default. Switching a row inactive (or removing all rows) unassigns on
+          save.
         </p>
       </div>
 
@@ -220,13 +247,12 @@ function AssignmentEditor({
           ) : (
             <p className="text-brand-900/50">
               {draft.length}{' '}
-              {draft.length === 1 ? 'service point' : 'service points'}{' '}
-              assigned
+              {draft.length === 1 ? 'service point' : 'service points'} assigned
             </p>
           )}
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onRequestClose}>
             Cancel
           </Button>
           <Button type="button" onClick={handleSave}>
@@ -256,6 +282,14 @@ export function AssignServicePointsDrawer({
   onSave,
 }: AssignServicePointsDrawerProps) {
   const [mounted, setMounted] = useState(false)
+  // Lifted from the editor: true while the draft differs from the stored
+  // assignments, so every close path below can ask before discarding.
+  const [dirty, setDirty] = useState(false)
+
+  const { guard, dialogProps } = useUnsavedChanges({ when: open && dirty })
+
+  /** Backdrop, X and Cancel all funnel through the guarded close. */
+  const requestClose = () => guard(onClose)
 
   useEffect(() => {
     setMounted(true)
@@ -280,7 +314,7 @@ export function AssignServicePointsDrawer({
         portals append to <body> later — paint above it. */}
       <div
         className="fixed inset-0 z-50 bg-black/35 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
-        onClick={onClose}
+        onClick={requestClose}
         aria-hidden="true"
       />
 
@@ -315,7 +349,7 @@ export function AssignServicePointsDrawer({
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={onClose}
+            onClick={requestClose}
             className="shrink-0 rounded-xl text-brand-900/40 hover:bg-brand-100/50 hover:text-brand-900"
             aria-label="Close"
           >
@@ -374,9 +408,13 @@ export function AssignServicePointsDrawer({
             catalogue={catalogue}
             onSave={onSave}
             onClose={onClose}
+            onRequestClose={requestClose}
+            onDirtyChange={setDirty}
           />
         )}
       </div>
+
+      <UnsavedChangesDialog {...dialogProps} />
     </>,
     document.body,
   )

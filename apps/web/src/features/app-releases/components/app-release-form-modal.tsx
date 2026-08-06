@@ -22,6 +22,8 @@ import {
 } from '#/components/ui/select.tsx'
 import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
+import { UnsavedChangesDialog } from '#/components/UnsavedChangesDialog.tsx'
+import { useUnsavedChanges } from '#/hooks/use-unsaved-changes.ts'
 import { releaseVersionAvailabilityQueryOptions } from '../api/check-app-release-version.ts'
 import type {
   AppReleasePlatform,
@@ -216,15 +218,17 @@ export function AppReleaseFormModal({
     [values, initialValues],
   )
 
-  /** Warns about unsaved edits before letting the dialog close. */
+  const { guard, dialogProps } = useUnsavedChanges({
+    when: open && isDirty && !saving,
+  })
+
+  /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && isDirty && !saving) {
-      const discard = window.confirm(
-        'You have unsaved changes. Discard them and close?',
-      )
-      if (!discard) return
+    if (!nextOpen) {
+      guard(() => onOpenChange(false))
+      return
     }
-    onOpenChange(nextOpen)
+    onOpenChange(true)
   }
 
   const setField = <TField extends keyof AppReleaseFormValues>(
@@ -296,328 +300,347 @@ export function AppReleaseFormModal({
     'border-[#DDE0EC] bg-white text-[#0E2748] placeholder:text-[#0E2748]/40 dark:border-[#DDE0EC] dark:bg-white'
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="theme-light max-h-[90vh] overflow-y-auto border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
-            {release ? 'Edit release' : 'Add release'}
-          </DialogTitle>
-          <DialogDescription className="text-[#0E2748]/60">
-            {release
-              ? 'Update the release metadata served to mobile clients.'
-              : 'Register an APK or OTA release for the mobile app.'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="theme-light max-h-[90vh] overflow-y-auto border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
+              {release ? 'Edit release' : 'Add release'}
+            </DialogTitle>
+            <DialogDescription className="text-[#0E2748]/60">
+              {release
+                ? 'Update the release metadata served to mobile clients.'
+                : 'Register an APK or OTA release for the mobile app.'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-platform" className="text-[#0E2748]">
-                Platform
-              </Label>
-              <Select
-                value={values.platform}
-                onValueChange={(value) =>
-                  setField('platform', value as AppReleasePlatform)
-                }
-              >
-                <SelectTrigger
-                  id="ar-platform"
-                  className={`w-full ${fieldClasses}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="android">Android</SelectItem>
-                  <SelectItem value="ios">iOS</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-update-type" className="text-[#0E2748]">
-                Update type
-              </Label>
-              <Select
-                value={values.updateType}
-                onValueChange={(value) =>
-                  setField('updateType', value as AppReleaseUpdateType)
-                }
-              >
-                <SelectTrigger
-                  id="ar-update-type"
-                  className={`w-full ${fieldClasses}`}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="apk">APK — full installer</SelectItem>
-                  <SelectItem value="ota">OTA — over-the-air bundle</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-version-name" className="text-[#0E2748]">
-                Version name{' '}
-                <span className="text-rose-600" aria-hidden="true">
-                  *
-                </span>
-              </Label>
-              <Input
-                id="ar-version-name"
-                value={values.versionName}
-                onChange={(event) =>
-                  setField('versionName', event.target.value)
-                }
-                placeholder="e.g. 1.4.0"
-                aria-invalid={Boolean(errors.versionName)}
-                className={fieldClasses}
-              />
-              {errors.versionName && (
-                <p className="text-xs text-rose-600">{errors.versionName}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-version-code" className="text-[#0E2748]">
-                Version code
-              </Label>
-              <Input
-                id="ar-version-code"
-                inputMode="numeric"
-                value={values.versionCode}
-                onChange={(event) =>
-                  setField('versionCode', event.target.value)
-                }
-                placeholder="e.g. 140"
-                aria-invalid={Boolean(errors.versionCode)}
-                className={fieldClasses}
-              />
-              {errors.versionCode && (
-                <p className="text-xs text-rose-600">{errors.versionCode}</p>
-              )}
-            </div>
-            {knownDuplicate && (
-              <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 sm:col-span-2">
-                <TriangleAlert
-                  className="h-3.5 w-3.5 shrink-0"
-                  strokeWidth={1.75}
-                />
-                This version already exists for{' '}
-                {values.platform === 'ios' ? 'iOS' : 'Android'}{' '}
-                {values.updateType.toUpperCase()} — change the version name or
-                code before saving.
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-minimum-version" className="text-[#0E2748]">
-                Minimum version{' '}
-                <span className="text-rose-600" aria-hidden="true">
-                  *
-                </span>
-              </Label>
-              <Input
-                id="ar-minimum-version"
-                value={values.minimumVersion}
-                onChange={(event) =>
-                  setField('minimumVersion', event.target.value)
-                }
-                placeholder="e.g. 1.0.0"
-                aria-invalid={Boolean(errors.minimumVersion)}
-                className={fieldClasses}
-              />
-              {errors.minimumVersion ? (
-                <p className="text-xs text-rose-600">
-                  {errors.minimumVersion}
-                </p>
-              ) : (
-                <p className="text-xs text-[#0E2748]/50">
-                  Clients below this version are forced to update.
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-published-at" className="text-[#0E2748]">
-                Publish date
-              </Label>
-              <Input
-                id="ar-published-at"
-                type="datetime-local"
-                value={values.publishedAt}
-                onChange={(event) =>
-                  setField('publishedAt', event.target.value)
-                }
-                aria-invalid={Boolean(errors.publishedAt)}
-                className={fieldClasses}
-              />
-              {errors.publishedAt ? (
-                <p className="text-xs text-rose-600">{errors.publishedAt}</p>
-              ) : (
-                <p className="text-xs text-[#0E2748]/50">
-                  Leave empty to stamp it when the release is published.
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-download-url" className="text-[#0E2748]">
-              Download URL{' '}
-              {values.updateType === 'apk' && (
-                <span className="text-rose-600" aria-hidden="true">
-                  *
-                </span>
-              )}
-            </Label>
-            <Input
-              id="ar-download-url"
-              type="url"
-              value={values.downloadUrl}
-              onChange={(event) => setField('downloadUrl', event.target.value)}
-              placeholder="e.g. https://cdn.edc.co.id/releases/app-1.4.0.apk"
-              aria-invalid={Boolean(errors.downloadUrl)}
-              className={fieldClasses}
-            />
-            {errors.downloadUrl && (
-              <p className="text-xs text-rose-600">{errors.downloadUrl}</p>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-file-size" className="text-[#0E2748]">
-                File size (bytes)
-              </Label>
-              <Input
-                id="ar-file-size"
-                inputMode="numeric"
-                value={values.fileSize}
-                onChange={(event) => setField('fileSize', event.target.value)}
-                placeholder="e.g. 52428800"
-                aria-invalid={Boolean(errors.fileSize)}
-                className={fieldClasses}
-              />
-              {errors.fileSize && (
-                <p className="text-xs text-rose-600">{errors.fileSize}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="ar-checksum" className="text-[#0E2748]">
-                Checksum
-              </Label>
-              <Input
-                id="ar-checksum"
-                value={values.checksum}
-                onChange={(event) => setField('checksum', event.target.value)}
-                placeholder="e.g. sha256:9f86d08…"
-                className={fieldClasses}
-              />
-            </div>
-          </div>
-
-          {values.updateType === 'ota' && (
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="ar-channel" className="text-[#0E2748]">
-                  OTA channel
+                <Label htmlFor="ar-platform" className="text-[#0E2748]">
+                  Platform
                 </Label>
-                <Input
-                  id="ar-channel"
-                  value={values.channel}
-                  onChange={(event) => setField('channel', event.target.value)}
-                  placeholder="e.g. production"
-                  className={fieldClasses}
-                />
+                <Select
+                  value={values.platform}
+                  onValueChange={(value) =>
+                    setField('platform', value as AppReleasePlatform)
+                  }
+                >
+                  <SelectTrigger
+                    id="ar-platform"
+                    className={`w-full ${fieldClasses}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="android">Android</SelectItem>
+                    <SelectItem value="ios">iOS</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ar-runtime-version" className="text-[#0E2748]">
-                  Runtime version
+                <Label htmlFor="ar-update-type" className="text-[#0E2748]">
+                  Update type
+                </Label>
+                <Select
+                  value={values.updateType}
+                  onValueChange={(value) =>
+                    setField('updateType', value as AppReleaseUpdateType)
+                  }
+                >
+                  <SelectTrigger
+                    id="ar-update-type"
+                    className={`w-full ${fieldClasses}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="apk">APK — full installer</SelectItem>
+                    <SelectItem value="ota">
+                      OTA — over-the-air bundle
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-version-name" className="text-[#0E2748]">
+                  Version name{' '}
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
                 </Label>
                 <Input
-                  id="ar-runtime-version"
-                  value={values.runtimeVersion}
+                  id="ar-version-name"
+                  value={values.versionName}
                   onChange={(event) =>
-                    setField('runtimeVersion', event.target.value)
+                    setField('versionName', event.target.value)
+                  }
+                  placeholder="e.g. 1.4.0"
+                  aria-invalid={Boolean(errors.versionName)}
+                  className={fieldClasses}
+                />
+                {errors.versionName && (
+                  <p className="text-xs text-rose-600">{errors.versionName}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-version-code" className="text-[#0E2748]">
+                  Version code
+                </Label>
+                <Input
+                  id="ar-version-code"
+                  inputMode="numeric"
+                  value={values.versionCode}
+                  onChange={(event) =>
+                    setField('versionCode', event.target.value)
+                  }
+                  placeholder="e.g. 140"
+                  aria-invalid={Boolean(errors.versionCode)}
+                  className={fieldClasses}
+                />
+                {errors.versionCode && (
+                  <p className="text-xs text-rose-600">{errors.versionCode}</p>
+                )}
+              </div>
+              {knownDuplicate && (
+                <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 sm:col-span-2">
+                  <TriangleAlert
+                    className="h-3.5 w-3.5 shrink-0"
+                    strokeWidth={1.75}
+                  />
+                  This version already exists for{' '}
+                  {values.platform === 'ios' ? 'iOS' : 'Android'}{' '}
+                  {values.updateType.toUpperCase()} — change the version name or
+                  code before saving.
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-minimum-version" className="text-[#0E2748]">
+                  Minimum version{' '}
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="ar-minimum-version"
+                  value={values.minimumVersion}
+                  onChange={(event) =>
+                    setField('minimumVersion', event.target.value)
                   }
                   placeholder="e.g. 1.0.0"
+                  aria-invalid={Boolean(errors.minimumVersion)}
+                  className={fieldClasses}
+                />
+                {errors.minimumVersion ? (
+                  <p className="text-xs text-rose-600">
+                    {errors.minimumVersion}
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#0E2748]/50">
+                    Clients below this version are forced to update.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-published-at" className="text-[#0E2748]">
+                  Publish date
+                </Label>
+                <Input
+                  id="ar-published-at"
+                  type="datetime-local"
+                  value={values.publishedAt}
+                  onChange={(event) =>
+                    setField('publishedAt', event.target.value)
+                  }
+                  aria-invalid={Boolean(errors.publishedAt)}
+                  className={fieldClasses}
+                />
+                {errors.publishedAt ? (
+                  <p className="text-xs text-rose-600">{errors.publishedAt}</p>
+                ) : (
+                  <p className="text-xs text-[#0E2748]/50">
+                    Leave empty to stamp it when the release is published.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="ar-download-url" className="text-[#0E2748]">
+                Download URL{' '}
+                {values.updateType === 'apk' && (
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
+                )}
+              </Label>
+              <Input
+                id="ar-download-url"
+                type="url"
+                value={values.downloadUrl}
+                onChange={(event) =>
+                  setField('downloadUrl', event.target.value)
+                }
+                placeholder="e.g. https://cdn.edc.co.id/releases/app-1.4.0.apk"
+                aria-invalid={Boolean(errors.downloadUrl)}
+                className={fieldClasses}
+              />
+              {errors.downloadUrl && (
+                <p className="text-xs text-rose-600">{errors.downloadUrl}</p>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-file-size" className="text-[#0E2748]">
+                  File size (bytes)
+                </Label>
+                <Input
+                  id="ar-file-size"
+                  inputMode="numeric"
+                  value={values.fileSize}
+                  onChange={(event) => setField('fileSize', event.target.value)}
+                  placeholder="e.g. 52428800"
+                  aria-invalid={Boolean(errors.fileSize)}
+                  className={fieldClasses}
+                />
+                {errors.fileSize && (
+                  <p className="text-xs text-rose-600">{errors.fileSize}</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="ar-checksum" className="text-[#0E2748]">
+                  Checksum
+                </Label>
+                <Input
+                  id="ar-checksum"
+                  value={values.checksum}
+                  onChange={(event) => setField('checksum', event.target.value)}
+                  placeholder="e.g. sha256:9f86d08…"
                   className={fieldClasses}
                 />
               </div>
             </div>
-          )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="ar-changelog" className="text-[#0E2748]">
-              Changelog{' '}
-              <span className="font-normal text-[#0E2748]/40">
-                (Markdown supported)
-              </span>
-            </Label>
-            <Textarea
-              id="ar-changelog"
-              value={values.changelog}
-              onChange={(event) => setField('changelog', event.target.value)}
-              rows={5}
-              maxLength={10_000}
-              placeholder={'e.g.\n- Faster merchant sync\n- Fixed login crash on Android 14'}
-              className={fieldClasses}
-            />
-          </div>
+            {values.updateType === 'ota' && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ar-channel" className="text-[#0E2748]">
+                    OTA channel
+                  </Label>
+                  <Input
+                    id="ar-channel"
+                    value={values.channel}
+                    onChange={(event) =>
+                      setField('channel', event.target.value)
+                    }
+                    placeholder="e.g. production"
+                    className={fieldClasses}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="ar-runtime-version"
+                    className="text-[#0E2748]"
+                  >
+                    Runtime version
+                  </Label>
+                  <Input
+                    id="ar-runtime-version"
+                    value={values.runtimeVersion}
+                    onChange={(event) =>
+                      setField('runtimeVersion', event.target.value)
+                    }
+                    placeholder="e.g. 1.0.0"
+                    className={fieldClasses}
+                  />
+                </div>
+              </div>
+            )}
 
-          <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium text-[#0E2748]">Force update</p>
-              <p className="text-xs text-[#0E2748]/50">
-                Clients must install this release before continuing to use the
-                app.
-              </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="ar-changelog" className="text-[#0E2748]">
+                Changelog{' '}
+                <span className="font-normal text-[#0E2748]/40">
+                  (Markdown supported)
+                </span>
+              </Label>
+              <Textarea
+                id="ar-changelog"
+                value={values.changelog}
+                onChange={(event) => setField('changelog', event.target.value)}
+                rows={5}
+                maxLength={10_000}
+                placeholder={
+                  'e.g.\n- Faster merchant sync\n- Fixed login crash on Android 14'
+                }
+                className={fieldClasses}
+              />
             </div>
-            <Switch
-              className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
-              checked={values.forceUpdate}
-              onCheckedChange={(checked) => setField('forceUpdate', checked)}
-            />
-          </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium text-[#0E2748]">
-                Active release
-              </p>
-              <p className="text-xs text-[#0E2748]/50">
-                The active release is the one served to devices — activating
-                this one deactivates the platform&apos;s current release.
-              </p>
+            <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-[#0E2748]">
+                  Force update
+                </p>
+                <p className="text-xs text-[#0E2748]/50">
+                  Clients must install this release before continuing to use the
+                  app.
+                </p>
+              </div>
+              <Switch
+                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                checked={values.forceUpdate}
+                onCheckedChange={(checked) => setField('forceUpdate', checked)}
+              />
             </div>
-            <Switch
-              className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
-              checked={values.isActive}
-              onCheckedChange={(checked) => setField('isActive', checked)}
-            />
-          </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              onClick={() => handleOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving || knownDuplicate}>
-              {saving && (
-                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
-              )}
-              {release ? 'Save changes' : 'Create release'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-[#0E2748]">
+                  Active release
+                </p>
+                <p className="text-xs text-[#0E2748]/50">
+                  The active release is the one served to devices — activating
+                  this one deactivates the platform&apos;s current release.
+                </p>
+              </div>
+              <Switch
+                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                checked={values.isActive}
+                onCheckedChange={(checked) => setField('isActive', checked)}
+              />
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => handleOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving || knownDuplicate}>
+                {saving && (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    strokeWidth={1.75}
+                  />
+                )}
+                {release ? 'Save changes' : 'Create release'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <UnsavedChangesDialog {...dialogProps} />
+    </>
   )
 }
