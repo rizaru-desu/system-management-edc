@@ -11,6 +11,7 @@ import {
   ChevronRight,
   EllipsisVertical,
   Loader2,
+  MapPinned,
   Pencil,
   ShieldCheck,
   Smartphone,
@@ -109,6 +110,9 @@ interface UsersTableProps {
   /** Editing covers deactivation too — the form has an Active status switch. */
   onEdit: (user: UserRecord) => void
   onViewDevices: (user: UserRecord) => void
+  onAssignServicePoints: (user: UserRecord) => void
+  /** Mock assignment count shown in the Service Points column. */
+  getAssignedServicePointCount: (user: UserRecord) => number
 }
 
 export function UsersTable({
@@ -124,6 +128,8 @@ export function UsersTable({
   onViewPermissions,
   onEdit,
   onViewDevices,
+  onAssignServicePoints,
+  getAssignedServicePointCount,
 }: UsersTableProps) {
 
   const columns = useMemo<Array<LegacyColumnDef<UserRecord>>>(
@@ -162,6 +168,22 @@ export function UsersTable({
             )}
           </div>
         ),
+      },
+      {
+        id: 'servicePoints',
+        header: 'Service Points',
+        cell: ({ row }) => {
+          const count = getAssignedServicePointCount(row.original)
+          if (count === 0) {
+            return <span className="text-xs text-brand-900/40">None</span>
+          }
+          return (
+            <Badge variant="soft">
+              <MapPinned className="h-3 w-3 text-primary" strokeWidth={1.75} />
+              {count} assigned
+            </Badge>
+          )
+        },
       },
       {
         id: 'signIn',
@@ -284,6 +306,13 @@ export function UsersTable({
                     />
                     Manage devices
                   </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onAssignServicePoints(user)}>
+                    <MapPinned
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    Assign service points
+                  </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => onViewPermissions(user)}>
                     <ShieldCheck
                       className="h-4 w-4 text-primary"
@@ -305,7 +334,13 @@ export function UsersTable({
         },
       },
     ],
-    [onViewPermissions, onEdit, onViewDevices],
+    [
+      onViewPermissions,
+      onEdit,
+      onViewDevices,
+      onAssignServicePoints,
+      getAssignedServicePointCount,
+    ],
   )
 
   const table = useLegacyTable({

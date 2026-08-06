@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   KeyRound,
@@ -7,6 +7,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -34,7 +35,10 @@ import {
 import { useUpdateUser } from '../api/update-user.ts'
 import { userStatsQueryOptions } from '../api/user-stats.ts'
 import { seedRolePermissions } from '../data/permissions.ts'
+import { seedAssignmentsForUser } from '../data/service-point-assignments.ts'
+import type { ServicePointAssignment } from '../data/service-point-assignments.ts'
 import type { UserRecord } from '../data/users.ts'
+import { AssignServicePointsDrawer } from './assign-service-points-drawer.tsx'
 import { PermissionsModal } from './permissions-modal.tsx'
 import { RolePermissionsModal } from './role-permissions-modal.tsx'
 import { UserDeviceDrawer } from './user-device-drawer.tsx'
@@ -92,6 +96,47 @@ export function UsersPage() {
   // Device management drawer
   const [devicesDrawerOpen, setDevicesDrawerOpen] = useState(false)
   const [devicesUser, setDevicesUser] = useState<UserRecord | null>(null)
+
+  // Service point assignment drawer (UI only). Saved drafts live in this
+  // session-local map; users without an entry fall back to the deterministic
+  // mock seed, so the table column always has a count to show. The future
+  // Assignment API replaces both.
+  const [assignmentOverrides, setAssignmentOverrides] = useState<
+    Record<string, Array<ServicePointAssignment>>
+  >({})
+  const [assignDrawerOpen, setAssignDrawerOpen] = useState(false)
+  const [assignUser, setAssignUser] = useState<UserRecord | null>(null)
+
+  const assignmentsFor = useCallback(
+    (user: UserRecord) =>
+      assignmentOverrides[user.id] ?? seedAssignmentsForUser(user),
+    [assignmentOverrides],
+  )
+
+  // Memoized so the drawer's draft-reseeding effect only fires on real
+  // changes, not on every page render.
+  const assignUserAssignments = useMemo(
+    () => (assignUser ? assignmentsFor(assignUser) : []),
+    [assignUser, assignmentsFor],
+  )
+
+  const openAssignDrawer = (user: UserRecord) => {
+    setAssignUser(user)
+    setAssignDrawerOpen(true)
+  }
+
+  const handleSaveAssignments = (
+    user: UserRecord,
+    assignments: Array<ServicePointAssignment>,
+  ) => {
+    setAssignmentOverrides((previous) => ({
+      ...previous,
+      [user.id]: assignments,
+    }))
+    toast.success(`Service point assignments for “${user.name}” updated.`, {
+      description: 'Mock data — changes reset on reload.',
+    })
+  }
 
   // V/C/U/D matrix from GET /permissions (seed defaults until it resolves);
   // saving goes through PUT /permissions with an optimistic cache update.
@@ -363,6 +408,8 @@ export function UsersPage() {
         onViewPermissions={openPermissions}
         onEdit={openEdit}
         onViewDevices={openDevicesDrawer}
+        onAssignServicePoints={openAssignDrawer}
+        getAssignedServicePointCount={(user) => assignmentsFor(user).length}
       />
 
       <UserFormModal
@@ -387,6 +434,13 @@ export function UsersPage() {
         user={devicesUser}
         open={devicesDrawerOpen}
         onClose={() => setDevicesDrawerOpen(false)}
+      />
+      <AssignServicePointsDrawer
+        user={assignUser}
+        open={assignDrawerOpen}
+        onClose={() => setAssignDrawerOpen(false)}
+        assignments={assignUserAssignments}
+        onSave={handleSaveAssignments}
       />
     </div>
   )
