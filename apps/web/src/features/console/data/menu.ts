@@ -207,6 +207,12 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         directRoute: '/service-points',
       },
       {
+        title: 'App Releases',
+        path: 'app-releases',
+        allowedRoles: ['System_Administrator'],
+        directRoute: '/app-releases',
+      },
+      {
         title: 'Audit Logs',
         path: 'audit-logs',
         allowedRoles: ['System_Administrator'],

@@ -22,10 +22,22 @@ export {
 } from "./queries/permissions.js";
 export {
   createMobileVersion,
+  deleteMobileVersion,
+  findMobileVersionById,
   getActiveMobileVersion,
+  listMobileVersions,
+  setMobileVersionActive,
+  updateMobileVersion,
   type CreateMobileVersionInput,
+  type DeleteMobileVersionResult,
+  type ListMobileVersionsOptions,
+  type MobileVersionAdminRow,
+  type MobileVersionListPage,
   type MobileVersionRecord,
   type MobileVersionResponse,
+  type SetMobileVersionActiveResult,
+  type UpdateMobileVersionInput,
+  type UpdateMobileVersionResult,
 } from "./queries/mobile-version.js";
 export {
   createServicePoint,

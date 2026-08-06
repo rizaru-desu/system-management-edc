@@ -11,6 +11,7 @@ export const mobileVersion = pgTable("mobile_version", {
     .$defaultFn(createId),
   platform: text("platform").notNull().default("android"),
   latestVersion: text("latest_version").notNull(),
+  versionCode: integer("version_code").notNull().default(0),
   minimumVersion: text("minimum_version").notNull(),
   forceUpdate: boolean("force_update").notNull().default(false),
   updateUrl: text("update_url").notNull().default(""),
