@@ -13,6 +13,7 @@ import {
   Pencil,
   SearchX,
   Trash2,
+  TriangleAlert,
   Users,
 } from 'lucide-react'
 
@@ -83,6 +84,9 @@ interface ServicePointsTableProps {
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
   isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while the tree is being pruned by an active search/status filter. */
   isFiltering: boolean
   /** Expansion is locked while filtering — matches must stay visible. */
@@ -99,6 +103,9 @@ export function ServicePointsTable({
   pagination,
   onPaginationChange,
   isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onToggleExpand,
   onClearFilters,
@@ -208,11 +215,11 @@ export function ServicePointsTable({
             <TooltipTrigger asChild>
               <span className="inline-flex cursor-help items-center gap-1.5 text-brand-900/70 tabular-nums">
                 <Users className="h-3.5 w-3.5 text-primary" strokeWidth={1.75} />
-                {row.original.record.assignedUsers}
+                {row.original.record.assignedUsers ?? '—'}
               </span>
             </TooltipTrigger>
             <TooltipContent className="border-brand-900 bg-brand-900 text-white">
-              Managed via the upcoming Service Point Assignment module.
+              Managed via user service point assignments.
             </TooltipContent>
           </Tooltip>
         ),
@@ -342,7 +349,23 @@ export function ServicePointsTable({
               </td>
             </tr>
           )}
-          {!isPending && total === 0 && (
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -383,7 +406,7 @@ export function ServicePointsTable({
         </tbody>
       </table>
 
-      {!isPending && total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} visible service points

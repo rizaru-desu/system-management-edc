@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ListTree, ListX, MapPinPlus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -12,7 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { SEED_SERVICE_POINTS } from '../data/service-points.ts'
+import { useCreateServicePoint } from '../api/create-service-point.ts'
+import type { ServicePointPayload } from '../api/create-service-point.ts'
+import { useDeleteServicePoint } from '../api/delete-service-point.ts'
+import { servicePointDetailQueryOptions } from '../api/service-point-detail.ts'
+import { servicePointTreeQueryOptions } from '../api/service-point-tree.ts'
+import { useUpdateServicePoint } from '../api/update-service-point.ts'
 import type {
   ServicePointRecord,
   ServicePointStatus,
@@ -31,18 +36,11 @@ import type { ServicePointFormValues } from './service-point-form-modal.tsx'
 import { ServicePointViewModal } from './service-point-view-modal.tsx'
 import { ServicePointsTable } from './service-points-table.tsx'
 
-/** Simulated fetch latency so the loading state is visible. */
-const MOCK_LOAD_MS = 600
-
 const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
 
-/** Maps the dialog's string fields onto a stored record (mock persistence). */
-function recordFromForm(
-  values: ServicePointFormValues,
-  base: Pick<ServicePointRecord, 'id' | 'assignedUsers' | 'createdAt'>,
-): ServicePointRecord {
+/** Maps the dialog's string fields onto the API payload shape. */
+function payloadFromForm(values: ServicePointFormValues): ServicePointPayload {
   return {
-    ...base,
     code: values.code,
     name: values.name,
     parentId: values.parentId,
@@ -58,27 +56,30 @@ function recordFromForm(
 }
 
 /**
- * Administration → Service Point. UI-only for now: the hierarchy lives in
- * local state seeded from mock data (loading and refresh are simulated), and
- * every CRUD action mutates that state without any backend call. Leader/PIC
- * are deliberately absent — they arrive with the Service Point Assignment
- * module later.
+ * Administration → Service Point. The hierarchy comes from GET
+ * /service-points/tree (flattened back to `parentId` records — search,
+ * status filter, expand/collapse and pagination all stay client-side over
+ * the full tree), and every CRUD action goes through the backend API.
+ * Leader/PIC are deliberately absent — they belong to the Service Point
+ * Assignment module.
  */
 export function ServicePointsPage() {
-  // ── Mock data lifecycle ────────────────────────────────────────────────
-  const [records, setRecords] = useState<Array<ServicePointRecord>>([])
-  const [isPending, setIsPending] = useState(true)
+  const treeQuery = useQuery(servicePointTreeQueryOptions())
+  const records = useMemo(() => treeQuery.data ?? [], [treeQuery.data])
+  const isPending = treeQuery.isPending
+
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
+  // Start fully expanded so the hierarchy is visible at first glance —
+  // once, when the tree first arrives; later refetches keep the user's
+  // expand/collapse state.
+  const expandedInitialized = useRef(false)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setRecords(SEED_SERVICE_POINTS)
-      // Start fully expanded so the hierarchy is visible at first glance.
-      setExpandedIds(collectParentIds(SEED_SERVICE_POINTS))
-      setIsPending(false)
-    }, MOCK_LOAD_MS)
-    return () => clearTimeout(timer)
-  }, [])
+    if (!expandedInitialized.current && records.length > 0) {
+      expandedInitialized.current = true
+      setExpandedIds(collectParentIds(records))
+    }
+  }, [records])
 
   // ── Search & filter ────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
@@ -233,52 +234,39 @@ export function ServicePointsPage() {
     [records, deleting],
   )
 
-  // ── Mock CRUD (state only — no API) ────────────────────────────────────
+  // The view dialog re-reads the record so it always shows fresh data even
+  // when the cached tree is stale (GET /service-points/:id).
+  const detailQuery = useQuery({
+    ...servicePointDetailQueryOptions(viewing?.id ?? ''),
+    enabled: viewOpen && viewing !== null,
+  })
+
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createServicePoint = useCreateServicePoint()
+  const updateServicePoint = useUpdateServicePoint()
+  const deleteServicePoint = useDeleteServicePoint()
+
   const handleSubmit = (values: ServicePointFormValues) => {
+    const payload = payloadFromForm(values)
     if (editing) {
-      const updated = recordFromForm(values, {
-        id: editing.id,
-        assignedUsers: editing.assignedUsers,
-        createdAt: editing.createdAt,
-      })
-      setRecords((previous) =>
-        previous.map((record) =>
-          record.id === editing.id ? updated : record,
-        ),
-      )
-      toast.success(`Service point “${updated.name}” updated.`, {
-        description: 'Mock data — changes reset on reload.',
-      })
+      updateServicePoint.mutate({ id: editing.id, ...payload })
       return
     }
-    const created = recordFromForm(values, {
-      id: `sp-${crypto.randomUUID()}`,
-      // Real counts arrive with the Service Point Assignment module.
-      assignedUsers: 0,
-      createdAt: new Date().toISOString().slice(0, 10),
-    })
-    setRecords((previous) => [...previous, created])
-    // Reveal the new row immediately, wherever it landed in the tree.
-    if (created.parentId) {
-      setExpandedIds((previous) => new Set([...previous, created.parentId!]))
-    }
-    toast.success(`Service point “${created.name}” created.`, {
-      description: 'Mock data — changes reset on reload.',
+    createServicePoint.mutate(payload, {
+      // Reveal the new row immediately, wherever it landed in the tree.
+      onSuccess: (created) => {
+        if (created.parentId) {
+          setExpandedIds(
+            (previous) => new Set([...previous, created.parentId!]),
+          )
+        }
+      },
     })
   }
 
   const handleDelete = () => {
     if (!deleting) return
-    const removed = new Set([
-      deleting.id,
-      ...collectDescendantIds(records, deleting.id),
-    ])
-    setRecords((previous) =>
-      previous.filter((record) => !removed.has(record.id)),
-    )
-    toast.success(`Service point “${deleting.name}” deleted.`, {
-      description: 'Mock data — changes reset on reload.',
-    })
+    deleteServicePoint.mutate({ id: deleting.id, name: deleting.name })
     setDeleting(null)
   }
 
@@ -354,6 +342,13 @@ export function ServicePointsPage() {
         pagination={pagination}
         onPaginationChange={setPagination}
         isPending={isPending}
+        isError={treeQuery.isError}
+        errorMessage={
+          treeQuery.error instanceof Error
+            ? treeQuery.error.message
+            : 'Failed to load service points.'
+        }
+        onRetry={() => treeQuery.refetch()}
         isFiltering={isFiltering}
         onToggleExpand={toggleExpand}
         onClearFilters={clearFilters}
@@ -372,7 +367,11 @@ export function ServicePointsPage() {
       <ServicePointViewModal
         open={viewOpen}
         onOpenChange={setViewOpen}
-        servicePoint={viewing}
+        servicePoint={
+          detailQuery.data && detailQuery.data.id === viewing?.id
+            ? detailQuery.data
+            : viewing
+        }
         parentName={
           viewing?.parentId
             ? (recordsById.get(viewing.parentId)?.name ?? null)
