@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '#/components/ui/button.tsx'
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -264,7 +265,14 @@ export function MerchantFormModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="theme-light max-h-[90vh] overflow-y-auto border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-2xl">
+        {/* Backdrop clicks never dismiss the form — closing goes through the
+          "X" button, Cancel, or a successful save (all guarded against
+          unsaved changes). Header and footer stay pinned; only the field
+          list inside DialogBody scrolls. */}
+        <DialogContent
+          disableOutsideClose
+          className="theme-light border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-2xl"
+        >
           <DialogHeader>
             <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
               {merchant ? 'Edit merchant' : 'Add merchant'}
@@ -276,290 +284,306 @@ export function MerchantFormModal({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-code" className="text-[#0E2748]">
-                  Merchant code {requiredMark}
-                </Label>
-                <Input
-                  id="mch-code"
-                  value={values.code}
-                  onChange={(event) => setField('code', event.target.value)}
-                  placeholder="e.g. MCH-TGS-027"
-                  aria-invalid={Boolean(errors.code)}
-                  className={fieldClasses}
-                />
-                {errors.code && (
-                  <p className="text-xs text-rose-600">{errors.code}</p>
-                )}
+          <form
+            onSubmit={handleSubmit}
+            className="flex min-h-0 flex-1 flex-col gap-4"
+            noValidate
+          >
+            <DialogBody className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-code" className="text-[#0E2748]">
+                    Merchant code {requiredMark}
+                  </Label>
+                  <Input
+                    id="mch-code"
+                    value={values.code}
+                    onChange={(event) => setField('code', event.target.value)}
+                    placeholder="e.g. MCH-TGS-027"
+                    aria-invalid={Boolean(errors.code)}
+                    className={fieldClasses}
+                  />
+                  {errors.code && (
+                    <p className="text-xs text-rose-600">{errors.code}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-name" className="text-[#0E2748]">
+                    Merchant name {requiredMark}
+                  </Label>
+                  <Input
+                    id="mch-name"
+                    value={values.name}
+                    onChange={(event) => setField('name', event.target.value)}
+                    placeholder="e.g. Indomaret Pondok Aren"
+                    aria-invalid={Boolean(errors.name)}
+                    className={fieldClasses}
+                  />
+                  {errors.name && (
+                    <p className="text-xs text-rose-600">{errors.name}</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-name" className="text-[#0E2748]">
-                  Merchant name {requiredMark}
-                </Label>
-                <Input
-                  id="mch-name"
-                  value={values.name}
-                  onChange={(event) => setField('name', event.target.value)}
-                  placeholder="e.g. Indomaret Pondok Aren"
-                  aria-invalid={Boolean(errors.name)}
-                  className={fieldClasses}
-                />
-                {errors.name && (
-                  <p className="text-xs text-rose-600">{errors.name}</p>
-                )}
-              </div>
-            </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-type" className="text-[#0E2748]">
-                  Merchant type
-                </Label>
-                <Select
-                  value={values.type || NO_TYPE}
-                  onValueChange={(value) =>
-                    setField('type', value === NO_TYPE ? '' : value)
-                  }
-                >
-                  <SelectTrigger
-                    id="mch-type"
-                    className={`w-full ${fieldClasses}`}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-type" className="text-[#0E2748]">
+                    Merchant type
+                  </Label>
+                  <Select
+                    value={values.type || NO_TYPE}
+                    onValueChange={(value) =>
+                      setField('type', value === NO_TYPE ? '' : value)
+                    }
                   >
-                    <SelectValue placeholder="Select a type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_TYPE}>No type</SelectItem>
-                    {MERCHANT_TYPE_OPTIONS.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                    {/* An edited record may carry a type outside the
+                    <SelectTrigger
+                      id="mch-type"
+                      className={`w-full ${fieldClasses}`}
+                    >
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_TYPE}>No type</SelectItem>
+                      {MERCHANT_TYPE_OPTIONS.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                      {/* An edited record may carry a type outside the
                       suggested list (free text server-side) — keep it
                       selectable so editing never silently drops it. */}
-                    {values.type &&
-                      !MERCHANT_TYPE_OPTIONS.includes(
-                        values.type as (typeof MERCHANT_TYPE_OPTIONS)[number],
-                      ) && (
-                        <SelectItem value={values.type}>
-                          {values.type}
-                        </SelectItem>
-                      )}
+                      {values.type &&
+                        !MERCHANT_TYPE_OPTIONS.includes(
+                          values.type as (typeof MERCHANT_TYPE_OPTIONS)[number],
+                        ) && (
+                          <SelectItem value={values.type}>
+                            {values.type}
+                          </SelectItem>
+                        )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-pic" className="text-[#0E2748]">
+                    PIC name
+                  </Label>
+                  <Input
+                    id="mch-pic"
+                    value={values.picName}
+                    onChange={(event) =>
+                      setField('picName', event.target.value)
+                    }
+                    placeholder="e.g. Budi Santoso"
+                    className={fieldClasses}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-phone" className="text-[#0E2748]">
+                    Phone number
+                  </Label>
+                  <Input
+                    id="mch-phone"
+                    type="tel"
+                    value={values.phone}
+                    onChange={(event) => setField('phone', event.target.value)}
+                    placeholder="e.g. +62 812 3456 7890"
+                    aria-invalid={Boolean(errors.phone)}
+                    className={fieldClasses}
+                  />
+                  {errors.phone && (
+                    <p className="text-xs text-rose-600">{errors.phone}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-email" className="text-[#0E2748]">
+                    Email
+                  </Label>
+                  <Input
+                    id="mch-email"
+                    type="email"
+                    value={values.email}
+                    onChange={(event) => setField('email', event.target.value)}
+                    placeholder="e.g. store@merchant.co.id"
+                    aria-invalid={Boolean(errors.email)}
+                    className={fieldClasses}
+                  />
+                  {errors.email && (
+                    <p className="text-xs text-rose-600">{errors.email}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="mch-address" className="text-[#0E2748]">
+                  Address
+                </Label>
+                <Input
+                  id="mch-address"
+                  value={values.address}
+                  onChange={(event) => setField('address', event.target.value)}
+                  placeholder="Street, number, building"
+                  className={fieldClasses}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-province" className="text-[#0E2748]">
+                    Province
+                  </Label>
+                  <Input
+                    id="mch-province"
+                    value={values.province}
+                    onChange={(event) =>
+                      setField('province', event.target.value)
+                    }
+                    placeholder="e.g. Banten"
+                    className={fieldClasses}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-city" className="text-[#0E2748]">
+                    City
+                  </Label>
+                  <Input
+                    id="mch-city"
+                    value={values.city}
+                    onChange={(event) => setField('city', event.target.value)}
+                    placeholder="e.g. Tangerang Selatan"
+                    className={fieldClasses}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-district" className="text-[#0E2748]">
+                    District
+                  </Label>
+                  <Input
+                    id="mch-district"
+                    value={values.district}
+                    onChange={(event) =>
+                      setField('district', event.target.value)
+                    }
+                    placeholder="e.g. Pondok Aren"
+                    className={fieldClasses}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-postal" className="text-[#0E2748]">
+                    Postal code
+                  </Label>
+                  <Input
+                    id="mch-postal"
+                    inputMode="numeric"
+                    value={values.postalCode}
+                    onChange={(event) =>
+                      setField('postalCode', event.target.value)
+                    }
+                    placeholder="e.g. 15224"
+                    aria-invalid={Boolean(errors.postalCode)}
+                    className={fieldClasses}
+                  />
+                  {errors.postalCode && (
+                    <p className="text-xs text-rose-600">{errors.postalCode}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-latitude" className="text-[#0E2748]">
+                    Latitude
+                  </Label>
+                  <Input
+                    id="mch-latitude"
+                    inputMode="decimal"
+                    value={values.latitude}
+                    onChange={(event) =>
+                      setField('latitude', event.target.value)
+                    }
+                    placeholder="e.g. -6.2711"
+                    aria-invalid={Boolean(errors.latitude)}
+                    className={fieldClasses}
+                  />
+                  {errors.latitude && (
+                    <p className="text-xs text-rose-600">{errors.latitude}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="mch-longitude" className="text-[#0E2748]">
+                    Longitude
+                  </Label>
+                  <Input
+                    id="mch-longitude"
+                    inputMode="decimal"
+                    value={values.longitude}
+                    onChange={(event) =>
+                      setField('longitude', event.target.value)
+                    }
+                    placeholder="e.g. 106.7146"
+                    aria-invalid={Boolean(errors.longitude)}
+                    className={fieldClasses}
+                  />
+                  {errors.longitude && (
+                    <p className="text-xs text-rose-600">{errors.longitude}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="mch-service-point" className="text-[#0E2748]">
+                  Service point {requiredMark}
+                </Label>
+                <Select
+                  value={values.servicePointId || undefined}
+                  onValueChange={(value) => setField('servicePointId', value)}
+                >
+                  <SelectTrigger
+                    id="mch-service-point"
+                    aria-invalid={Boolean(errors.servicePointId)}
+                    className={`w-full ${fieldClasses}`}
+                  >
+                    <SelectValue placeholder="Select the owning service point" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {servicePointOptions.map((servicePoint) => (
+                      <SelectItem key={servicePoint.id} value={servicePoint.id}>
+                        {servicePoint.name} ({servicePoint.code})
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-pic" className="text-[#0E2748]">
-                  PIC name
-                </Label>
-                <Input
-                  id="mch-pic"
-                  value={values.picName}
-                  onChange={(event) => setField('picName', event.target.value)}
-                  placeholder="e.g. Budi Santoso"
-                  className={fieldClasses}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-phone" className="text-[#0E2748]">
-                  Phone number
-                </Label>
-                <Input
-                  id="mch-phone"
-                  type="tel"
-                  value={values.phone}
-                  onChange={(event) => setField('phone', event.target.value)}
-                  placeholder="e.g. +62 812 3456 7890"
-                  aria-invalid={Boolean(errors.phone)}
-                  className={fieldClasses}
-                />
-                {errors.phone && (
-                  <p className="text-xs text-rose-600">{errors.phone}</p>
+                {errors.servicePointId && (
+                  <p className="text-xs text-rose-600">
+                    {errors.servicePointId}
+                  </p>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-email" className="text-[#0E2748]">
-                  Email
-                </Label>
-                <Input
-                  id="mch-email"
-                  type="email"
-                  value={values.email}
-                  onChange={(event) => setField('email', event.target.value)}
-                  placeholder="e.g. store@merchant.co.id"
-                  aria-invalid={Boolean(errors.email)}
-                  className={fieldClasses}
-                />
-                {errors.email && (
-                  <p className="text-xs text-rose-600">{errors.email}</p>
-                )}
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="mch-address" className="text-[#0E2748]">
-                Address
-              </Label>
-              <Input
-                id="mch-address"
-                value={values.address}
-                onChange={(event) => setField('address', event.target.value)}
-                placeholder="Street, number, building"
-                className={fieldClasses}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-province" className="text-[#0E2748]">
-                  Province
-                </Label>
-                <Input
-                  id="mch-province"
-                  value={values.province}
-                  onChange={(event) => setField('province', event.target.value)}
-                  placeholder="e.g. Banten"
-                  className={fieldClasses}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-city" className="text-[#0E2748]">
-                  City
-                </Label>
-                <Input
-                  id="mch-city"
-                  value={values.city}
-                  onChange={(event) => setField('city', event.target.value)}
-                  placeholder="e.g. Tangerang Selatan"
-                  className={fieldClasses}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-district" className="text-[#0E2748]">
-                  District
-                </Label>
-                <Input
-                  id="mch-district"
-                  value={values.district}
-                  onChange={(event) => setField('district', event.target.value)}
-                  placeholder="e.g. Pondok Aren"
-                  className={fieldClasses}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-postal" className="text-[#0E2748]">
-                  Postal code
-                </Label>
-                <Input
-                  id="mch-postal"
-                  inputMode="numeric"
-                  value={values.postalCode}
-                  onChange={(event) =>
-                    setField('postalCode', event.target.value)
+              <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium text-[#0E2748]">
+                    Active merchant
+                  </p>
+                  <p className="text-xs text-[#0E2748]/50">
+                    Inactive merchants stay in the catalogue but are excluded
+                    from terminal deployments.
+                  </p>
+                </div>
+                <Switch
+                  className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                  checked={values.status === 'active'}
+                  onCheckedChange={(checked) =>
+                    setField('status', checked ? 'active' : 'inactive')
                   }
-                  placeholder="e.g. 15224"
-                  aria-invalid={Boolean(errors.postalCode)}
-                  className={fieldClasses}
                 />
-                {errors.postalCode && (
-                  <p className="text-xs text-rose-600">{errors.postalCode}</p>
-                )}
               </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-latitude" className="text-[#0E2748]">
-                  Latitude
-                </Label>
-                <Input
-                  id="mch-latitude"
-                  inputMode="decimal"
-                  value={values.latitude}
-                  onChange={(event) => setField('latitude', event.target.value)}
-                  placeholder="e.g. -6.2711"
-                  aria-invalid={Boolean(errors.latitude)}
-                  className={fieldClasses}
-                />
-                {errors.latitude && (
-                  <p className="text-xs text-rose-600">{errors.latitude}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="mch-longitude" className="text-[#0E2748]">
-                  Longitude
-                </Label>
-                <Input
-                  id="mch-longitude"
-                  inputMode="decimal"
-                  value={values.longitude}
-                  onChange={(event) =>
-                    setField('longitude', event.target.value)
-                  }
-                  placeholder="e.g. 106.7146"
-                  aria-invalid={Boolean(errors.longitude)}
-                  className={fieldClasses}
-                />
-                {errors.longitude && (
-                  <p className="text-xs text-rose-600">{errors.longitude}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="mch-service-point" className="text-[#0E2748]">
-                Service point {requiredMark}
-              </Label>
-              <Select
-                value={values.servicePointId || undefined}
-                onValueChange={(value) => setField('servicePointId', value)}
-              >
-                <SelectTrigger
-                  id="mch-service-point"
-                  aria-invalid={Boolean(errors.servicePointId)}
-                  className={`w-full ${fieldClasses}`}
-                >
-                  <SelectValue placeholder="Select the owning service point" />
-                </SelectTrigger>
-                <SelectContent>
-                  {servicePointOptions.map((servicePoint) => (
-                    <SelectItem key={servicePoint.id} value={servicePoint.id}>
-                      {servicePoint.name} ({servicePoint.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.servicePointId && (
-                <p className="text-xs text-rose-600">{errors.servicePointId}</p>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium text-[#0E2748]">
-                  Active merchant
-                </p>
-                <p className="text-xs text-[#0E2748]/50">
-                  Inactive merchants stay in the catalogue but are excluded from
-                  terminal deployments.
-                </p>
-              </div>
-              <Switch
-                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
-                checked={values.status === 'active'}
-                onCheckedChange={(checked) =>
-                  setField('status', checked ? 'active' : 'inactive')
-                }
-              />
-            </div>
+            </DialogBody>
 
             <DialogFooter>
               <Button
