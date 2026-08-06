@@ -22,6 +22,9 @@ export {
   appReleasesQueryKey,
 } from './api/list-app-releases.ts'
 export { appReleaseDetailQueryOptions } from './api/app-release-detail.ts'
+export { releaseVersionAvailabilityQueryOptions } from './api/check-app-release-version.ts'
+export type { ReleaseVersionIdentity } from './api/check-app-release-version.ts'
+export { isDuplicateVersionError } from './api/list-app-releases.ts'
 export { useCreateAppRelease } from './api/create-app-release.ts'
 export type { AppReleasePayload } from './api/create-app-release.ts'
 export { useUpdateAppRelease } from './api/update-app-release.ts'

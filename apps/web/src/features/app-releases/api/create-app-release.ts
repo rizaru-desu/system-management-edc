@@ -7,6 +7,7 @@ import { apiClient } from '#/lib/api-client.ts'
 import {
   appReleaseError,
   appReleasesQueryKey,
+  isDuplicateVersionError,
   toAppReleaseRecord,
 } from './list-app-releases.ts'
 import type { BackendAppRelease } from './list-app-releases.ts'
@@ -88,10 +89,14 @@ export function useCreateAppRelease() {
   return useMutation({
     mutationFn: (input: AppReleasePayload) =>
       createAppReleaseFn({ data: input }),
-    onSuccess: (release) => {
-      toast.success(`Release ${release.versionName} created.`)
+    onSuccess: () => {
+      toast.success('Release created successfully.')
     },
     onError: (error) => {
+      if (isDuplicateVersionError(error)) {
+        toast.error('Release version already exists.')
+        return
+      }
       toast.error(
         error instanceof Error ? error.message : 'Failed to create the release.',
       )

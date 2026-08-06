@@ -1,6 +1,71 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, ne, or, sql } from "drizzle-orm";
 import { db } from "../client.js";
 import { mobileVersion } from "../schema/mobile-version.js";
+
+/** Executor for shared checks: the pool client or a transaction. */
+type DbExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * The combination that identifies a release — mirrored by the
+ * `mobile_version_release_identity_idx` unique index, so the application
+ * check and the database constraint can never drift apart.
+ */
+export interface MobileVersionIdentity {
+  platform: string;
+  updateType: string;
+  latestVersion: string;
+  versionCode: number;
+  /** Ignore this row (the record being edited) when checking. */
+  excludeId?: string;
+}
+
+/** True when another release already uses the identity combination. */
+async function duplicateExists(
+  executor: DbExecutor,
+  identity: MobileVersionIdentity,
+): Promise<boolean> {
+  const conditions = [
+    eq(mobileVersion.platform, identity.platform),
+    eq(mobileVersion.updateType, identity.updateType),
+    eq(mobileVersion.latestVersion, identity.latestVersion),
+    eq(mobileVersion.versionCode, identity.versionCode),
+  ];
+  if (identity.excludeId) {
+    conditions.push(ne(mobileVersion.id, identity.excludeId));
+  }
+  const [row] = await executor
+    .select({ id: mobileVersion.id })
+    .from(mobileVersion)
+    .where(and(...conditions));
+  return row !== undefined;
+}
+
+/**
+ * True when no release uses the identity combination yet — the form's
+ * live availability check (pass `excludeId` while editing).
+ */
+export async function isMobileVersionAvailable(
+  identity: MobileVersionIdentity,
+): Promise<boolean> {
+  return !(await duplicateExists(db, identity));
+}
+
+/**
+ * True when the error is the unique index rejecting a concurrent duplicate
+ * insert — the race the in-transaction check cannot cover (PG 23505).
+ */
+function isUniqueViolation(error: unknown): boolean {
+  for (
+    let current = error;
+    current instanceof Error;
+    current = current.cause
+  ) {
+    if ((current as { code?: unknown }).code === "23505") return true;
+  }
+  return false;
+}
 
 export interface MobileVersionRecord {
   id: string;
@@ -117,54 +182,81 @@ export interface CreateMobileVersionInput {
   isActive?: boolean;
 }
 
+export type CreateMobileVersionResult =
+  | { ok: true; release: MobileVersionRecord }
+  | { ok: false; error: "version-exists" };
+
 /**
- * Creates or inserts a mobile version record. If isActive is true,
- * deactivates all other records for the specified platform first (ensuring only one active version).
+ * Creates a mobile version record after checking that no release already
+ * uses the same (platform, updateType, latestVersion, versionCode)
+ * combination — the unique index still backstops the concurrent race. If
+ * isActive is true, deactivates all other records for the specified
+ * platform first (ensuring only one active version).
  */
 export async function createMobileVersion(
   input: CreateMobileVersionInput,
-): Promise<MobileVersionRecord> {
+): Promise<CreateMobileVersionResult> {
   const platform = input.platform ?? "android";
+  const updateType = input.updateType ?? "apk";
+  const versionCode = input.versionCode ?? 0;
   const isActive = input.isActive ?? true;
 
   const downloadUrl = input.downloadUrl ?? input.updateUrl ?? "";
   const updateUrl = input.updateUrl ?? input.downloadUrl ?? "";
 
-  return await db.transaction(async (tx) => {
-    if (isActive) {
-      await tx
-        .update(mobileVersion)
-        .set({ isActive: false })
-        .where(eq(mobileVersion.platform, platform));
-    }
+  try {
+    return await db.transaction(async (tx) => {
+      if (
+        await duplicateExists(tx, {
+          platform,
+          updateType,
+          latestVersion: input.latestVersion,
+          versionCode,
+        })
+      ) {
+        return { ok: false as const, error: "version-exists" as const };
+      }
 
-    const inserted = await tx
-      .insert(mobileVersion)
-      .values({
-        platform,
-        latestVersion: input.latestVersion,
-        versionCode: input.versionCode ?? 0,
-        minimumVersion: input.minimumVersion,
-        forceUpdate: input.forceUpdate ?? false,
-        updateUrl,
-        downloadUrl,
-        checksum: input.checksum ?? "",
-        fileSize: input.fileSize ?? 0,
-        releaseNotes: input.releaseNotes ?? "",
-        updateType: input.updateType ?? "apk",
-        channel: input.channel ?? "production",
-        runtimeVersion: input.runtimeVersion ?? "1.0.0",
-        publishedAt: input.publishedAt ?? new Date(),
-        isActive,
-      })
-      .returning();
+      if (isActive) {
+        await tx
+          .update(mobileVersion)
+          .set({ isActive: false })
+          .where(eq(mobileVersion.platform, platform));
+      }
 
-    const record = inserted[0];
-    if (!record) {
-      throw new Error("Failed to insert mobile version record");
+      const inserted = await tx
+        .insert(mobileVersion)
+        .values({
+          platform,
+          latestVersion: input.latestVersion,
+          versionCode,
+          minimumVersion: input.minimumVersion,
+          forceUpdate: input.forceUpdate ?? false,
+          updateUrl,
+          downloadUrl,
+          checksum: input.checksum ?? "",
+          fileSize: input.fileSize ?? 0,
+          releaseNotes: input.releaseNotes ?? "",
+          updateType,
+          channel: input.channel ?? "production",
+          runtimeVersion: input.runtimeVersion ?? "1.0.0",
+          publishedAt: input.publishedAt ?? new Date(),
+          isActive,
+        })
+        .returning();
+
+      const record = inserted[0];
+      if (!record) {
+        throw new Error("Failed to insert mobile version record");
+      }
+      return { ok: true as const, release: record };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { ok: false as const, error: "version-exists" as const };
     }
-    return record;
-  });
+    throw error;
+  }
 }
 
 // ── Admin release management (console APK / OTA module) ─────────────────────
@@ -340,43 +432,69 @@ export type UpdateMobileVersionInput = Partial<CreateMobileVersionInput>;
 
 export type UpdateMobileVersionResult =
   | { ok: true; release: MobileVersionRecord }
-  | { ok: false; error: "not-found" };
+  | { ok: false; error: "not-found" | "version-exists" };
 
 /**
- * Updates a release. When the update activates the row (or re-platforms an
- * active row), every other record on that platform is deactivated inside the
- * same transaction — the mobile check-update endpoint reads exactly one
- * active release per platform.
+ * Updates a release. The identity combination that would result from the
+ * update must not collide with another release (the record itself is
+ * excluded, so saving without changing the version stays valid). When the
+ * update activates the row (or re-platforms an active row), every other
+ * record on that platform is deactivated inside the same transaction — the
+ * mobile check-update endpoint reads exactly one active release per
+ * platform.
  */
 export async function updateMobileVersion(
   id: string,
   input: UpdateMobileVersionInput,
 ): Promise<UpdateMobileVersionResult> {
-  return db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select()
-      .from(mobileVersion)
-      .where(eq(mobileVersion.id, id));
-    if (!existing) return { ok: false as const, error: "not-found" as const };
+  try {
+    return await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(mobileVersion)
+        .where(eq(mobileVersion.id, id));
+      if (!existing) {
+        return { ok: false as const, error: "not-found" as const };
+      }
 
-    const platform = input.platform ?? existing.platform;
-    const isActive = input.isActive ?? existing.isActive;
+      const platform = input.platform ?? existing.platform;
+      const isActive = input.isActive ?? existing.isActive;
 
-    if (isActive) {
-      await tx
+      if (
+        await duplicateExists(tx, {
+          platform,
+          updateType: input.updateType ?? existing.updateType,
+          latestVersion: input.latestVersion ?? existing.latestVersion,
+          versionCode: input.versionCode ?? existing.versionCode,
+          excludeId: id,
+        })
+      ) {
+        return { ok: false as const, error: "version-exists" as const };
+      }
+
+      if (isActive) {
+        await tx
+          .update(mobileVersion)
+          .set({ isActive: false })
+          .where(eq(mobileVersion.platform, platform));
+      }
+
+      const [updated] = await tx
         .update(mobileVersion)
-        .set({ isActive: false })
-        .where(eq(mobileVersion.platform, platform));
+        .set({ ...input, isActive })
+        .where(eq(mobileVersion.id, id))
+        .returning();
+      if (!updated) {
+        return { ok: false as const, error: "not-found" as const };
+      }
+      return { ok: true as const, release: updated };
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { ok: false as const, error: "version-exists" as const };
     }
-
-    const [updated] = await tx
-      .update(mobileVersion)
-      .set({ ...input, isActive })
-      .where(eq(mobileVersion.id, id))
-      .returning();
-    if (!updated) return { ok: false as const, error: "not-found" as const };
-    return { ok: true as const, release: updated };
-  });
+    throw error;
+  }
 }
 
 export type SetMobileVersionActiveResult =

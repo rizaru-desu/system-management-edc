@@ -16,7 +16,10 @@ import { appReleaseDetailQueryOptions } from '../api/app-release-detail.ts'
 import { useCreateAppRelease } from '../api/create-app-release.ts'
 import type { AppReleasePayload } from '../api/create-app-release.ts'
 import { useDeleteAppRelease } from '../api/delete-app-release.ts'
-import { appReleasesListQueryOptions } from '../api/list-app-releases.ts'
+import {
+  appReleasesListQueryOptions,
+  isDuplicateVersionError,
+} from '../api/list-app-releases.ts'
 import { useSetAppReleasePublished } from '../api/publish-app-release.ts'
 import { useUpdateAppRelease } from '../api/update-app-release.ts'
 import type {
@@ -123,6 +126,9 @@ export function AppReleasesPage() {
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<AppReleaseRecord | null>(null)
+  // Bumped on every duplicate-version 409 so the form modal highlights the
+  // version fields without losing the entered values.
+  const [duplicateConflict, setDuplicateConflict] = useState(0)
   const [viewOpen, setViewOpen] = useState(false)
   const [viewing, setViewing] = useState<AppReleaseRecord | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -132,11 +138,13 @@ export function AppReleasesPage() {
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: AppReleaseRecord) => {
     setEditing(record)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
@@ -171,19 +179,23 @@ export function AppReleasesPage() {
   const saving = createAppRelease.isPending || updateAppRelease.isPending
 
   // The form stays open (with its submit disabled) until the save lands, so
-  // a rejected payload keeps the user's input intact.
+  // a rejected payload keeps the user's input intact. A duplicate-version
+  // 409 additionally highlights the version fields inline.
   const handleSubmit = (values: AppReleaseFormValues) => {
     const payload = payloadFromForm(values)
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateVersionError(error)) {
+          setDuplicateConflict((previous) => previous + 1)
+        }
+      },
+    }
     if (editing) {
-      updateAppRelease.mutate(
-        { id: editing.id, ...payload },
-        { onSuccess: () => setFormOpen(false) },
-      )
+      updateAppRelease.mutate({ id: editing.id, ...payload }, callbacks)
       return
     }
-    createAppRelease.mutate(payload, {
-      onSuccess: () => setFormOpen(false),
-    })
+    createAppRelease.mutate(payload, callbacks)
   }
 
   const handleDelete = () => {
@@ -308,6 +320,7 @@ export function AppReleasesPage() {
         onOpenChange={setFormOpen}
         release={editing}
         saving={saving}
+        duplicateConflict={duplicateConflict}
         onSubmit={handleSubmit}
       />
       <AppReleaseViewModal

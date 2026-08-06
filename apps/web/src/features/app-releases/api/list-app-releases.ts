@@ -56,6 +56,15 @@ export function toAppReleaseRecord(row: BackendAppRelease): AppReleaseRecord {
   }
 }
 
+/**
+ * True when the error is the backend's 409 for a duplicate (platform,
+ * updateType, versionName, versionCode) combination. Matched on the message
+ * because server-function errors cross the SSR boundary as plain Errors.
+ */
+export function isDuplicateVersionError(error: unknown): boolean {
+  return error instanceof Error && /already exists/i.test(error.message)
+}
+
 export function appReleaseError(err: unknown, fallback: string): Error {
   const apiErr = err instanceof ApiError ? err : null
   const status = apiErr?.status ?? 500
