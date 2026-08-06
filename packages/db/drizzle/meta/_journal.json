@@ -71,6 +71,13 @@
       "when": 1786023413929,
       "tag": "0009_add_mobile_version_release_identity_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786029929376,
+      "tag": "0010_add_merchants",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppReleaseModule } from './app-releases/app-release.module';
 import { MailModule } from './mail/mail.module';
+import { MerchantModule } from './merchants/merchant.module';
 import { MobileModule } from './mobile/mobile.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     PermissionsModule,
     MailModule,
+    MerchantModule,
     MobileModule,
     ServicePointModule,
     ServicePointAssignmentModule,
