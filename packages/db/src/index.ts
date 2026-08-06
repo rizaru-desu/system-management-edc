@@ -61,6 +61,22 @@ export {
   type UpdateServicePointResult,
 } from "./queries/service-points.js";
 export {
+  createMerchant,
+  findMerchantById,
+  listMerchants,
+  softDeleteMerchant,
+  updateMerchant,
+  upsertMerchantsByCode,
+  type CreateMerchantResult,
+  type DeleteMerchantResult,
+  type ListMerchantsOptions,
+  type MerchantInput,
+  type MerchantListPage,
+  type MerchantRow,
+  type MerchantSeed,
+  type UpdateMerchantResult,
+} from "./queries/merchants.js";
+export {
   listUserServicePointAssignments,
   replaceUserServicePointAssignments,
   seedDefaultAssignmentByEmail,

@@ -11,6 +11,7 @@ import {
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { createId } from "../id.js";
 import { user } from "./auth.js";
+import { merchants } from "./merchant.js";
 
 export const SERVICE_POINT_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export type ServicePointStatus = (typeof SERVICE_POINT_STATUSES)[number];
@@ -140,6 +141,7 @@ export const servicePointsRelations = relations(
       relationName: "servicePointHierarchy",
     }),
     assignments: many(servicePointAssignments),
+    merchants: many(merchants),
   }),
 );
 
