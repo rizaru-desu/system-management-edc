@@ -40,7 +40,7 @@ import {
   SelectValue,
 } from '#/components/ui/select.tsx'
 import { cn } from '#/lib/utils.ts'
-import { MERCHANT_TYPE_LABELS, formatDateTime } from '../data/merchants.ts'
+import { formatDateTime } from '../data/merchants.ts'
 import type { MerchantRecord } from '../data/merchants.ts'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
@@ -48,16 +48,9 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 /** Column count used by the loading-skeleton rows. */
 const SKELETON_ROWS = 6
 
-/** Columns the page knows how to sort the full row set by (client-side). */
+/** Columns the backend list endpoint can sort by (server-side). */
 export type MerchantSortColumn =
-  | 'code'
-  | 'name'
-  | 'type'
-  | 'picName'
-  | 'phone'
-  | 'servicePoint'
-  | 'status'
-  | 'createdAt'
+  'code' | 'name' | 'type' | 'picName' | 'phone' | 'status' | 'createdAt'
 
 export interface MerchantSort {
   column: MerchantSortColumn
@@ -189,33 +182,42 @@ export function MerchantsTable({
       {
         id: 'type',
         header: () => sortableHeader('Merchant Type', 'type'),
-        cell: ({ row }) => (
-          <Badge variant="soft">
-            {MERCHANT_TYPE_LABELS[row.original.type]}
-          </Badge>
-        ),
+        cell: ({ row }) =>
+          row.original.type ? (
+            <Badge variant="soft">{row.original.type}</Badge>
+          ) : (
+            <span className="text-brand-900/40">—</span>
+          ),
       },
       {
         id: 'picName',
         header: () => sortableHeader('PIC Name', 'picName'),
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap text-brand-900/70">
-            {row.original.picName}
-          </span>
-        ),
+        cell: ({ row }) =>
+          row.original.picName ? (
+            <span className="whitespace-nowrap text-brand-900/70">
+              {row.original.picName}
+            </span>
+          ) : (
+            <span className="text-brand-900/40">—</span>
+          ),
       },
       {
         id: 'phone',
         header: () => sortableHeader('Phone Number', 'phone'),
-        cell: ({ row }) => (
-          <span className="whitespace-nowrap text-brand-900/70 tabular-nums">
-            {row.original.phone}
-          </span>
-        ),
+        cell: ({ row }) =>
+          row.original.phone ? (
+            <span className="whitespace-nowrap text-brand-900/70 tabular-nums">
+              {row.original.phone}
+            </span>
+          ) : (
+            <span className="text-brand-900/40">—</span>
+          ),
       },
       {
+        // The service point name is joined server-side and not sortable there,
+        // so this header stays plain.
         id: 'servicePoint',
-        header: () => sortableHeader('Service Point', 'servicePoint'),
+        header: 'Service Point',
         cell: ({ row }) => (
           <span className="whitespace-nowrap text-brand-900/70">
             {row.original.servicePointName}

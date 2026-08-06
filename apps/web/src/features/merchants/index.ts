@@ -5,34 +5,36 @@ export { MerchantViewModal } from './components/merchant-view-modal.tsx'
 export { DeleteMerchantDialog } from './components/delete-merchant-dialog.tsx'
 export { ToggleMerchantStatusDialog } from './components/toggle-merchant-status-dialog.tsx'
 export { ImportMerchantsModal } from './components/import-merchants-modal.tsx'
-export type { MerchantFormValues } from './components/merchant-form-modal.tsx'
+export type {
+  MerchantFormValues,
+  ServicePointOption,
+} from './components/merchant-form-modal.tsx'
 export type {
   MerchantSort,
   MerchantSortColumn,
 } from './components/merchants-table.tsx'
+export { MERCHANT_TYPE_OPTIONS, formatDateTime } from './data/merchants.ts'
+export type { MerchantRecord, MerchantStatus } from './data/merchants.ts'
 export {
-  MERCHANT_SERVICE_POINTS,
-  MERCHANT_TYPES,
-  MERCHANT_TYPE_LABELS,
-  SEED_MERCHANTS,
-  formatDateTime,
-  servicePointNameOf,
-} from './data/merchants.ts'
-export type {
-  MerchantRecord,
-  MerchantServicePointOption,
-  MerchantStatus,
-  MerchantType,
-} from './data/merchants.ts'
-export {
+  isDuplicateCodeError,
+  merchantsListQueryOptions,
   merchantsQueryKey,
-  merchantsQueryOptions,
+  toMerchantRecord,
 } from './api/list-merchants.ts'
-export type { MerchantPayload } from './api/mock-backend.ts'
+export type {
+  BackendMerchant,
+  MerchantSortField,
+  MerchantsListPage,
+  MerchantsQueryFilters,
+} from './api/list-merchants.ts'
+export { merchantDetailQueryOptions } from './api/merchant-detail.ts'
 export { useCreateMerchant } from './api/create-merchant.ts'
-export { useUpdateMerchant } from './api/update-merchant.ts'
+export type { MerchantPayload } from './api/create-merchant.ts'
+export {
+  useSetMerchantStatus,
+  useUpdateMerchant,
+} from './api/update-merchant.ts'
 export { useDeleteMerchant } from './api/delete-merchant.ts'
-export { useSetMerchantStatus } from './api/toggle-merchant-status.ts'
 export {
   MERCHANT_TEMPLATE_COLUMNS,
   buildImportPreview,
