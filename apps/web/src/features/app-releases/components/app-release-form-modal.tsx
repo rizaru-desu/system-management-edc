@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2, TriangleAlert } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import {
@@ -21,6 +22,7 @@ import {
 } from '#/components/ui/select.tsx'
 import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
+import { releaseVersionAvailabilityQueryOptions } from '../api/check-app-release-version.ts'
 import type {
   AppReleasePlatform,
   AppReleaseRecord,
@@ -52,6 +54,12 @@ interface AppReleaseFormModalProps {
   release: AppReleaseRecord | null
   /** True while the create/update mutation is in flight. */
   saving: boolean
+  /**
+   * Incremented by the page whenever the API rejects a save with the
+   * duplicate-version 409 — each bump surfaces the inline field errors while
+   * the entered values stay intact.
+   */
+  duplicateConflict: number
   onSubmit: (values: AppReleaseFormValues) => void
 }
 
@@ -122,11 +130,14 @@ function valuesFromRecord(release: AppReleaseRecord): AppReleaseFormValues {
   }
 }
 
+const DUPLICATE_VERSION_MESSAGE = 'This version already exists.'
+
 export function AppReleaseFormModal({
   open,
   onOpenChange,
   release,
   saving,
+  duplicateConflict,
   onSubmit,
 }: AppReleaseFormModalProps) {
   const [values, setValues] = useState<AppReleaseFormValues>(EMPTY)
@@ -143,6 +154,62 @@ export function AppReleaseFormModal({
       setErrors({})
     }
   }, [open, release])
+
+  // A duplicate-version 409 from the API highlights the version fields
+  // in place — the entered values are never reset.
+  useEffect(() => {
+    if (duplicateConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        versionName: DUPLICATE_VERSION_MESSAGE,
+        versionCode: DUPLICATE_VERSION_MESSAGE,
+      }))
+    }
+  }, [duplicateConflict])
+
+  // ── Live availability check (advisory) ─────────────────────────────────
+  // Once the identity fields settle, probe the backend for an existing
+  // release with the same combination; a hit shows a warning and blocks
+  // submission (editing stays free, and the server still enforces it).
+  const identity = useMemo(
+    () => ({
+      platform: values.platform,
+      updateType: values.updateType,
+      versionName: values.versionName.trim(),
+      versionCode: values.versionCode.trim() ? Number(values.versionCode) : 0,
+      excludeId: release?.id,
+    }),
+    [
+      values.platform,
+      values.updateType,
+      values.versionName,
+      values.versionCode,
+      release,
+    ],
+  )
+  const [debouncedIdentity, setDebouncedIdentity] = useState(identity)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedIdentity(identity), 400)
+    return () => clearTimeout(timer)
+  }, [identity])
+
+  const identitySettled =
+    debouncedIdentity.versionName === identity.versionName &&
+    debouncedIdentity.versionCode === identity.versionCode &&
+    debouncedIdentity.platform === identity.platform &&
+    debouncedIdentity.updateType === identity.updateType
+
+  const availabilityQuery = useQuery({
+    ...releaseVersionAvailabilityQueryOptions(debouncedIdentity),
+    enabled:
+      open &&
+      VERSION_PATTERN.test(debouncedIdentity.versionName) &&
+      Number.isInteger(debouncedIdentity.versionCode) &&
+      debouncedIdentity.versionCode >= 0,
+  })
+  const knownDuplicate =
+    identitySettled && availabilityQuery.data?.available === false
 
   const isDirty = useMemo(
     () => JSON.stringify(values) !== JSON.stringify(initialValues),
@@ -200,6 +267,12 @@ export function AppReleaseFormModal({
       Number.isNaN(new Date(values.publishedAt).getTime())
     ) {
       nextErrors.publishedAt = 'Enter a valid publish date.'
+    }
+    // The live availability check already flagged this combination — block
+    // the submit (the server would reject it with a 409 anyway).
+    if (knownDuplicate) {
+      nextErrors.versionName = DUPLICATE_VERSION_MESSAGE
+      nextErrors.versionCode = DUPLICATE_VERSION_MESSAGE
     }
 
     setErrors(nextErrors)
@@ -325,6 +398,18 @@ export function AppReleaseFormModal({
                 <p className="text-xs text-rose-600">{errors.versionCode}</p>
               )}
             </div>
+            {knownDuplicate && (
+              <p className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 sm:col-span-2">
+                <TriangleAlert
+                  className="h-3.5 w-3.5 shrink-0"
+                  strokeWidth={1.75}
+                />
+                This version already exists for{' '}
+                {values.platform === 'ios' ? 'iOS' : 'Android'}{' '}
+                {values.updateType.toUpperCase()} — change the version name or
+                code before saving.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -524,7 +609,7 @@ export function AppReleaseFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" disabled={saving || knownDuplicate}>
               {saving && (
                 <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
               )}

@@ -9,7 +9,7 @@ async function main() {
   console.log('Seeding active Android version record...');
 
   try {
-    const seeded = await createMobileVersion({
+    const result = await createMobileVersion({
       platform: 'android',
       latestVersion: '1.0.1',
       minimumVersion: '1.0.0',
@@ -23,8 +23,13 @@ async function main() {
       isActive: true,
     });
 
+    if (!result.ok) {
+      console.log('Android version already seeded — nothing to do.');
+      process.exit(0);
+    }
+
     console.log(
-      `Successfully seeded active Android version: ${seeded.latestVersion} (id: ${seeded.id})`,
+      `Successfully seeded active Android version: ${result.release.latestVersion} (id: ${result.release.id})`,
     );
   } catch (error) {
     console.error('Error seeding mobile version:', error);

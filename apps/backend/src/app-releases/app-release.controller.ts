@@ -11,6 +11,7 @@ import {
 import type { MobileVersionAdminRow, MobileVersionListPage } from '@repo/db';
 import { RequirePermission } from '../permissions/require-permission.decorator';
 import { AppReleaseService } from './app-release.service';
+import { parseCheckAvailabilityDto } from './dto/check-availability.dto';
 import { parseCreateAppReleaseDto } from './dto/create-app-release.dto';
 import { parseListAppReleasesDto } from './dto/list-app-releases.dto';
 import { parsePublishAppReleaseDto } from './dto/publish-app-release.dto';
@@ -31,6 +32,16 @@ export class AppReleaseController {
   @Get()
   list(@Query() query: unknown): Promise<MobileVersionListPage> {
     return this.appReleaseService.list(parseListAppReleasesDto(query));
+  }
+
+  /** Static segment declared before ':id' so the router never shadows it. */
+  @Get('check-availability')
+  checkAvailability(
+    @Query() query: unknown,
+  ): Promise<{ available: boolean }> {
+    return this.appReleaseService.checkAvailability(
+      parseCheckAvailabilityDto(query),
+    );
   }
 
   @Get(':id')

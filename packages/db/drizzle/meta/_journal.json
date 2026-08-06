@@ -64,6 +64,13 @@
       "when": 1786006301319,
       "tag": "0008_add_mobile_version_version_code",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786023413929,
+      "tag": "0009_add_mobile_version_release_identity_unique",
+      "breakpoints": true
     }
   ]
 }

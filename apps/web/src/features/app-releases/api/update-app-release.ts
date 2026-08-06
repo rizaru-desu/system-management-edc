@@ -9,6 +9,7 @@ import type { AppReleasePayload } from './create-app-release.ts'
 import {
   appReleaseError,
   appReleasesQueryKey,
+  isDuplicateVersionError,
   toAppReleaseRecord,
 } from './list-app-releases.ts'
 import type { BackendAppRelease } from './list-app-releases.ts'
@@ -56,6 +57,10 @@ export function useUpdateAppRelease() {
       toast.success(`Release ${release.versionName} updated.`)
     },
     onError: (error) => {
+      if (isDuplicateVersionError(error)) {
+        toast.error('Release version already exists.')
+        return
+      }
       toast.error(
         error instanceof Error ? error.message : 'Failed to update the release.',
       )

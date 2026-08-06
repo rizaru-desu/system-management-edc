@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "mobile_version_release_identity_idx" ON "mobile_version" USING btree ("platform","update_type","latest_version","version_code");
