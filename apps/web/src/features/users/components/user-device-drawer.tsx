@@ -1010,7 +1010,10 @@ export function UserDeviceDrawer({
       {/* Drawer panel (Global Right Drawer: 80-90vw, max-width 1200px) */}
       <div
         className={cn(
-          'fixed inset-y-0 right-0 z-50 flex w-full md:w-[85vw] max-w-[1200px] flex-col bg-white shadow-2xl',
+          // The portal escapes the console's theme-light wrapper — re-scope it
+          // so themed pieces (Skeleton's bg-accent, button variants, muted
+          // text) keep their light colors in dark mode.
+          'theme-light fixed inset-y-0 right-0 z-50 flex w-full md:w-[85vw] max-w-[1200px] flex-col bg-white shadow-2xl',
           'border-l border-brand-100',
           'animate-in slide-in-from-right duration-300 ease-out',
         )}
