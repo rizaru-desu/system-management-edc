@@ -8,6 +8,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { createId } from "../id.js";
 import { user } from "./auth.js";
 
 /**
@@ -20,7 +21,7 @@ export const mobileDevices = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(createId),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -68,7 +69,7 @@ export const mobileLoginHistory = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(createId),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -113,7 +114,7 @@ export const mobileLogoutHistory = pgTable(
   {
     id: text("id")
       .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
+      .$defaultFn(createId),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

@@ -1,4 +1,5 @@
 import { pgTable, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { createId } from "../id.js";
 
 /**
  * Mobile application version configuration.
@@ -7,7 +8,7 @@ import { pgTable, text, boolean, timestamp, integer } from "drizzle-orm/pg-core"
 export const mobileVersion = pgTable("mobile_version", {
   id: text("id")
     .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
+    .$defaultFn(createId),
   platform: text("platform").notNull().default("android"),
   latestVersion: text("latest_version").notNull(),
   minimumVersion: text("minimum_version").notNull(),

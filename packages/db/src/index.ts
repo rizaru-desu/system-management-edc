@@ -1,5 +1,6 @@
 export { db, type Database } from "./client.js";
 export { dbEnv } from "./env.js";
+export { createId } from "./id.js";
 export * as schema from "./schema/index.js";
 export {
   countUserStats,
