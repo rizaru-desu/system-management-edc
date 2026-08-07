@@ -20,6 +20,8 @@ export interface BackendServicePoint {
   email: string | null
   latitude: number | null
   longitude: number | null
+  /** Service area radius (km) for automatic merchant assignment. */
+  coverageRadiusKm: number | null
   notes: string | null
   status: 'ACTIVE' | 'INACTIVE'
   /** Users linked via ACTIVE service point assignments. */
@@ -47,6 +49,7 @@ export function toServicePointRecord(
     email: row.email,
     latitude: row.latitude,
     longitude: row.longitude,
+    coverageRadiusKm: row.coverageRadiusKm ?? null,
     notes: row.notes,
     status: row.status.toLowerCase() as ServicePointStatus,
     // Live ACTIVE-assignment count computed by the backend row select; the

@@ -49,12 +49,12 @@ export const servicePointBaseSchema = z.object({
   /**
    * Service area radius (km) for the merchant import's automatic
    * assignment; null/omitted = unlimited (nearest service point always
-   * wins).
+   * wins). Decimals allowed.
    */
   coverageRadiusKm: z
-    .number()
-    .positive()
-    .max(20_000)
+    .number('coverageRadiusKm must be a valid number')
+    .positive('coverageRadiusKm must be greater than 0')
+    .max(1000, 'coverageRadiusKm cannot exceed 1000 KM')
     .nullish()
     .transform((value) => value ?? null),
   notes: optionalText,

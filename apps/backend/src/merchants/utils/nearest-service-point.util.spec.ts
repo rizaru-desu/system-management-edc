@@ -91,4 +91,27 @@ describe('findNearestServicePoint', () => {
     ]);
     expect(result.servicePointId).toBe('b');
   });
+
+  it('skips a nearer candidate whose radius excludes the merchant', () => {
+    // 'near' is ~1.5 km away but only covers 1 km; 'far' is ~15 km away with
+    // no radius — the nearest *eligible* candidate wins.
+    const result = findNearestServicePoint(-6.2, 106.8, [
+      candidate('near', -6.21, 106.81, 1),
+      candidate('far', -6.3, 106.9),
+    ]);
+    expect(result.servicePointId).toBe('far');
+    expect(result.nearestServicePointName).toBe('SP far');
+    expect(result.assignmentStatus).toBe('ASSIGNED');
+    expect(result.distanceKm).toBeGreaterThan(2);
+  });
+
+  it('reports the nearest candidate when every radius excludes the merchant', () => {
+    const result = findNearestServicePoint(-6.2, 106.8, [
+      candidate('near', -6.21, 106.81, 1),
+      candidate('far', -6.3, 106.9, 5),
+    ]);
+    expect(result.servicePointId).toBeNull();
+    expect(result.nearestServicePointId).toBe('near');
+    expect(result.assignmentStatus).toBe('OUTSIDE_COVERAGE_RADIUS');
+  });
 });

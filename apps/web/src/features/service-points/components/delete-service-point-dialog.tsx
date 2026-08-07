@@ -57,9 +57,9 @@ export function DeleteServicePointDialog({
         {descendantCount > 0 && (
           <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
             This service point has {descendantCount}{' '}
-            {descendantCount === 1 ? 'service point' : 'service points'}{' '}
-            nested under it — move or delete those first; deleting a service
-            point with children is not allowed.
+            {descendantCount === 1 ? 'service point' : 'service points'} nested
+            under it — move or delete those first; deleting a service point with
+            children is not allowed.
           </p>
         )}
 

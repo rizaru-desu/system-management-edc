@@ -78,8 +78,7 @@ export function flattenVisibleRows(
     depth: number,
     parentName: string | null,
   ) => {
-    const expanded =
-      expandedIds === 'all' || expandedIds.has(node.record.id)
+    const expanded = expandedIds === 'all' || expandedIds.has(node.record.id)
     rows.push({
       record: node.record,
       depth,

@@ -38,29 +38,39 @@ export type AssignmentStatus =
   'ASSIGNED' | 'OUTSIDE_COVERAGE_RADIUS' | 'NO_ACTIVE_SERVICE_POINT';
 
 export interface NearestServicePointResult {
-  /** Assigned only when the nearest candidate is within coverage. */
+  /** The nearest eligible candidate; null when none is within coverage. */
   servicePointId: string | null;
-  /** The nearest candidate regardless of coverage; null with no candidates. */
+  /**
+   * When assigned, the winning candidate; otherwise the nearest candidate
+   * regardless of coverage (for reporting). Null with no candidates at all.
+   */
   nearestServicePointId: string | null;
   nearestServicePointName: string | null;
-  /** Distance (km, 2dp) to the nearest candidate. */
+  /** Distance (km, 2dp) to the reported candidate. */
   distanceKm: number | null;
   assignmentStatus: AssignmentStatus;
 }
 
 /**
- * Picks the nearest service point for a coordinate from an in-memory
- * candidate list (loaded once per import — never per row). A candidate with
- * a configured `coverageRadiusKm` only wins assignment when the distance is
- * within it; without one the nearest candidate always wins.
+ * Picks the nearest *eligible* service point for a coordinate from an
+ * in-memory candidate list (loaded once per import — never per row). A
+ * candidate is eligible when it has no `coverageRadiusKm`, or the distance
+ * falls within it — so a nearby service point with a tight radius loses to
+ * a farther one whose coverage actually reaches the merchant.
  */
 export function findNearestServicePoint(
   latitude: number,
   longitude: number,
   candidates: ServicePointCandidate[],
 ): NearestServicePointResult {
+  // Nearest overall (for reporting) and nearest *eligible* — a candidate is
+  // eligible when it has no radius, or the distance falls within it. The two
+  // can differ: a nearby service point with a tight radius loses to a
+  // slightly farther one whose coverage actually reaches the merchant.
   let nearest: ServicePointCandidate | null = null;
   let nearestDistance = Infinity;
+  let eligible: ServicePointCandidate | null = null;
+  let eligibleDistance = Infinity;
 
   for (const candidate of candidates) {
     const distance = haversineDistanceKm(
@@ -72,6 +82,13 @@ export function findNearestServicePoint(
     if (distance < nearestDistance) {
       nearest = candidate;
       nearestDistance = distance;
+    }
+    const withinCoverage =
+      candidate.coverageRadiusKm === null ||
+      Math.round(distance * 100) / 100 <= candidate.coverageRadiusKm;
+    if (withinCoverage && distance < eligibleDistance) {
+      eligible = candidate;
+      eligibleDistance = distance;
     }
   }
 
@@ -85,15 +102,23 @@ export function findNearestServicePoint(
     };
   }
 
-  const distanceKm = Math.round(nearestDistance * 100) / 100;
-  const withinCoverage =
-    nearest.coverageRadiusKm === null || distanceKm <= nearest.coverageRadiusKm;
+  if (!eligible) {
+    // Candidates exist, but every one is out of coverage — report the
+    // nearest so the preview shows how far off it was.
+    return {
+      servicePointId: null,
+      nearestServicePointId: nearest.id,
+      nearestServicePointName: nearest.name,
+      distanceKm: Math.round(nearestDistance * 100) / 100,
+      assignmentStatus: 'OUTSIDE_COVERAGE_RADIUS',
+    };
+  }
 
   return {
-    servicePointId: withinCoverage ? nearest.id : null,
-    nearestServicePointId: nearest.id,
-    nearestServicePointName: nearest.name,
-    distanceKm,
-    assignmentStatus: withinCoverage ? 'ASSIGNED' : 'OUTSIDE_COVERAGE_RADIUS',
+    servicePointId: eligible.id,
+    nearestServicePointId: eligible.id,
+    nearestServicePointName: eligible.name,
+    distanceKm: Math.round(eligibleDistance * 100) / 100,
+    assignmentStatus: 'ASSIGNED',
   };
 }

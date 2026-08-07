@@ -208,13 +208,28 @@ export function ServicePointsTable({
           ),
       },
       {
+        id: 'coverageRadius',
+        header: 'Coverage Radius',
+        cell: ({ row }) =>
+          row.original.record.coverageRadiusKm !== null ? (
+            <span className="whitespace-nowrap text-brand-900/70 tabular-nums">
+              {row.original.record.coverageRadiusKm} KM
+            </span>
+          ) : (
+            <span className="text-brand-900/40">Unlimited</span>
+          ),
+      },
+      {
         id: 'assignedUsers',
         header: 'Assigned Users',
         cell: ({ row }) => (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="inline-flex cursor-help items-center gap-1.5 text-brand-900/70 tabular-nums">
-                <Users className="h-3.5 w-3.5 text-primary" strokeWidth={1.75} />
+                <Users
+                  className="h-3.5 w-3.5 text-primary"
+                  strokeWidth={1.75}
+                />
                 {row.original.record.assignedUsers ?? '—'}
               </span>
             </TooltipTrigger>
@@ -343,7 +358,10 @@ export function ServicePointsTable({
                 className="px-5 py-12 text-center text-sm text-brand-900/50"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    strokeWidth={1.75}
+                  />
                   Loading...
                 </div>
               </td>
@@ -375,7 +393,11 @@ export function ServicePointsTable({
                     title="No service points match"
                     description="Try a different search term or status filter."
                     action={
-                      <Button variant="outline" size="sm" onClick={onClearFilters}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onClearFilters}
+                      >
                         Clear filters
                       </Button>
                     }
