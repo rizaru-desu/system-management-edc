@@ -157,6 +157,19 @@ export function MerchantsPage() {
     [servicePointsQuery.data],
   )
 
+  // Searchable filter choices in the shared "[CODE] Name" display format —
+  // the label carries both, so one label search matches code and name.
+  const servicePointFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All service points' },
+      ...servicePointOptions.map((servicePoint) => ({
+        value: servicePoint.id,
+        label: `[${servicePoint.code}] ${servicePoint.name}`,
+      })),
+    ],
+    [servicePointOptions],
+  )
+
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<MerchantRecord | null>(null)
@@ -304,21 +317,14 @@ export function MerchantsPage() {
           </SelectContent>
         </Select>
         <Select
+          searchable
           value={servicePointFilter}
           onValueChange={setServicePointFilter}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by service point" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All service points</SelectItem>
-            {servicePointOptions.map((servicePoint) => (
-              <SelectItem key={servicePoint.id} value={servicePoint.id}>
-                {servicePoint.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          options={servicePointFilterOptions}
+          placeholder="Filter by service point"
+          searchPlaceholder="Search code or name…"
+          triggerClassName="w-[220px]"
+        />
       </div>
 
       {/* Merchant table */}

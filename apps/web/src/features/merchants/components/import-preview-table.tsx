@@ -128,6 +128,12 @@ export function ImportPreviewTable({ rows, summary }: ImportPreviewTableProps) {
     manual: summary.needManualAssignment,
   }
 
+  // Quick-filter choices with their live counters, e.g. "Valid (480)".
+  const filterOptions = FILTERS.map(({ key, label }) => ({
+    value: key,
+    label: `${label} (${formatCount(filterCounts[key])})`,
+  }))
+
   const visibleRows = useMemo(() => {
     const term = search.trim().toLowerCase()
     return rows.filter(
@@ -161,21 +167,14 @@ export function ImportPreviewTable({ rows, summary }: ImportPreviewTableProps) {
 
   return (
     <div className="space-y-3">
-      {/* Quick filters + search */}
+      {/* Quick filter + search */}
       <div className="flex flex-wrap items-center gap-2">
-        {FILTERS.map(({ key, label }) => (
-          <Button
-            key={key}
-            type="button"
-            variant={filter === key ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={filter === key}
-            onClick={() => setFilter(key)}
-            className="text-xs"
-          >
-            {label} ({formatCount(filterCounts[key])})
-          </Button>
-        ))}
+        <Select
+          value={filter}
+          onValueChange={(value) => setFilter(value as FilterKey)}
+          options={filterOptions}
+          triggerClassName="w-[240px]"
+        />
         <SearchInput
           value={search}
           onChange={(event) => setSearch(event.target.value)}

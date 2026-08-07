@@ -174,6 +174,17 @@ export function MerchantFormModal({
     [values, initialValues],
   )
 
+  // Searchable choices in the shared "[CODE] Name" display format — the
+  // label carries both, so one label search matches code and name.
+  const servicePointSelectOptions = useMemo(
+    () =>
+      servicePointOptions.map((servicePoint) => ({
+        value: servicePoint.id,
+        label: `[${servicePoint.code}] ${servicePoint.name}`,
+      })),
+    [servicePointOptions],
+  )
+
   const { guard, dialogProps } = useUnsavedChanges({ when: open && isDirty })
 
   // A duplicate-code 409 from the backend highlights the code field inline
@@ -540,24 +551,16 @@ export function MerchantFormModal({
                   Service point {requiredMark}
                 </Label>
                 <Select
+                  searchable
                   value={values.servicePointId || undefined}
                   onValueChange={(value) => setField('servicePointId', value)}
-                >
-                  <SelectTrigger
-                    id="mch-service-point"
-                    aria-invalid={Boolean(errors.servicePointId)}
-                    className={`w-full ${fieldClasses}`}
-                  >
-                    <SelectValue placeholder="Select the owning service point" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {servicePointOptions.map((servicePoint) => (
-                      <SelectItem key={servicePoint.id} value={servicePoint.id}>
-                        {servicePoint.name} ({servicePoint.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={servicePointSelectOptions}
+                  placeholder="Select the owning service point"
+                  searchPlaceholder="Search code or name…"
+                  id="mch-service-point"
+                  aria-invalid={Boolean(errors.servicePointId)}
+                  triggerClassName={`w-full ${fieldClasses}`}
+                />
                 {errors.servicePointId && (
                   <p className="text-xs text-rose-600">
                     {errors.servicePointId}
