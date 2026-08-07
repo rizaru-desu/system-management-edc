@@ -62,7 +62,9 @@ export function useUpdateAppRelease() {
         return
       }
       toast.error(
-        error instanceof Error ? error.message : 'Failed to update the release.',
+        error instanceof Error
+          ? error.message
+          : 'Failed to update the release.',
       )
     },
     onSettled: () =>

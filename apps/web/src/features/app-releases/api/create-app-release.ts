@@ -98,7 +98,9 @@ export function useCreateAppRelease() {
         return
       }
       toast.error(
-        error instanceof Error ? error.message : 'Failed to create the release.',
+        error instanceof Error
+          ? error.message
+          : 'Failed to create the release.',
       )
     },
     onSettled: () =>

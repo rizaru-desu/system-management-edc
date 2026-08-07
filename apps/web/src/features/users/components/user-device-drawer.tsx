@@ -135,9 +135,11 @@ function initialsOf(name: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DevicesTab({ userId }: { userId: string }) {
-  const { data: devices = [], isPending, isError } = useQuery(
-    userDevicesQueryOptions(userId),
-  )
+  const {
+    data: devices = [],
+    isPending,
+    isError,
+  } = useQuery(userDevicesQueryOptions(userId))
   const [search, setSearch] = useState('')
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null)
 
@@ -266,7 +268,9 @@ function DevicesTab({ userId }: { userId: string }) {
                   <div className="mt-2.5 flex items-center justify-between text-[10px] text-brand-900/50 pt-2 border-t border-brand-100/50">
                     <span className="capitalize font-medium">{d.platform}</span>
                     <span>
-                      {d.lastLoginAt ? formatRelativeTime(d.lastLoginAt) : 'Never'}
+                      {d.lastLoginAt
+                        ? formatRelativeTime(d.lastLoginAt)
+                        : 'Never'}
                     </span>
                   </div>
                 </button>
@@ -297,8 +301,8 @@ function DevicesTab({ userId }: { userId: string }) {
                       <StatusPill active={selectedDevice.status === 'ACTIVE'} />
                     </div>
                     <p className="text-xs text-brand-900/50 mt-0.5 truncate">
-                      {selectedDevice.manufacturer ?? 'Unknown Manufacturer'} • ID:{' '}
-                      {selectedDevice.deviceId}
+                      {selectedDevice.manufacturer ?? 'Unknown Manufacturer'} •
+                      ID: {selectedDevice.deviceId}
                     </p>
                   </div>
                 </div>
@@ -307,25 +311,39 @@ function DevicesTab({ userId }: { userId: string }) {
               {/* Quick Spec Pills */}
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-brand-100/70">
                 <div className="rounded-xl bg-white/90 p-2.5 border border-brand-100">
-                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">Android</p>
+                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">
+                    Android
+                  </p>
                   <p className="text-xs font-bold text-brand-900 truncate">
-                    {selectedDevice.androidVersion ? `v${selectedDevice.androidVersion}` : 'N/A'}
+                    {selectedDevice.androidVersion
+                      ? `v${selectedDevice.androidVersion}`
+                      : 'N/A'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-white/90 p-2.5 border border-brand-100">
-                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">SDK</p>
+                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">
+                    SDK
+                  </p>
                   <p className="text-xs font-bold text-brand-900 truncate">
-                    {selectedDevice.sdkVersion ? `SDK ${selectedDevice.sdkVersion}` : 'N/A'}
+                    {selectedDevice.sdkVersion
+                      ? `SDK ${selectedDevice.sdkVersion}`
+                      : 'N/A'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-white/90 p-2.5 border border-brand-100">
-                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">App Version</p>
+                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">
+                    App Version
+                  </p>
                   <p className="text-xs font-bold text-brand-900 truncate">
-                    {selectedDevice.appVersion ? `v${selectedDevice.appVersion}` : 'N/A'}
+                    {selectedDevice.appVersion
+                      ? `v${selectedDevice.appVersion}`
+                      : 'N/A'}
                   </p>
                 </div>
                 <div className="rounded-xl bg-white/90 p-2.5 border border-brand-100">
-                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">Last Active</p>
+                  <p className="text-[10px] font-semibold text-brand-900/40 uppercase">
+                    Last Active
+                  </p>
                   <p className="text-xs font-bold text-brand-900 truncate">
                     {selectedDevice.lastLoginAt
                       ? formatRelativeTime(selectedDevice.lastLoginAt)
@@ -342,11 +360,17 @@ function DevicesTab({ userId }: { userId: string }) {
               </h4>
               <Card className="p-4">
                 <DetailRow label="Device ID" value={selectedDevice.deviceId} />
-                <DetailRow label="Manufacturer" value={selectedDevice.manufacturer} />
+                <DetailRow
+                  label="Manufacturer"
+                  value={selectedDevice.manufacturer}
+                />
                 <DetailRow label="Brand" value={selectedDevice.brand} />
                 <DetailRow label="Model" value={selectedDevice.model} />
                 <DetailRow label="Carrier" value={selectedDevice.carrier} />
-                <DetailRow label="Network Type" value={selectedDevice.networkType} />
+                <DetailRow
+                  label="Network Type"
+                  value={selectedDevice.networkType}
+                />
                 <DetailRow
                   label="Root Status"
                   value={
@@ -413,7 +437,9 @@ function DevicesTab({ userId }: { userId: string }) {
                   label="FCM Status"
                   value={
                     selectedDevice.fcmToken ? (
-                      <span className="font-semibold text-emerald-700">Registered</span>
+                      <span className="font-semibold text-emerald-700">
+                        Registered
+                      </span>
                     ) : (
                       <span className="text-brand-900/40">Not Registered</span>
                     )
@@ -475,7 +501,11 @@ function groupByDay(
       const isYesterday = day === today - dayMs
       group = {
         key,
-        title: isToday ? 'Today' : isYesterday ? 'Yesterday' : formatDayLabel(date),
+        title: isToday
+          ? 'Today'
+          : isYesterday
+            ? 'Yesterday'
+            : formatDayLabel(date),
         subtitle: isToday || isYesterday ? formatDayLabel(date) : null,
         isToday,
         items: [],
@@ -537,7 +567,9 @@ function HistoryEventCard({ item }: { item: LoginHistoryEventRecord }) {
         <div
           className={cn(
             'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
-            isLogin ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500',
+            isLogin
+              ? 'bg-emerald-50 text-emerald-600'
+              : 'bg-rose-50 text-rose-500',
           )}
         >
           {isLogin ? (
@@ -677,7 +709,10 @@ function LoginHistoryTab({ userId }: { userId: string }) {
           </PopoverTrigger>
           <PopoverContent align="end" className="w-72 space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="history-from" className="text-xs text-brand-900/60">
+              <Label
+                htmlFor="history-from"
+                className="text-xs text-brand-900/60"
+              >
                 From
               </Label>
               <Input
@@ -871,9 +906,11 @@ function LoginHistoryTab({ userId }: { userId: string }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SessionsTab({ userId }: { userId: string }) {
-  const { data: sessions = [], isPending, isError } = useQuery(
-    userSessionsQueryOptions(userId),
-  )
+  const {
+    data: sessions = [],
+    isPending,
+    isError,
+  } = useQuery(userSessionsQueryOptions(userId))
 
   if (isPending) {
     return <TabLoader message="Loading sessions..." />
@@ -890,9 +927,7 @@ function SessionsTab({ userId }: { userId: string }) {
   }
 
   if (sessions.length === 0) {
-    return (
-      <EmptyState icon={Wifi} description="No active sessions found." />
-    )
+    return <EmptyState icon={Wifi} description="No active sessions found." />
   }
 
   const mostRecent = sessions[0]?.id
@@ -1087,7 +1122,9 @@ export function UserDeviceDrawer({
           {user && (
             <>
               {activeTab === 'devices' && <DevicesTab userId={user.id} />}
-              {activeTab === 'login-history' && <LoginHistoryTab userId={user.id} />}
+              {activeTab === 'login-history' && (
+                <LoginHistoryTab userId={user.id} />
+              )}
               {activeTab === 'sessions' && <SessionsTab userId={user.id} />}
             </>
           )}

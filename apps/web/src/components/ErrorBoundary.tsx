@@ -37,11 +37,7 @@ export function ErrorBoundary({ error, reset }: ErrorComponentProps) {
           <RotateCcw />
           Try again
         </Button>
-        <Button
-          asChild
-          variant="outline"
-          className="h-11 px-6 font-semibold"
-        >
+        <Button asChild variant="outline" className="h-11 px-6 font-semibold">
           <Link to="/login">
             <ArrowLeft />
             Back to sign in

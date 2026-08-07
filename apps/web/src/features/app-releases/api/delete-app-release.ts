@@ -4,10 +4,7 @@ import { getRequestHeader } from '@tanstack/react-start/server'
 import { toast } from 'sonner'
 
 import { apiClient } from '#/lib/api-client.ts'
-import {
-  appReleaseError,
-  appReleasesQueryKey,
-} from './list-app-releases.ts'
+import { appReleaseError, appReleasesQueryKey } from './list-app-releases.ts'
 
 /**
  * Deletes a release through DELETE /app-releases/:id (gated by the
@@ -42,7 +39,9 @@ export function useDeleteAppRelease() {
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error ? error.message : 'Failed to delete the release.',
+        error instanceof Error
+          ? error.message
+          : 'Failed to delete the release.',
       )
     },
     onSettled: () =>

@@ -16,10 +16,7 @@ export type {
 export { sessionQueryKey, sessionQueryOptions } from './api/session.ts'
 export { signIn } from './api/sign-in.ts'
 export { signOut } from './api/sign-out.ts'
-export {
-  requestPasswordReset,
-  resetPassword,
-} from './api/password-reset.ts'
+export { requestPasswordReset, resetPassword } from './api/password-reset.ts'
 export { useSignIn } from './hooks/use-sign-in.ts'
 export { useSignOut } from './hooks/use-sign-out.ts'
 export { AuthError, getAuthErrorMessage } from './lib/auth-error.ts'
