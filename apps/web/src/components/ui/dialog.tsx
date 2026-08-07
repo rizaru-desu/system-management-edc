@@ -49,6 +49,7 @@ function DialogContent({
   children,
   showCloseButton = true,
   disableOutsideClose = false,
+  forceMount,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -61,10 +62,13 @@ function DialogContent({
   disableOutsideClose?: boolean
 }) {
   return (
-    <DialogPortal data-slot="dialog-portal">
+    // forceMount must apply to the portal too, or the whole subtree still
+    // unmounts on close (used by BaseModal's destroyOnClose={false}).
+    <DialogPortal data-slot="dialog-portal" forceMount={forceMount}>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
+        forceMount={forceMount}
         className={cn(
           // Flex column with a viewport cap: header/footer stay in normal
           // flow while a `DialogBody` child (min-h-0 + overflow-y-auto) takes

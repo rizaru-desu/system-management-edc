@@ -1,10 +1,7 @@
 import { useMemo } from 'react'
 import { flexRender } from '@tanstack/react-table'
 import type { OnChangeFn, PaginationState } from '@tanstack/react-table'
-import {
-  getCoreRowModel,
-  useLegacyTable,
-} from '@tanstack/react-table/legacy'
+import { getCoreRowModel, useLegacyTable } from '@tanstack/react-table/legacy'
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy'
 import {
   ChevronLeft,
@@ -43,7 +40,6 @@ import { cn } from '#/lib/utils.ts'
 import { describeUserAgent, formatRelativeTime } from '../lib/format.ts'
 import type { UserRecord } from '../data/users.ts'
 import { RoleBadge } from './role-badge.tsx'
-
 
 /** Badge variant per stored provider id; unknown providers fall back neutral. */
 const SIGN_IN_BADGES: Record<
@@ -134,7 +130,6 @@ export function UsersTable({
   onAssignServicePoints,
   getAssignedServicePointCount,
 }: UsersTableProps) {
-
   const columns = useMemo<Array<LegacyColumnDef<UserRecord>>>(
     () => [
       {
@@ -221,7 +216,10 @@ export function UsersTable({
         cell: ({ row }) => {
           const active = row.original.status === 'active'
           const pill = (
-            <StatusPill active={active} className={cn(!active && 'cursor-help')} />
+            <StatusPill
+              active={active}
+              className={cn(!active && 'cursor-help')}
+            />
           )
           if (active) return pill
           // Hovering (or focusing) the Inactive pill reveals why the account
@@ -312,7 +310,9 @@ export function UsersTable({
                     />
                     Manage devices
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => onAssignServicePoints(user)}>
+                  <DropdownMenuItem
+                    onSelect={() => onAssignServicePoints(user)}
+                  >
                     <MapPinned
                       className="h-4 w-4 text-primary"
                       strokeWidth={1.75}
@@ -399,7 +399,10 @@ export function UsersTable({
                 className="px-5 py-12 text-center text-sm text-brand-900/50"
               >
                 <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    strokeWidth={1.75}
+                  />
                   Loading...
                 </div>
               </td>

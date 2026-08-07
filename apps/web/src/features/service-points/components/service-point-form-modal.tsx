@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '#/components/ui/button.tsx'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '#/components/ui/dialog.tsx'
+import { BaseModal } from '#/components/ui/base-modal.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { Label } from '#/components/ui/label.tsx'
 import {
@@ -234,288 +227,284 @@ export function ServicePointFormModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="theme-light max-h-[90vh] overflow-y-auto border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
-              {servicePoint ? 'Edit service point' : 'Add service point'}
-            </DialogTitle>
-            <DialogDescription className="text-[#0E2748]/60">
-              {servicePoint
-                ? 'Update the service point details and its place in the hierarchy.'
-                : 'Create a service point and choose where it sits in the hierarchy.'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-code" className="text-[#0E2748]">
-                  Service point code{' '}
-                  <span className="text-rose-600" aria-hidden="true">
-                    *
-                  </span>
-                </Label>
-                <Input
-                  id="sp-code"
-                  value={values.code}
-                  onChange={(event) => setField('code', event.target.value)}
-                  placeholder="e.g. SP-JKT-005"
-                  aria-invalid={Boolean(errors.code)}
-                  className={fieldClasses}
-                />
-                {errors.code && (
-                  <p className="text-xs text-rose-600">{errors.code}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-name" className="text-[#0E2748]">
-                  Service point name{' '}
-                  <span className="text-rose-600" aria-hidden="true">
-                    *
-                  </span>
-                </Label>
-                <Input
-                  id="sp-name"
-                  value={values.name}
-                  onChange={(event) => setField('name', event.target.value)}
-                  placeholder="e.g. Jakarta Selatan"
-                  aria-invalid={Boolean(errors.name)}
-                  className={fieldClasses}
-                />
-                {errors.name && (
-                  <p className="text-xs text-rose-600">{errors.name}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-parent" className="text-[#0E2748]">
-                  Parent service point
-                </Label>
-                <Select
-                  value={values.parentId ?? NO_PARENT}
-                  onValueChange={(value) =>
-                    setField('parentId', value === NO_PARENT ? null : value)
-                  }
-                >
-                  <SelectTrigger
-                    id="sp-parent"
-                    aria-invalid={Boolean(errors.parentId)}
-                    className={`w-full ${fieldClasses}`}
-                  >
-                    <SelectValue placeholder="No parent (top level)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_PARENT}>
-                      No parent (top level)
-                    </SelectItem>
-                    {parentOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {/* Figure-space indent mirrors the tree depth. */}
-                        {'  '.repeat(option.depth)}
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.parentId ? (
-                  <p className="text-xs text-rose-600">{errors.parentId}</p>
-                ) : (
-                  servicePoint && (
-                    <p className="text-xs text-[#0E2748]/50">
-                      This service point and everything under it are excluded to
-                      keep the hierarchy free of cycles.
-                    </p>
-                  )
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-region" className="text-[#0E2748]">
-                  Region
-                </Label>
-                <Input
-                  id="sp-region"
-                  value={values.region}
-                  onChange={(event) => setField('region', event.target.value)}
-                  placeholder="e.g. DKI Jakarta"
-                  className={fieldClasses}
-                />
-              </div>
-            </div>
-
+      <BaseModal
+        open={open}
+        onOpenChange={handleOpenChange}
+        size="lg"
+        disableOutsideClose
+        title={servicePoint ? 'Edit service point' : 'Add service point'}
+        description={
+          servicePoint
+            ? 'Update the service point details and its place in the hierarchy.'
+            : 'Create a service point and choose where it sits in the hierarchy.'
+        }
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" form="service-point-form">
+              {servicePoint ? 'Save changes' : 'Create service point'}
+            </Button>
+          </>
+        }
+      >
+        <form
+          id="service-point-form"
+          onSubmit={handleSubmit}
+          className="space-y-5"
+          noValidate
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="sp-address" className="text-[#0E2748]">
-                Address
-              </Label>
-              <Input
-                id="sp-address"
-                value={values.address}
-                onChange={(event) => setField('address', event.target.value)}
-                placeholder="Street, number, city"
-                className={fieldClasses}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-phone" className="text-[#0E2748]">
-                  Phone
-                </Label>
-                <Input
-                  id="sp-phone"
-                  type="tel"
-                  value={values.phone}
-                  onChange={(event) => setField('phone', event.target.value)}
-                  placeholder="e.g. +62 21 5150 000"
-                  className={fieldClasses}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-email" className="text-[#0E2748]">
-                  Email
-                </Label>
-                <Input
-                  id="sp-email"
-                  type="email"
-                  value={values.email}
-                  onChange={(event) => setField('email', event.target.value)}
-                  placeholder="e.g. jaksel@edc.co.id"
-                  aria-invalid={Boolean(errors.email)}
-                  className={fieldClasses}
-                />
-                {errors.email && (
-                  <p className="text-xs text-rose-600">{errors.email}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-latitude" className="text-[#0E2748]">
-                  Latitude
-                </Label>
-                <Input
-                  id="sp-latitude"
-                  inputMode="decimal"
-                  value={values.latitude}
-                  onChange={(event) => setField('latitude', event.target.value)}
-                  placeholder="e.g. -6.2907"
-                  aria-invalid={Boolean(errors.latitude)}
-                  className={fieldClasses}
-                />
-                {errors.latitude && (
-                  <p className="text-xs text-rose-600">{errors.latitude}</p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="sp-longitude" className="text-[#0E2748]">
-                  Longitude
-                </Label>
-                <Input
-                  id="sp-longitude"
-                  inputMode="decimal"
-                  value={values.longitude}
-                  onChange={(event) =>
-                    setField('longitude', event.target.value)
-                  }
-                  placeholder="e.g. 106.8018"
-                  aria-invalid={Boolean(errors.longitude)}
-                  className={fieldClasses}
-                />
-                {errors.longitude && (
-                  <p className="text-xs text-rose-600">{errors.longitude}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="sp-coverage-radius" className="text-[#0E2748]">
-                Coverage Radius (KM){' '}
-                <span className="font-normal text-[#0E2748]/40">
-                  (optional)
+              <Label htmlFor="sp-code" className="text-[#0E2748]">
+                Service point code{' '}
+                <span className="text-rose-600" aria-hidden="true">
+                  *
                 </span>
               </Label>
               <Input
-                id="sp-coverage-radius"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={1000}
-                step="any"
-                value={values.coverageRadiusKm}
-                onChange={(event) =>
-                  setField('coverageRadiusKm', event.target.value)
-                }
-                placeholder="Enter coverage radius in KM"
-                aria-invalid={Boolean(errors.coverageRadiusKm)}
+                id="sp-code"
+                value={values.code}
+                onChange={(event) => setField('code', event.target.value)}
+                placeholder="e.g. SP-JKT-005"
+                aria-invalid={Boolean(errors.code)}
                 className={fieldClasses}
               />
-              {errors.coverageRadiusKm ? (
-                <p className="text-xs text-rose-600">
-                  {errors.coverageRadiusKm}
-                </p>
-              ) : (
-                <p className="text-xs text-[#0E2748]/50">
-                  Maximum distance from this service point for automatic
-                  merchant assignment. If empty, the nearest Service Point will
-                  always be assigned regardless of distance.
-                </p>
+              {errors.code && (
+                <p className="text-xs text-rose-600">{errors.code}</p>
               )}
             </div>
-
-            <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
-              <div>
-                <p className="text-sm font-medium text-[#0E2748]">
-                  Active service point
-                </p>
-                <p className="text-xs text-[#0E2748]/50">
-                  Inactive service points stay in the hierarchy but are flagged
-                  as out of operation.
-                </p>
-              </div>
-              <Switch
-                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
-                checked={values.status === 'active'}
-                onCheckedChange={(checked) =>
-                  setField('status', checked ? 'active' : 'inactive')
-                }
-              />
-            </div>
-
             <div className="space-y-1.5">
-              <Label htmlFor="sp-notes" className="text-[#0E2748]">
-                Notes{' '}
-                <span className="font-normal text-[#0E2748]/40">
-                  (optional)
+              <Label htmlFor="sp-name" className="text-[#0E2748]">
+                Service point name{' '}
+                <span className="text-rose-600" aria-hidden="true">
+                  *
                 </span>
               </Label>
               <Input
-                id="sp-notes"
-                value={values.notes}
-                maxLength={500}
-                onChange={(event) => setField('notes', event.target.value)}
-                placeholder="e.g. Pilot area for dense-merchant coverage"
+                id="sp-name"
+                value={values.name}
+                onChange={(event) => setField('name', event.target.value)}
+                placeholder="e.g. Jakarta Selatan"
+                aria-invalid={Boolean(errors.name)}
+                className={fieldClasses}
+              />
+              {errors.name && (
+                <p className="text-xs text-rose-600">{errors.name}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-parent" className="text-[#0E2748]">
+                Parent service point
+              </Label>
+              <Select
+                value={values.parentId ?? NO_PARENT}
+                onValueChange={(value) =>
+                  setField('parentId', value === NO_PARENT ? null : value)
+                }
+              >
+                <SelectTrigger
+                  id="sp-parent"
+                  aria-invalid={Boolean(errors.parentId)}
+                  className={`w-full ${fieldClasses}`}
+                >
+                  <SelectValue placeholder="No parent (top level)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PARENT}>
+                    No parent (top level)
+                  </SelectItem>
+                  {parentOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.id}>
+                      {/* Figure-space indent mirrors the tree depth. */}
+                      {'  '.repeat(option.depth)}
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.parentId ? (
+                <p className="text-xs text-rose-600">{errors.parentId}</p>
+              ) : (
+                servicePoint && (
+                  <p className="text-xs text-[#0E2748]/50">
+                    This service point and everything under it are excluded to
+                    keep the hierarchy free of cycles.
+                  </p>
+                )
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-region" className="text-[#0E2748]">
+                Region
+              </Label>
+              <Input
+                id="sp-region"
+                value={values.region}
+                onChange={(event) => setField('region', event.target.value)}
+                placeholder="e.g. DKI Jakarta"
                 className={fieldClasses}
               />
             </div>
+          </div>
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">
-                {servicePoint ? 'Save changes' : 'Create service point'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-1.5">
+            <Label htmlFor="sp-address" className="text-[#0E2748]">
+              Address
+            </Label>
+            <Input
+              id="sp-address"
+              value={values.address}
+              onChange={(event) => setField('address', event.target.value)}
+              placeholder="Street, number, city"
+              className={fieldClasses}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-phone" className="text-[#0E2748]">
+                Phone
+              </Label>
+              <Input
+                id="sp-phone"
+                type="tel"
+                value={values.phone}
+                onChange={(event) => setField('phone', event.target.value)}
+                placeholder="e.g. +62 21 5150 000"
+                className={fieldClasses}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-email" className="text-[#0E2748]">
+                Email
+              </Label>
+              <Input
+                id="sp-email"
+                type="email"
+                value={values.email}
+                onChange={(event) => setField('email', event.target.value)}
+                placeholder="e.g. jaksel@edc.co.id"
+                aria-invalid={Boolean(errors.email)}
+                className={fieldClasses}
+              />
+              {errors.email && (
+                <p className="text-xs text-rose-600">{errors.email}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-latitude" className="text-[#0E2748]">
+                Latitude
+              </Label>
+              <Input
+                id="sp-latitude"
+                inputMode="decimal"
+                value={values.latitude}
+                onChange={(event) => setField('latitude', event.target.value)}
+                placeholder="e.g. -6.2907"
+                aria-invalid={Boolean(errors.latitude)}
+                className={fieldClasses}
+              />
+              {errors.latitude && (
+                <p className="text-xs text-rose-600">{errors.latitude}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-longitude" className="text-[#0E2748]">
+                Longitude
+              </Label>
+              <Input
+                id="sp-longitude"
+                inputMode="decimal"
+                value={values.longitude}
+                onChange={(event) => setField('longitude', event.target.value)}
+                placeholder="e.g. 106.8018"
+                aria-invalid={Boolean(errors.longitude)}
+                className={fieldClasses}
+              />
+              {errors.longitude && (
+                <p className="text-xs text-rose-600">{errors.longitude}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sp-coverage-radius" className="text-[#0E2748]">
+              Coverage Radius (KM){' '}
+              <span className="font-normal text-[#0E2748]/40">(optional)</span>
+            </Label>
+            <Input
+              id="sp-coverage-radius"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={1000}
+              step="any"
+              value={values.coverageRadiusKm}
+              onChange={(event) =>
+                setField('coverageRadiusKm', event.target.value)
+              }
+              placeholder="Enter coverage radius in KM"
+              aria-invalid={Boolean(errors.coverageRadiusKm)}
+              className={fieldClasses}
+            />
+            {errors.coverageRadiusKm ? (
+              <p className="text-xs text-rose-600">{errors.coverageRadiusKm}</p>
+            ) : (
+              <p className="text-xs text-[#0E2748]/50">
+                Maximum distance from this service point for automatic merchant
+                assignment. If empty, the nearest Service Point will always be
+                assigned regardless of distance.
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
+            <div>
+              <p className="text-sm font-medium text-[#0E2748]">
+                Active service point
+              </p>
+              <p className="text-xs text-[#0E2748]/50">
+                Inactive service points stay in the hierarchy but are flagged as
+                out of operation.
+              </p>
+            </div>
+            <Switch
+              className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+              checked={values.status === 'active'}
+              onCheckedChange={(checked) =>
+                setField('status', checked ? 'active' : 'inactive')
+              }
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sp-notes" className="text-[#0E2748]">
+              Notes{' '}
+              <span className="font-normal text-[#0E2748]/40">(optional)</span>
+            </Label>
+            <Input
+              id="sp-notes"
+              value={values.notes}
+              maxLength={500}
+              onChange={(event) => setField('notes', event.target.value)}
+              placeholder="e.g. Pilot area for dense-merchant coverage"
+              className={fieldClasses}
+            />
+          </div>
+        </form>
+      </BaseModal>
       <UnsavedChangesDialog {...dialogProps} />
     </>
   )

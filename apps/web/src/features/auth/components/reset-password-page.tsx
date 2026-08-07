@@ -34,8 +34,7 @@ export function ResetPasswordPage({ token, error }: ResetPasswordPageProps) {
 
   const reset = useMutation({
     mutationFn: resetPassword,
-    onSuccess: () =>
-      navigate({ to: '/login', search: { reset: true } }),
+    onSuccess: () => navigate({ to: '/login', search: { reset: true } }),
   })
 
   const form = useForm({

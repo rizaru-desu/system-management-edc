@@ -61,7 +61,8 @@ export function ServicePointTransfer({
   )
 
   const servicePointsById = useMemo(
-    () => new Map(catalogue.map((servicePoint) => [servicePoint.id, servicePoint])),
+    () =>
+      new Map(catalogue.map((servicePoint) => [servicePoint.id, servicePoint])),
     [catalogue],
   )
 
@@ -208,7 +209,10 @@ export function ServicePointTransfer({
             disabled={checkedAvailable.length === 0}
             onClick={addChecked}
           >
-            <ChevronsRight className="h-4 w-4 text-primary" strokeWidth={1.75} />
+            <ChevronsRight
+              className="h-4 w-4 text-primary"
+              strokeWidth={1.75}
+            />
             Assign selected
             {checkedAvailable.length > 0 && ` (${checkedAvailable.length})`}
           </Button>

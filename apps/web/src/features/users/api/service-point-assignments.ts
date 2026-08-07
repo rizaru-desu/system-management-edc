@@ -1,4 +1,8 @@
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  queryOptions,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader } from '@tanstack/react-start/server'
 import { toast } from 'sonner'
@@ -207,9 +211,7 @@ export function useReplaceAssignments() {
     },
     onError: (error) => {
       toast.error(
-        error instanceof Error
-          ? error.message
-          : 'Failed to save assignments.',
+        error instanceof Error ? error.message : 'Failed to save assignments.',
       )
     },
     onSettled: (_assignments, _error, input) =>

@@ -86,10 +86,10 @@ const fetchUserDevices = createServerFn({ method: 'GET' })
     const cookie = getRequestHeader('cookie')
     if (!cookie) return []
     try {
-      const res = await apiClient.get<{ success: boolean; data: DeviceRecord[] }>(
-        `mobile/users/${data.userId}/devices`,
-        { headers: { cookie } },
-      )
+      const res = await apiClient.get<{
+        success: boolean
+        data: DeviceRecord[]
+      }>(`mobile/users/${data.userId}/devices`, { headers: { cookie } })
       return res.data.data
     } catch (err: unknown) {
       const apiErr = err as ApiError
@@ -99,11 +99,13 @@ const fetchUserDevices = createServerFn({ method: 'GET' })
 
 const fetchUserLoginHistory = createServerFn({ method: 'GET' })
   .validator(
-    (input: {
-      userId: string
-      page: number
-      limit: number
-    } & LoginHistoryFilters) => input,
+    (
+      input: {
+        userId: string
+        page: number
+        limit: number
+      } & LoginHistoryFilters,
+    ) => input,
   )
   .handler(async ({ data }): Promise<LoginHistoryPage> => {
     const { userId, page, limit, ...filters } = data
@@ -139,10 +141,10 @@ const fetchUserSessions = createServerFn({ method: 'GET' })
     const cookie = getRequestHeader('cookie')
     if (!cookie) return []
     try {
-      const res = await apiClient.get<{ success: boolean; data: SessionRecord[] }>(
-        `mobile/users/${data.userId}/sessions`,
-        { headers: { cookie } },
-      )
+      const res = await apiClient.get<{
+        success: boolean
+        data: SessionRecord[]
+      }>(`mobile/users/${data.userId}/sessions`, { headers: { cookie } })
       return res.data.data
     } catch (err: unknown) {
       const apiErr = err as ApiError
