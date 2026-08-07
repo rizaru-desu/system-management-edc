@@ -94,7 +94,7 @@ export async function downloadMerchantTemplate(): Promise<void> {
 export const IMPORT_MAX_FILE_SIZE = 10 * 1024 * 1024
 export const IMPORT_ACCEPTED_EXTENSIONS = ['.xlsx', '.xls'] as const
 /** Mirrors the backend's per-request row ceiling. */
-export const IMPORT_MAX_ROWS = 1000
+export const IMPORT_MAX_ROWS = 5000
 
 /** Extension + size gate for the upload area; null when the file is fine. */
 export function importFileError(file: File): string | null {

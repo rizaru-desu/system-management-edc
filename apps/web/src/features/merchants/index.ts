@@ -5,6 +5,7 @@ export { MerchantViewModal } from './components/merchant-view-modal.tsx'
 export { DeleteMerchantDialog } from './components/delete-merchant-dialog.tsx'
 export { ToggleMerchantStatusDialog } from './components/toggle-merchant-status-dialog.tsx'
 export { ImportMerchantsModal } from './components/import-merchants-modal.tsx'
+export { ImportPreviewTable } from './components/import-preview-table.tsx'
 export type {
   MerchantFormValues,
   ServicePointOption,
