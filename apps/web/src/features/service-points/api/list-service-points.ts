@@ -43,9 +43,10 @@ const fetchServicePoints = createServerFn({ method: 'GET' })
       pageSize?: number
     }) => ({
       search: typeof input.search === 'string' ? input.search.trim() : '',
-      status: input.status === 'active' || input.status === 'inactive'
-        ? input.status
-        : '',
+      status:
+        input.status === 'active' || input.status === 'inactive'
+          ? input.status
+          : '',
       page: typeof input.page === 'number' ? input.page : 1,
       pageSize: typeof input.pageSize === 'number' ? input.pageSize : 50,
     }),

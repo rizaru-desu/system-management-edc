@@ -27,6 +27,8 @@ export interface ServicePointPayload {
   email: string | null
   latitude: number | null
   longitude: number | null
+  /** Service area radius (km) for automatic merchant assignment; null = unlimited. */
+  coverageRadiusKm: number | null
   notes: string | null
   status: ServicePointStatus
 }

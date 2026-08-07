@@ -60,6 +60,25 @@ describe('parseCreateServicePointDto', () => {
       parseCreateServicePointDto({ code: 'X', name: 'X', status: 'PAUSED' }),
     ).toThrow(BadRequestException);
   });
+
+  it('accepts decimal coverage radii and normalizes empty to null', () => {
+    expect(
+      parseCreateServicePointDto({ code: 'X', name: 'X', coverageRadiusKm: 25.5 })
+        .coverageRadiusKm,
+    ).toBe(25.5);
+    expect(
+      parseCreateServicePointDto({ code: 'X', name: 'X', coverageRadiusKm: null })
+        .coverageRadiusKm,
+    ).toBeNull();
+  });
+
+  it('rejects zero, negative, non-numeric and >1000 coverage radii', () => {
+    for (const coverageRadiusKm of [0, -10, 'abc', 1001]) {
+      expect(() =>
+        parseCreateServicePointDto({ code: 'X', name: 'X', coverageRadiusKm }),
+      ).toThrow(BadRequestException);
+    }
+  });
 });
 
 describe('parseUpdateServicePointDto', () => {

@@ -37,6 +37,8 @@ export interface ServicePointFormValues {
   email: string
   latitude: string
   longitude: string
+  /** Coverage radius in KM as entered; '' = unlimited. */
+  coverageRadiusKm: string
   status: ServicePointRecord['status']
   notes: string
 }
@@ -61,6 +63,7 @@ interface FormErrors {
   email?: string
   latitude?: string
   longitude?: string
+  coverageRadiusKm?: string
 }
 
 const EMPTY: ServicePointFormValues = {
@@ -73,6 +76,7 @@ const EMPTY: ServicePointFormValues = {
   email: '',
   latitude: '',
   longitude: '',
+  coverageRadiusKm: '',
   status: 'active',
   notes: '',
 }
@@ -88,6 +92,24 @@ function coordinateError(
   if (Number.isNaN(value)) return `${label} must be a number.`
   if (Math.abs(value) > bound) {
     return `${label} must be between -${bound} and ${bound}.`
+  }
+  return undefined
+}
+
+/** Maximum configurable coverage radius (matches the backend DTO). */
+const MAX_COVERAGE_RADIUS_KM = 1000
+
+/**
+ * Validates the optional coverage radius: numeric (decimals allowed),
+ * greater than 0, at most {@link MAX_COVERAGE_RADIUS_KM}. Empty = unlimited.
+ */
+function coverageRadiusError(raw: string): string | undefined {
+  if (!raw.trim()) return undefined
+  const value = Number(raw)
+  if (Number.isNaN(value)) return 'Coverage Radius must be a valid number.'
+  if (value <= 0) return 'Coverage Radius must be greater than 0.'
+  if (value > MAX_COVERAGE_RADIUS_KM) {
+    return `Coverage Radius cannot exceed ${MAX_COVERAGE_RADIUS_KM} KM.`
   }
   return undefined
 }
@@ -124,6 +146,10 @@ export function ServicePointFormModal({
               servicePoint.longitude === null
                 ? ''
                 : String(servicePoint.longitude),
+            coverageRadiusKm:
+              servicePoint.coverageRadiusKm === null
+                ? ''
+                : String(servicePoint.coverageRadiusKm),
             status: servicePoint.status,
             notes: servicePoint.notes ?? '',
           }
@@ -181,6 +207,8 @@ export function ServicePointFormModal({
     if (latitudeError) nextErrors.latitude = latitudeError
     const longitudeError = coordinateError(values.longitude, 180, 'Longitude')
     if (longitudeError) nextErrors.longitude = longitudeError
+    const radiusError = coverageRadiusError(values.coverageRadiusKm)
+    if (radiusError) nextErrors.coverageRadiusKm = radiusError
 
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
@@ -195,6 +223,7 @@ export function ServicePointFormModal({
       email: values.email.trim().toLowerCase(),
       latitude: values.latitude.trim(),
       longitude: values.longitude.trim(),
+      coverageRadiusKm: values.coverageRadiusKm.trim(),
       notes: values.notes.trim(),
     })
     onOpenChange(false)
@@ -399,6 +428,41 @@ export function ServicePointFormModal({
                   <p className="text-xs text-rose-600">{errors.longitude}</p>
                 )}
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="sp-coverage-radius" className="text-[#0E2748]">
+                Coverage Radius (KM){' '}
+                <span className="font-normal text-[#0E2748]/40">
+                  (optional)
+                </span>
+              </Label>
+              <Input
+                id="sp-coverage-radius"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={1000}
+                step="any"
+                value={values.coverageRadiusKm}
+                onChange={(event) =>
+                  setField('coverageRadiusKm', event.target.value)
+                }
+                placeholder="Enter coverage radius in KM"
+                aria-invalid={Boolean(errors.coverageRadiusKm)}
+                className={fieldClasses}
+              />
+              {errors.coverageRadiusKm ? (
+                <p className="text-xs text-rose-600">
+                  {errors.coverageRadiusKm}
+                </p>
+              ) : (
+                <p className="text-xs text-[#0E2748]/50">
+                  Maximum distance from this service point for automatic
+                  merchant assignment. If empty, the nearest Service Point will
+                  always be assigned regardless of distance.
+                </p>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">

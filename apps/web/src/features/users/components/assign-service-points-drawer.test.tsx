@@ -35,6 +35,7 @@ function servicePoint(id: string, name: string): ServicePointRecord {
     email: null,
     latitude: null,
     longitude: null,
+    coverageRadiusKm: null,
     status: 'active',
     notes: null,
     assignedUsers: 0,
@@ -115,9 +116,7 @@ describe('AssignServicePointsDrawer', () => {
       'true',
     )
     expect(defaultRadio('BSD').getAttribute('aria-checked')).toBe('false')
-    expect(defaultRadio('Tangerang').getAttribute('aria-checked')).toBe(
-      'false',
-    )
+    expect(defaultRadio('Tangerang').getAttribute('aria-checked')).toBe('false')
 
     // Assigned entries have left the available panel; the rest remain.
     // Available entries are the toggle buttons carrying aria-pressed.

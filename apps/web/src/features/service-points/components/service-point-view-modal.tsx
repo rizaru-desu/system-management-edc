@@ -4,6 +4,7 @@ import {
   MapPin,
   Network,
   Phone,
+  Radius,
   StickyNote,
   Users,
 } from 'lucide-react'
@@ -106,6 +107,15 @@ export function ServicePointViewModal({
               )}
             </DetailRow>
           </div>
+          <DetailRow icon={Radius} label="Coverage radius">
+            {servicePoint.coverageRadiusKm !== null ? (
+              <span className="tabular-nums">
+                {servicePoint.coverageRadiusKm} KM
+              </span>
+            ) : (
+              'Unlimited'
+            )}
+          </DetailRow>
           <DetailRow icon={Phone} label="Phone">
             {servicePoint.phone || '—'}
           </DetailRow>

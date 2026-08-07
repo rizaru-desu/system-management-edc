@@ -50,6 +50,9 @@ function payloadFromForm(values: ServicePointFormValues): ServicePointPayload {
     email: blankOrNull(values.email),
     latitude: values.latitude.trim() ? Number(values.latitude) : null,
     longitude: values.longitude.trim() ? Number(values.longitude) : null,
+    coverageRadiusKm: values.coverageRadiusKm.trim()
+      ? Number(values.coverageRadiusKm)
+      : null,
     status: values.status,
     notes: blankOrNull(values.notes),
   }
@@ -221,16 +224,13 @@ export function ServicePointsPage() {
     let current: ServicePointRecord | undefined = viewing
     while (current) {
       path.unshift(current.name)
-      current = current.parentId
-        ? recordsById.get(current.parentId)
-        : undefined
+      current = current.parentId ? recordsById.get(current.parentId) : undefined
     }
     return path
   }, [viewing, recordsById])
 
   const deletingDescendants = useMemo(
-    () =>
-      deleting ? collectDescendantIds(records, deleting.id).size : 0,
+    () => (deleting ? collectDescendantIds(records, deleting.id).size : 0),
     [records, deleting],
   )
 
@@ -282,8 +282,8 @@ export function ServicePointsPage() {
             Service Point
           </h1>
           <p className="text-sm text-brand-900/60">
-            Manage the service point hierarchy — regions, branches and
-            sub-areas under one tree.
+            Manage the service point hierarchy — regions, branches and sub-areas
+            under one tree.
           </p>
         </div>
         <Button onClick={openCreate}>
