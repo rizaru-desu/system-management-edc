@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
 /** Ceiling on rows per import request — one Excel sheet, not a data dump. */
-export const MAX_IMPORT_ROWS = 1000;
+export const MAX_IMPORT_ROWS = 5000;
 
 /**
  * One raw cell as parsed from the Excel sheet: SheetJS yields strings or

@@ -1,7 +1,5 @@
 import { useRef, useState } from 'react'
 import {
-  CircleCheck,
-  CircleX,
   CloudUpload,
   Download,
   FileSpreadsheet,
@@ -11,7 +9,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import {
@@ -29,7 +26,6 @@ import {
   useImportMerchants,
 } from '../api/import-merchants.ts'
 import type {
-  ImportAssignmentStatus,
   ImportPreviewResult,
   RawImportRow,
 } from '../api/import-merchants.ts'
@@ -39,6 +35,7 @@ import {
   importFileError,
   parseMerchantWorkbook,
 } from '../lib/excel.ts'
+import { ImportPreviewTable } from './import-preview-table.tsx'
 
 interface ImportMerchantsModalProps {
   open: boolean
@@ -50,6 +47,8 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+
+const formatCount = (value: number): string => value.toLocaleString('en-US')
 
 /** One stat tile of the preview summary row. */
 function SummaryCard({
@@ -79,24 +78,6 @@ function SummaryCard({
       </p>
     </Card>
   )
-}
-
-/** Assignment outcome chip of one preview row. */
-function AssignmentBadge({
-  status,
-}: {
-  status: ImportAssignmentStatus | null
-}) {
-  switch (status) {
-    case 'ASSIGNED':
-      return <Badge variant="success">Assigned</Badge>
-    case 'OUTSIDE_COVERAGE_RADIUS':
-      return <Badge variant="sky">Outside Coverage Radius</Badge>
-    case 'NO_ACTIVE_SERVICE_POINT':
-      return <Badge variant="muted">No Active Service Point</Badge>
-    default:
-      return <span className="text-[#0E2748]/40">—</span>
-  }
 }
 
 /**
@@ -202,7 +183,7 @@ export function ImportMerchantsModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         disableOutsideClose
-        className="theme-light border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-4xl"
+        className="theme-light border-[#DDE0EC] bg-white text-[#0E2748] sm:max-w-5xl"
       >
         <DialogHeader>
           <DialogTitle className="font-display text-xl font-bold text-[#0E2748]">
@@ -369,116 +350,44 @@ export function ImportMerchantsModal({
                 />
               </div>
 
-              <Card className="overflow-x-auto border-[#DDE0EC]">
-                <table className="w-full min-w-3xl text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-[#DDE0EC] text-[11px] uppercase tracking-wider text-[#0E2748]/50">
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Row
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Merchant Code
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Merchant Name
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Nearest Service Point
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Distance (KM)
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Assignment Status
-                      </th>
-                      <th className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                        Validation Result
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.rows.map((row) => (
-                      <tr
-                        key={row.rowNumber}
-                        className="border-b border-[#DDE0EC] last:border-0"
-                      >
-                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/50 tabular-nums">
-                          {row.rowNumber}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium whitespace-nowrap text-[#0E2748]/80 tabular-nums">
-                          {row.merchantCode || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-[#0E2748]/80">
-                          {row.merchantName || (
-                            <span className="text-[#0E2748]/40">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70">
-                          {row.nearestServicePointName || (
-                            <span className="text-[#0E2748]/40">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-[#0E2748]/70 tabular-nums">
-                          {row.distanceKm === null ? (
-                            <span className="text-[#0E2748]/40">—</span>
-                          ) : (
-                            row.distanceKm.toFixed(2)
-                          )}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <AssignmentBadge status={row.assignmentStatus} />
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {row.errors.length === 0 ? (
-                            <Badge variant="success">
-                              <CircleCheck
-                                className="h-3 w-3"
-                                strokeWidth={2}
-                              />
-                              Valid
-                            </Badge>
-                          ) : (
-                            <span className="leading-tight">
-                              <Badge variant="danger">
-                                <CircleX className="h-3 w-3" strokeWidth={2} />
-                                Invalid
-                              </Badge>
-                              {row.errors.map((error) => (
-                                <span
-                                  key={error}
-                                  className="mt-1 block text-xs text-rose-600"
-                                >
-                                  {error}
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </Card>
+              <ImportPreviewTable
+                rows={preview.rows}
+                summary={preview.summary}
+              />
 
-              {preview.summary.needManualAssignment > 0 && (
-                <p className="rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-[#0E2748]/60">
-                  {preview.summary.needManualAssignment}{' '}
-                  {preview.summary.needManualAssignment === 1
-                    ? 'valid row is'
-                    : 'valid rows are'}{' '}
-                  outside the nearest service point&apos;s coverage radius (or
-                  no active service point exists) — the import skips them; add
-                  those merchants manually.
-                </p>
-              )}
-              {preview.summary.invalidRows > 0 && (
-                <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                  {preview.summary.invalidRows}{' '}
-                  {preview.summary.invalidRows === 1 ? 'row is' : 'rows are'}{' '}
-                  invalid and will be skipped — fix them in the file and
-                  re-upload to import everything.
-                </p>
-              )}
+              <p className="rounded-lg bg-[#3F6FA8]/5 px-3 py-2 text-xs text-[#0E2748]/70">
+                <span className="font-semibold text-[#0E2748]">
+                  {formatCount(preview.summary.assigned)}
+                </span>{' '}
+                {preview.summary.assigned === 1 ? 'record' : 'records'} will be
+                imported.
+                {preview.summary.invalidRows > 0 && (
+                  <>
+                    {' '}
+                    <span className="font-semibold text-rose-600">
+                      {formatCount(preview.summary.invalidRows)}
+                    </span>{' '}
+                    {preview.summary.invalidRows === 1
+                      ? 'record contains'
+                      : 'records contain'}{' '}
+                    validation errors and will be skipped.
+                  </>
+                )}
+                {preview.summary.needManualAssignment > 0 && (
+                  <>
+                    {' '}
+                    <span className="font-semibold text-[#0E2748]">
+                      {formatCount(preview.summary.needManualAssignment)}
+                    </span>{' '}
+                    valid{' '}
+                    {preview.summary.needManualAssignment === 1
+                      ? 'record needs'
+                      : 'records need'}{' '}
+                    manual assignment (outside coverage radius or no active
+                    service point) and will be skipped.
+                  </>
+                )}
+              </p>
             </DialogBody>
 
             <DialogFooter className="sm:justify-between">
@@ -513,7 +422,7 @@ export function ImportMerchantsModal({
                       strokeWidth={1.75}
                     />
                   )}
-                  Import {preview.summary.assigned}{' '}
+                  Import {formatCount(preview.summary.assigned)}{' '}
                   {preview.summary.assigned === 1 ? 'merchant' : 'merchants'}
                 </Button>
               </div>
