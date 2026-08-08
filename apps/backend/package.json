@@ -20,6 +20,7 @@
     "seed:merchants": "pnpm run build:deps && nest build && node dist/scripts/seed-merchants.js",
     "seed:accounts": "pnpm run build:deps && nest build && node dist/scripts/seed-accounts.js",
     "seed:projects": "pnpm run build:deps && nest build && node dist/scripts/seed-projects.js",
+    "seed:contract-lines": "pnpm run build:deps && nest build && node dist/scripts/seed-contract-lines.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",

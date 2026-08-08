@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from '@repo/auth';
 import { AccountModule } from './accounts/account.module';
+import { ContractLineModule } from './contract-lines/contract-line.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppReleaseModule } from './app-releases/app-release.module';
@@ -19,6 +20,7 @@ import { UsersModule } from './users/users.module';
     AuthModule.forRoot({ auth }),
     AccountModule,
     AppReleaseModule,
+    ContractLineModule,
     UsersModule,
     PermissionsModule,
     MailModule,

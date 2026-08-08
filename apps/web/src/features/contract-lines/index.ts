@@ -8,7 +8,6 @@ export type {
   RelationOption,
 } from './components/contract-line-form-modal.tsx'
 export {
-  CONTRACT_LINES,
   CONTRACT_LINE_STATUS_OPTIONS,
   DOCUMENT_STATUS_OPTIONS,
   documentStatusLabel,
@@ -18,3 +17,21 @@ export type {
   ContractLineStatus,
   DocumentStatus,
 } from './data/contract-lines.ts'
+export {
+  contractLinesListQueryOptions,
+  contractLinesQueryKey,
+  isDuplicateLineNumberError,
+  toContractLineRecord,
+} from './api/list-contract-lines.ts'
+export type {
+  BackendContractLine,
+  ContractLinesListPage,
+  ContractLinesQueryFilters,
+} from './api/list-contract-lines.ts'
+export { useCreateContractLine } from './api/create-contract-line.ts'
+export type { ContractLinePayload } from './api/create-contract-line.ts'
+export {
+  useSetContractLineStatus,
+  useUpdateContractLine,
+} from './api/update-contract-line.ts'
+export { useDeleteContractLine } from './api/delete-contract-line.ts'

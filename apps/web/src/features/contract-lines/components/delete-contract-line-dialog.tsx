@@ -32,7 +32,7 @@ export function DeleteContractLineDialog({
           <span className="font-semibold text-brand-900">
             {contractLine.name}
           </span>{' '}
-          ({contractLine.id}). This action cannot be undone.
+          ({contractLine.lineNumber}). This action cannot be undone.
         </>
       }
       confirmLabel="Delete"

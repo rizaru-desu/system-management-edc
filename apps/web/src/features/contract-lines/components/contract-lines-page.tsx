@@ -14,8 +14,18 @@ import {
 } from '#/components/ui/select.tsx'
 import { accountsListQueryOptions } from '#/features/accounts/index.ts'
 import { projectsListQueryOptions } from '#/features/projects/index.ts'
+import { useCreateContractLine } from '../api/create-contract-line.ts'
+import type { ContractLinePayload } from '../api/create-contract-line.ts'
+import { useDeleteContractLine } from '../api/delete-contract-line.ts'
 import {
-  CONTRACT_LINES,
+  contractLinesListQueryOptions,
+  isDuplicateLineNumberError,
+} from '../api/list-contract-lines.ts'
+import {
+  useSetContractLineStatus,
+  useUpdateContractLine,
+} from '../api/update-contract-line.ts'
+import {
   CONTRACT_LINE_STATUS_OPTIONS,
   DOCUMENT_STATUS_OPTIONS,
 } from '../data/contract-lines.ts'
@@ -35,21 +45,33 @@ import { ToggleContractLineStatusDialog } from './toggle-contract-line-status-di
 
 const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
 
+/** Maps the dialog's string fields onto the API payload shape. */
+function payloadFromForm(values: ContractLineFormValues): ContractLinePayload {
+  return {
+    lineNumber: values.lineNumber,
+    name: values.lineName,
+    status: values.status,
+    documentStatus: values.documentStatus,
+    vendorEdc: blankOrNull(values.vendorEdc),
+    accountId: values.accountId,
+    projectId: values.projectId,
+    serviceItem: blankOrNull(values.serviceItem),
+    startDate: values.startDate || null,
+    endDate: values.endDate || null,
+    notes: blankOrNull(values.notes),
+  }
+}
+
 /**
- * Contract Management → Contract Lines. The index/list view over the
- * contract line catalogue: search, status/document status filters and
- * pagination run client-side, and add/edit/delete/status changes go through
- * the same modal + confirmation dialogs as the other modules — all against
- * the local placeholder list until the backend endpoint lands. The
+ * Contract Management → Contract Lines. Search, status/document status
+ * filters and pagination all run server-side (GET /contract-lines, with the
+ * owning account and project joined into every row), and every CRUD action
+ * goes through the backend API; the mutation hooks own toasts and cache
+ * invalidation, so the table refreshes after every write. The
  * account/project selects are fed by the live catalogues (GET /accounts and
  * GET /projects), never hardcoded.
  */
 export function ContractLinesPage() {
-  // The catalogue lives in state so the form modal and the confirmation
-  // dialogs mutate it in place (in memory only, until the API exists).
-  const [contractLines, setContractLines] =
-    useState<Array<ContractLineRecord>>(CONTRACT_LINES)
-
   // ── Relational options (live catalogues from the backend) ──────────────
   const accountsQuery = useQuery(accountsListQueryOptions({ pageSize: 100 }))
   const projectsQuery = useQuery(projectsListQueryOptions({ pageSize: 100 }))
@@ -74,7 +96,7 @@ export function ContractLinesPage() {
     [projectsQuery.data],
   )
 
-  // ── Search & filters (client-side over the local list) ─────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | ContractLineStatus>(
     'all',
@@ -82,19 +104,27 @@ export function ContractLinesPage() {
   const [documentStatusFilter, setDocumentStatusFilter] = useState<
     'all' | DocumentStatus
   >('all')
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const isFiltering =
-    search.trim() !== '' ||
+    debouncedSearch.trim() !== '' ||
     statusFilter !== 'all' ||
     documentStatusFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setStatusFilter('all')
     setDocumentStatusFilter('all')
   }
 
-  // ── Pagination (client-side) ───────────────────────────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -106,34 +136,26 @@ export function ContractLinesPage() {
     setPagination((previous) =>
       previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
     )
-  }, [search, statusFilter, documentStatusFilter])
+  }, [debouncedSearch, statusFilter, documentStatusFilter])
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return contractLines.filter((line) => {
-      if (statusFilter !== 'all' && line.status !== statusFilter) return false
-      if (
-        documentStatusFilter !== 'all' &&
-        line.documentStatus !== documentStatusFilter
-      ) {
-        return false
-      }
-      if (!term) return true
-      return (
-        line.id.toLowerCase().includes(term) ||
-        line.name.toLowerCase().includes(term)
-      )
-    })
-  }, [contractLines, search, statusFilter, documentStatusFilter])
-
-  const pageRows = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize
-    return filtered.slice(start, start + pagination.pageSize)
-  }, [filtered, pagination])
+  const listQuery = useQuery(
+    contractLinesListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      documentStatus: documentStatusFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const contractLines = listQuery.data?.contractLines ?? []
+  const total = listQuery.data?.total ?? 0
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ContractLineRecord | null>(null)
+  // Bumped on every duplicate-number 409 so the form modal highlights the
+  // line number field without losing the entered values.
+  const [duplicateConflict, setDuplicateConflict] = useState(0)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState<ContractLineRecord | null>(null)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -141,11 +163,13 @@ export function ContractLinesPage() {
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: ContractLineRecord) => {
     setEditing(record)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
@@ -159,66 +183,46 @@ export function ContractLinesPage() {
     setStatusOpen(true)
   }
 
-  // ── CRUD (in-memory list updates) ──────────────────────────────────────
-  /** Maps the dialog's fields onto the record shape, resolving labels. */
-  const recordFromForm = (
-    values: ContractLineFormValues,
-  ): ContractLineRecord => {
-    const accountLabel =
-      accountOptions.find((option) => option.value === values.accountId)
-        ?.label ??
-      (editing?.accountId === values.accountId ? editing.accountLabel : '')
-    const projectLabel =
-      projectOptions.find((option) => option.value === values.projectId)
-        ?.label ??
-      (editing?.projectId === values.projectId ? editing.projectLabel : '')
-    return {
-      id: values.lineNumber,
-      name: values.lineName,
-      accountId: values.accountId,
-      accountLabel,
-      projectId: values.projectId,
-      projectLabel,
-      vendorEdc: blankOrNull(values.vendorEdc),
-      serviceItem: blankOrNull(values.serviceItem),
-      startDate: values.startDate,
-      endDate: values.endDate,
-      notes: blankOrNull(values.notes),
-      status: values.status,
-      documentStatus: values.documentStatus,
-    }
-  }
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createContractLine = useCreateContractLine()
+  const updateContractLine = useUpdateContractLine()
+  const deleteContractLine = useDeleteContractLine()
+  const setContractLineStatus = useSetContractLineStatus()
 
+  const saving = createContractLine.isPending || updateContractLine.isPending
+
+  // The form stays open (with its submit disabled) until the save lands, so
+  // a rejected payload keeps the user's input intact. A duplicate-number
+  // 409 additionally highlights the line number field inline.
   const handleSubmit = (values: ContractLineFormValues) => {
-    const record = recordFromForm(values)
-    setContractLines((previous) =>
-      editing
-        ? previous.map((line) => (line.id === editing.id ? record : line))
-        : [...previous, record],
-    )
-    setFormOpen(false)
+    const payload = payloadFromForm(values)
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateLineNumberError(error)) {
+          setDuplicateConflict((previous) => previous + 1)
+        }
+      },
+    }
+    if (editing) {
+      updateContractLine.mutate({ id: editing.id, ...payload }, callbacks)
+      return
+    }
+    createContractLine.mutate(payload, callbacks)
   }
 
   const handleDelete = () => {
     if (!deleting) return
-    setContractLines((previous) =>
-      previous.filter((line) => line.id !== deleting.id),
-    )
+    deleteContractLine.mutate({ id: deleting.id, name: deleting.name })
     setDeleting(null)
   }
 
   const handleStatusToggle = () => {
     if (!toggling) return
-    setContractLines((previous) =>
-      previous.map((line) =>
-        line.id === toggling.id
-          ? {
-              ...line,
-              status: line.status === 'active' ? 'inactive' : 'active',
-            }
-          : line,
-      ),
-    )
+    setContractLineStatus.mutate({
+      id: toggling.id,
+      status: toggling.status === 'active' ? 'inactive' : 'active',
+    })
     setToggling(null)
   }
 
@@ -253,6 +257,7 @@ export function ContractLinesPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search line number or name…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -294,10 +299,18 @@ export function ContractLinesPage() {
 
       {/* Contract line table */}
       <ContractLinesTable
-        rows={pageRows}
-        total={filtered.length}
+        rows={contractLines}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load contract lines.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEdit={openEdit}
@@ -311,7 +324,8 @@ export function ContractLinesPage() {
         contractLine={editing}
         accountOptions={accountOptions}
         projectOptions={projectOptions}
-        existingNumbers={contractLines.map((line) => line.id)}
+        saving={saving}
+        duplicateConflict={duplicateConflict}
         onSubmit={handleSubmit}
       />
       <DeleteContractLineDialog
