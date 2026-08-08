@@ -27,6 +27,8 @@ export interface BackendAccount {
   picName: string | null
   picPhone: string | null
   picEmail: string | null
+  /** Live contract lines referencing this account (aggregated count). */
+  contractLineCount: number
   createdAt: string
   updatedAt: string
 }
@@ -53,6 +55,7 @@ export function toAccountRecord(row: BackendAccount): AccountRecord {
     picName: row.picName,
     picPhone: row.picPhone,
     picEmail: row.picEmail,
+    contractLineCount: row.contractLineCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }

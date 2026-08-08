@@ -39,6 +39,7 @@ const account: AccountRow = {
   picName: 'Budi Santoso',
   picPhone: '+62 812 3456 7890',
   picEmail: 'budi.santoso@majubersama.co.id',
+  contractLineCount: 2,
   createdAt: new Date('2026-08-01T00:00:00Z'),
   updatedAt: new Date('2026-08-01T00:00:00Z'),
 };

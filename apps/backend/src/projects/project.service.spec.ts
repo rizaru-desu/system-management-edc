@@ -31,6 +31,7 @@ const project: ProjectRow = {
   projectName: 'EDC Rollout Jabodetabek',
   description: 'Terminal deployment wave for greater Jakarta merchants.',
   status: 'ACTIVE',
+  contractLineCount: 1,
   createdAt: new Date('2026-08-01T00:00:00Z'),
   updatedAt: new Date('2026-08-01T00:00:00Z'),
 };
