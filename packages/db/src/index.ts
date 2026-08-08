@@ -112,6 +112,22 @@ export {
   type UpdateProjectResult,
 } from "./queries/projects.js";
 export {
+  createContractLine,
+  findContractLineById,
+  listContractLines,
+  softDeleteContractLine,
+  updateContractLine,
+  upsertContractLinesByNumber,
+  type ContractLineInput,
+  type ContractLineListPage,
+  type ContractLineRow,
+  type ContractLineSeed,
+  type CreateContractLineResult,
+  type DeleteContractLineResult,
+  type ListContractLinesOptions,
+  type UpdateContractLineResult,
+} from "./queries/contract-lines.js";
+export {
   listUserServicePointAssignments,
   replaceUserServicePointAssignments,
   seedDefaultAssignmentByEmail,

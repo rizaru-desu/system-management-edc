@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -53,8 +54,10 @@ interface ContractLineFormModalProps {
   accountOptions: Array<RelationOption>
   /** Live project choices from the backend catalogue (never hardcoded). */
   projectOptions: Array<RelationOption>
-  /** Line numbers already in the catalogue — a new line may not reuse one. */
-  existingNumbers: Array<string>
+  /** Disables Save while the create/update mutation is in flight. */
+  saving: boolean
+  /** Bumped by the page on every duplicate-number 409 from the backend. */
+  duplicateConflict: number
   onSubmit: (values: ContractLineFormValues) => void
 }
 
@@ -101,7 +104,8 @@ export function ContractLineFormModal({
   contractLine,
   accountOptions,
   projectOptions,
-  existingNumbers,
+  saving,
+  duplicateConflict,
   onSubmit,
 }: ContractLineFormModalProps) {
   const [values, setValues] = useState<ContractLineFormValues>(EMPTY)
@@ -114,7 +118,7 @@ export function ContractLineFormModal({
     if (open) {
       const seeded = contractLine
         ? {
-            lineNumber: contractLine.id,
+            lineNumber: contractLine.lineNumber,
             lineName: contractLine.name,
             status: contractLine.status,
             documentStatus: contractLine.documentStatus,
@@ -139,6 +143,18 @@ export function ContractLineFormModal({
   )
 
   const { guard, dialogProps } = useUnsavedChanges({ when: open && isDirty })
+
+  // A duplicate-number 409 from the backend highlights the line number
+  // field inline while the toast carries the same message — the entered
+  // values survive.
+  useEffect(() => {
+    if (duplicateConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        lineNumber: 'Line number is already in use.',
+      }))
+    }
+  }, [duplicateConflict])
 
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
@@ -190,16 +206,12 @@ export function ContractLineFormModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
 
     const nextErrors: FormErrors = {}
     const trimmedNumber = values.lineNumber.trim()
     if (!trimmedNumber) {
       nextErrors.lineNumber = 'Line number is required.'
-    } else if (
-      trimmedNumber !== contractLine?.id &&
-      existingNumbers.includes(trimmedNumber)
-    ) {
-      nextErrors.lineNumber = 'Line number is already in use.'
     }
     if (!values.lineName.trim()) {
       nextErrors.lineName = 'Line name is required.'
@@ -251,6 +263,7 @@ export function ContractLineFormModal({
         onOpenChange={handleOpenChange}
         size="lg"
         disableOutsideClose
+        loading={saving}
         title={contractLine ? 'Edit contract line' : 'Add contract line'}
         description={
           contractLine
@@ -266,7 +279,10 @@ export function ContractLineFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" form="contract-line-form">
+            <Button type="submit" form="contract-line-form" disabled={saving}>
+              {saving && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {contractLine ? 'Save changes' : 'Create contract line'}
             </Button>
           </>

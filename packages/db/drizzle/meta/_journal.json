@@ -99,6 +99,13 @@
       "when": 1786216532217,
       "tag": "0013_add_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786218589129,
+      "tag": "0014_add_contract_lines",
+      "breakpoints": true
     }
   ]
 }
