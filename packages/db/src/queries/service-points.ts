@@ -357,6 +357,15 @@ export interface ServicePointSeed {
   parentCode: string | null;
   region: string | null;
   status: ServicePointStatus;
+  /** Latitude of the service point location; null = not set. */
+  latitude?: number | null;
+  /** Longitude of the service point location; null = not set. */
+  longitude?: number | null;
+  /**
+   * Service area radius (km) for automatic merchant assignment;
+   * null = unlimited (nearest candidate always wins).
+   */
+  coverageRadiusKm?: number | null;
 }
 
 /**
@@ -401,6 +410,9 @@ export async function upsertServicePointsByCode(
             parentId,
             region: seed.region,
             status: seed.status,
+            latitude: seed.latitude ?? null,
+            longitude: seed.longitude ?? null,
+            coverageRadiusKm: seed.coverageRadiusKm ?? null,
           })
           .where(eq(servicePoints.id, existing.id));
         updated.push(seed.code);
@@ -413,8 +425,9 @@ export async function upsertServicePointsByCode(
           address: null,
           phone: null,
           email: null,
-          latitude: null,
-          longitude: null,
+          latitude: seed.latitude ?? null,
+          longitude: seed.longitude ?? null,
+          coverageRadiusKm: seed.coverageRadiusKm ?? null,
           notes: null,
           status: seed.status,
         });
