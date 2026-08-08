@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../client.js";
 import { accounts } from "../schema/account.js";
+import { contractLines } from "../schema/contract-line.js";
 import type {
   AccountSortField,
   AccountStatus,
@@ -23,6 +24,8 @@ export interface AccountRow {
   picName: string | null;
   picPhone: string | null;
   picEmail: string | null;
+  /** Live contract lines referencing this account (aggregated count). */
+  contractLineCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +73,13 @@ const rowColumns = {
   picName: accounts.picName,
   picPhone: accounts.picPhone,
   picEmail: accounts.picEmail,
+  // Correlated count instead of a join, so the payload stays one row per
+  // account no matter how many lines reference it.
+  contractLineCount: sql<number>`(
+    select count(*) from ${contractLines}
+    where ${contractLines.accountId} = ${accounts.id}
+      and ${contractLines.deletedAt} is null
+  )`.mapWith(Number),
   createdAt: accounts.createdAt,
   updatedAt: accounts.updatedAt,
 } as const;
@@ -193,6 +203,18 @@ type DbExecutor =
   | typeof db
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** Re-selects one row through the shared select (inside `executor`). */
+async function readRow(
+  executor: DbExecutor,
+  id: string,
+): Promise<AccountRow | undefined> {
+  const [row] = await executor
+    .select(rowColumns)
+    .from(accounts)
+    .where(eq(accounts.id, id));
+  return row;
+}
+
 /** True when another live row already uses `accountId`. */
 async function accountIdTaken(
   executor: DbExecutor,
@@ -224,9 +246,14 @@ export async function createAccount(
     const [inserted] = await tx
       .insert(accounts)
       .values(input)
-      .returning(rowColumns);
+      .returning({ id: accounts.id });
     if (!inserted) throw new Error("Insert returned no row.");
-    return { ok: true as const, account: inserted };
+
+    // Re-select through the shared select — RETURNING cannot evaluate the
+    // correlated contract-line count.
+    const row = await readRow(tx, inserted.id);
+    if (!row) throw new Error("Insert row vanished mid-transaction.");
+    return { ok: true as const, account: row };
   });
 }
 
@@ -252,14 +279,12 @@ export async function updateAccount(
       return { ok: false as const, error: "account-id-taken" as const };
     }
 
-    const [updated] = await tx
-      .update(accounts)
-      .set(input)
-      .where(eq(accounts.id, id))
-      .returning(rowColumns);
+    await tx.update(accounts).set(input).where(eq(accounts.id, id));
+
+    const row = await readRow(tx, id);
     // Only reachable if the row vanished mid-transaction.
-    if (!updated) return { ok: false as const, error: "not-found" as const };
-    return { ok: true as const, account: updated };
+    if (!row) return { ok: false as const, error: "not-found" as const };
+    return { ok: true as const, account: row };
   });
 }
 

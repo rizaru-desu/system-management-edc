@@ -39,6 +39,8 @@ export interface AccountRecord {
   picName: string | null
   picPhone: string | null
   picEmail: string | null
+  /** Live contract lines referencing this account (aggregated count). */
+  contractLineCount: number
   /** ISO timestamps — strings so SSR and client render identically. */
   createdAt: string
   updatedAt: string

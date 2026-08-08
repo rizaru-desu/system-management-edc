@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "../client.js";
+import { contractLines } from "../schema/contract-line.js";
 import { projects } from "../schema/project.js";
 import type { ProjectSortField, ProjectStatus } from "../schema/project.js";
 import type { SortOrder } from "../schema/merchant.js";
@@ -11,6 +12,8 @@ export interface ProjectRow {
   projectName: string;
   description: string | null;
   status: ProjectStatus;
+  /** Live contract lines referencing this project (aggregated count). */
+  contractLineCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +52,13 @@ const rowColumns = {
   projectName: projects.projectName,
   description: projects.description,
   status: projects.status,
+  // Correlated count instead of a join, so the payload stays one row per
+  // project no matter how many lines reference it.
+  contractLineCount: sql<number>`(
+    select count(*) from ${contractLines}
+    where ${contractLines.projectId} = ${projects.id}
+      and ${contractLines.deletedAt} is null
+  )`.mapWith(Number),
   createdAt: projects.createdAt,
   updatedAt: projects.updatedAt,
 } as const;
@@ -157,6 +167,18 @@ type DbExecutor =
   | typeof db
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+/** Re-selects one row through the shared select (inside `executor`). */
+async function readRow(
+  executor: DbExecutor,
+  id: string,
+): Promise<ProjectRow | undefined> {
+  const [row] = await executor
+    .select(rowColumns)
+    .from(projects)
+    .where(eq(projects.id, id));
+  return row;
+}
+
 /** True when another live row already uses `projectCode`. */
 async function codeTaken(
   executor: DbExecutor,
@@ -188,9 +210,14 @@ export async function createProject(
     const [inserted] = await tx
       .insert(projects)
       .values(input)
-      .returning(rowColumns);
+      .returning({ id: projects.id });
     if (!inserted) throw new Error("Insert returned no row.");
-    return { ok: true as const, project: inserted };
+
+    // Re-select through the shared select — RETURNING cannot evaluate the
+    // correlated contract-line count.
+    const row = await readRow(tx, inserted.id);
+    if (!row) throw new Error("Insert row vanished mid-transaction.");
+    return { ok: true as const, project: row };
   });
 }
 
@@ -216,14 +243,12 @@ export async function updateProject(
       return { ok: false as const, error: "code-taken" as const };
     }
 
-    const [updated] = await tx
-      .update(projects)
-      .set(input)
-      .where(eq(projects.id, id))
-      .returning(rowColumns);
+    await tx.update(projects).set(input).where(eq(projects.id, id));
+
+    const row = await readRow(tx, id);
     // Only reachable if the row vanished mid-transaction.
-    if (!updated) return { ok: false as const, error: "not-found" as const };
-    return { ok: true as const, project: updated };
+    if (!row) return { ok: false as const, error: "not-found" as const };
+    return { ok: true as const, project: row };
   });
 }
 

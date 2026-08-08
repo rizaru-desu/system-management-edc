@@ -21,6 +21,8 @@ export interface ProjectRecord {
   name: string
   description: string | null
   status: ProjectStatus
+  /** Live contract lines referencing this project (aggregated count). */
+  contractLineCount: number
   /** ISO timestamps — strings so SSR and client render identically. */
   createdAt: string
   updatedAt: string

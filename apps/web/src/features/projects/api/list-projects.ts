@@ -12,6 +12,8 @@ export interface BackendProject {
   projectName: string
   description: string | null
   status: 'ACTIVE' | 'INACTIVE'
+  /** Live contract lines referencing this project (aggregated count). */
+  contractLineCount: number
   createdAt: string
   updatedAt: string
 }
@@ -24,6 +26,7 @@ export function toProjectRecord(row: BackendProject): ProjectRecord {
     name: row.projectName,
     description: row.description,
     status: row.status === 'ACTIVE' ? 'active' : 'inactive',
+    contractLineCount: row.contractLineCount,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }

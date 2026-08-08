@@ -156,6 +156,22 @@ export function AccountsTable({
           ),
       },
       {
+        id: 'contractLineCount',
+        header: 'Total Contracts',
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              'tabular-nums',
+              row.original.contractLineCount > 0
+                ? 'text-brand-900/70'
+                : 'text-brand-900/40',
+            )}
+          >
+            {row.original.contractLineCount}
+          </span>
+        ),
+      },
+      {
         id: 'actions',
         header: 'Actions',
         cell: ({ row }) => {

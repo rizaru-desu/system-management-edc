@@ -4,6 +4,8 @@ import { getRequestHeader } from '@tanstack/react-start/server'
 import { toast } from 'sonner'
 
 import { apiClient } from '#/lib/api-client.ts'
+import { accountsQueryKey } from '#/features/accounts/index.ts'
+import { projectsQueryKey } from '#/features/projects/index.ts'
 import {
   contractLineError,
   contractLinesQueryKey,
@@ -100,7 +102,12 @@ export function useCreateContractLine() {
           : 'Failed to create the contract line.',
       )
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: contractLinesQueryKey }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: contractLinesQueryKey })
+      // Contract line writes change the aggregated counts shown on the
+      // accounts and projects lists — refresh them too.
+      void queryClient.invalidateQueries({ queryKey: accountsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: projectsQueryKey })
+    },
   })
 }
