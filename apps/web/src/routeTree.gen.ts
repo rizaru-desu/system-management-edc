@@ -18,6 +18,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedSplatRouteImport } from './routes/_authed/$'
 import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
+import { Route as AuthedContractLinesRouteImport } from './routes/_authed/contract-lines'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
@@ -68,6 +69,11 @@ const AuthedAppReleasesRoute = AuthedAppReleasesRouteImport.update({
   path: '/app-releases',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedContractLinesRoute = AuthedContractLinesRouteImport.update({
+  id: '/contract-lines',
+  path: '/contract-lines',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof AuthedSplatRoute
   '/accounts': typeof AuthedAccountsRoute
   '/app-releases': typeof AuthedAppReleasesRoute
+  '/contract-lines': typeof AuthedContractLinesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
   '/projects': typeof AuthedProjectsRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/$': typeof AuthedSplatRoute
   '/accounts': typeof AuthedAccountsRoute
   '/app-releases': typeof AuthedAppReleasesRoute
+  '/contract-lines': typeof AuthedContractLinesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
   '/projects': typeof AuthedProjectsRoute
@@ -135,6 +143,7 @@ export interface FileRoutesById {
   '/_authed/$': typeof AuthedSplatRoute
   '/_authed/accounts': typeof AuthedAccountsRoute
   '/_authed/app-releases': typeof AuthedAppReleasesRoute
+  '/_authed/contract-lines': typeof AuthedContractLinesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/merchants': typeof AuthedMerchantsRoute
   '/_authed/projects': typeof AuthedProjectsRoute
@@ -152,6 +161,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/accounts'
     | '/app-releases'
+    | '/contract-lines'
     | '/dashboard'
     | '/merchants'
     | '/projects'
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/accounts'
     | '/app-releases'
+    | '/contract-lines'
     | '/dashboard'
     | '/merchants'
     | '/projects'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/_authed/$'
     | '/_authed/accounts'
     | '/_authed/app-releases'
+    | '/_authed/contract-lines'
     | '/_authed/dashboard'
     | '/_authed/merchants'
     | '/_authed/projects'
@@ -264,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedAppReleasesRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/contract-lines': {
+      id: '/_authed/contract-lines'
+      path: '/contract-lines'
+      fullPath: '/contract-lines'
+      preLoaderRoute: typeof AuthedContractLinesRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/dashboard': {
       id: '/_authed/dashboard'
       path: '/dashboard'
@@ -306,6 +325,7 @@ interface AuthedRouteChildren {
   AuthedSplatRoute: typeof AuthedSplatRoute
   AuthedAccountsRoute: typeof AuthedAccountsRoute
   AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
+  AuthedContractLinesRoute: typeof AuthedContractLinesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedMerchantsRoute: typeof AuthedMerchantsRoute
   AuthedProjectsRoute: typeof AuthedProjectsRoute
@@ -317,6 +337,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSplatRoute: AuthedSplatRoute,
   AuthedAccountsRoute: AuthedAccountsRoute,
   AuthedAppReleasesRoute: AuthedAppReleasesRoute,
+  AuthedContractLinesRoute: AuthedContractLinesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedMerchantsRoute: AuthedMerchantsRoute,
   AuthedProjectsRoute: AuthedProjectsRoute,

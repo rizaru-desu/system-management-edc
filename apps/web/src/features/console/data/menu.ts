@@ -146,6 +146,16 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         ],
         directRoute: '/projects',
       },
+      {
+        title: 'Contract Lines',
+        path: 'contract-lines',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Contract_Manager',
+        ],
+        directRoute: '/contract-lines',
+      },
     ],
   },
   {
