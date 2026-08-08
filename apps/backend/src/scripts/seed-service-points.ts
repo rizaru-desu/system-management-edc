@@ -130,7 +130,6 @@ const SERVICE_POINT_SEEDS: ServicePointSeed[] = [
   },
 ];
 
-
 const ASSIGNMENT_SEEDS: DefaultAssignmentSeed[] = [
   {
     email: 'admin@example.com',
