@@ -2,7 +2,6 @@ import {
   Boxes,
   Building2,
   CreditCard,
-  Database,
   FileSignature,
   Settings,
   Wrench,
@@ -96,18 +95,6 @@ const ALL: Array<RoleKey> = [
 ]
 
 export const SIDEBAR_MENU: Array<MenuGroup> = [
-  {
-    parent: 'Master Data',
-    icon: Database,
-    submenus: [
-      {
-        title: 'Add Account',
-        path: 'add-account',
-        allowedRoles: ['System_Administrator', 'Operations_Specialist'],
-        directRoute: '/add-account',
-      },
-    ],
-  },
   {
     parent: 'Merchant Management',
     icon: Building2,
