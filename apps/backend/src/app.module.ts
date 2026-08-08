@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from '@repo/auth';
+import { AccountModule } from './accounts/account.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppReleaseModule } from './app-releases/app-release.module';
@@ -15,6 +16,7 @@ import { UsersModule } from './users/users.module';
 @Module({
   imports: [
     AuthModule.forRoot({ auth }),
+    AccountModule,
     AppReleaseModule,
     UsersModule,
     PermissionsModule,

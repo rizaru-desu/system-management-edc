@@ -4,4 +4,5 @@ export * from "./mobile-version.js";
 export * from "./mobile-device.js";
 export * from "./service-point.js";
 export * from "./merchant.js";
+export * from "./account.js";
 

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { UserRoundPlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -11,8 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { useCreateAccount } from '../api/create-account.ts'
+import type { AccountPayload } from '../api/create-account.ts'
+import { useDeleteAccount } from '../api/delete-account.ts'
 import {
-  ACCOUNTS,
+  accountsListQueryOptions,
+  isDuplicateAccountIdError,
+} from '../api/list-accounts.ts'
+import { useSetAccountStatus, useUpdateAccount } from '../api/update-account.ts'
+import {
   ACCOUNT_STATUS_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
 } from '../data/accounts.ts'
@@ -29,10 +37,10 @@ import { ToggleAccountStatusDialog } from './toggle-account-status-dialog.tsx'
 
 const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
 
-/** Maps the dialog's string fields onto the account record shape. */
-function recordFromForm(values: AccountFormValues): AccountRecord {
+/** Maps the dialog's string fields onto the API payload shape. */
+function payloadFromForm(values: AccountFormValues): AccountPayload {
   return {
-    id: values.accountId,
+    accountId: values.accountId,
     name: values.accountName,
     // The form validates the type against the catalogue before submitting.
     type: values.accountType as AccountType,
@@ -49,32 +57,37 @@ function recordFromForm(values: AccountFormValues): AccountRecord {
 }
 
 /**
- * Contract Management → Account. The index/list view over the account
- * catalogue: search, type/status filters and pagination run client-side, and
- * add/edit/delete/status changes go through the same modal + confirmation
- * dialogs as the other modules — all against the local placeholder list
- * until the backend endpoint lands.
+ * Contract Management → Account. Search, type/status filters and pagination
+ * all run server-side (GET /accounts), and every CRUD action goes through
+ * the backend API; the mutation hooks own toasts and cache invalidation, so
+ * the table refreshes after every write.
  */
 export function AccountsPage() {
-  // The catalogue lives in state so the form modal and the confirmation
-  // dialogs mutate it in place (in memory only, until the API exists).
-  const [accounts, setAccounts] = useState<Array<AccountRecord>>(ACCOUNTS)
-
-  // ── Search & filters (client-side over the local list) ─────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | AccountType>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | AccountStatus>('all')
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const isFiltering =
-    search.trim() !== '' || typeFilter !== 'all' || statusFilter !== 'all'
+    debouncedSearch.trim() !== '' ||
+    typeFilter !== 'all' ||
+    statusFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setTypeFilter('all')
     setStatusFilter('all')
   }
 
-  // ── Pagination (client-side) ───────────────────────────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -86,32 +99,26 @@ export function AccountsPage() {
     setPagination((previous) =>
       previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
     )
-  }, [search, typeFilter, statusFilter])
+  }, [debouncedSearch, typeFilter, statusFilter])
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return accounts.filter((account) => {
-      if (typeFilter !== 'all' && account.type !== typeFilter) return false
-      if (statusFilter !== 'all' && account.status !== statusFilter) {
-        return false
-      }
-      if (!term) return true
-      return (
-        account.id.toLowerCase().includes(term) ||
-        account.name.toLowerCase().includes(term) ||
-        (account.picName?.toLowerCase().includes(term) ?? false)
-      )
-    })
-  }, [accounts, search, typeFilter, statusFilter])
-
-  const pageRows = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize
-    return filtered.slice(start, start + pagination.pageSize)
-  }, [filtered, pagination])
+  const listQuery = useQuery(
+    accountsListQueryOptions({
+      search: debouncedSearch,
+      type: typeFilter,
+      status: statusFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const accounts = listQuery.data?.accounts ?? []
+  const total = listQuery.data?.total ?? 0
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<AccountRecord | null>(null)
+  // Bumped on every duplicate-id 409 so the form modal highlights the
+  // Account ID field without losing the entered values.
+  const [duplicateConflict, setDuplicateConflict] = useState(0)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState<AccountRecord | null>(null)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -119,11 +126,13 @@ export function AccountsPage() {
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: AccountRecord) => {
     setEditing(record)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
@@ -137,39 +146,46 @@ export function AccountsPage() {
     setStatusOpen(true)
   }
 
-  // ── CRUD (in-memory list updates) ──────────────────────────────────────
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createAccount = useCreateAccount()
+  const updateAccount = useUpdateAccount()
+  const deleteAccount = useDeleteAccount()
+  const setAccountStatus = useSetAccountStatus()
+
+  const saving = createAccount.isPending || updateAccount.isPending
+
+  // The form stays open (with its submit disabled) until the save lands, so
+  // a rejected payload keeps the user's input intact. A duplicate-id 409
+  // additionally highlights the Account ID field inline.
   const handleSubmit = (values: AccountFormValues) => {
-    const record = recordFromForm(values)
-    setAccounts((previous) =>
-      editing
-        ? previous.map((account) =>
-            account.id === editing.id ? record : account,
-          )
-        : [...previous, record],
-    )
-    setFormOpen(false)
+    const payload = payloadFromForm(values)
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateAccountIdError(error)) {
+          setDuplicateConflict((previous) => previous + 1)
+        }
+      },
+    }
+    if (editing) {
+      updateAccount.mutate({ id: editing.id, ...payload }, callbacks)
+      return
+    }
+    createAccount.mutate(payload, callbacks)
   }
 
   const handleDelete = () => {
     if (!deleting) return
-    setAccounts((previous) =>
-      previous.filter((account) => account.id !== deleting.id),
-    )
+    deleteAccount.mutate({ id: deleting.id, name: deleting.name })
     setDeleting(null)
   }
 
   const handleStatusToggle = () => {
     if (!toggling) return
-    setAccounts((previous) =>
-      previous.map((account) =>
-        account.id === toggling.id
-          ? {
-              ...account,
-              status: account.status === 'active' ? 'inactive' : 'active',
-            }
-          : account,
-      ),
-    )
+    setAccountStatus.mutate({
+      id: toggling.id,
+      status: toggling.status === 'active' ? 'inactive' : 'active',
+    })
     setToggling(null)
   }
 
@@ -204,8 +220,12 @@ export function AccountsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search ID, name or PIC…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select
+          value={typeFilter}
+          onValueChange={(value) => setTypeFilter(value as 'all' | AccountType)}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Filter by type" />
           </SelectTrigger>
@@ -240,10 +260,18 @@ export function AccountsPage() {
 
       {/* Account table */}
       <AccountsTable
-        rows={pageRows}
-        total={filtered.length}
+        rows={accounts}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load accounts.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEdit={openEdit}
@@ -255,7 +283,8 @@ export function AccountsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         account={editing}
-        existingIds={accounts.map((account) => account.id)}
+        saving={saving}
+        duplicateConflict={duplicateConflict}
         onSubmit={handleSubmit}
       />
       <DeleteAccountDialog

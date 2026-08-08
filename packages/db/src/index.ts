@@ -80,6 +80,20 @@ export {
   type UpdateMerchantResult,
 } from "./queries/merchants.js";
 export {
+  createAccount,
+  findAccountById,
+  listAccounts,
+  softDeleteAccount,
+  updateAccount,
+  type AccountInput,
+  type AccountListPage,
+  type AccountRow,
+  type CreateAccountResult,
+  type DeleteAccountResult,
+  type ListAccountsOptions,
+  type UpdateAccountResult,
+} from "./queries/accounts.js";
+export {
   listUserServicePointAssignments,
   replaceUserServicePointAssignments,
   seedDefaultAssignmentByEmail,

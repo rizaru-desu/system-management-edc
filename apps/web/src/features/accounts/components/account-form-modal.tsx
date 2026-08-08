@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -41,8 +42,10 @@ interface AccountFormModalProps {
   onOpenChange: (open: boolean) => void
   /** When set the modal edits this record; otherwise it creates a new one. */
   account: AccountRecord | null
-  /** IDs already in the catalogue — a new account may not reuse one. */
-  existingIds: Array<string>
+  /** Disables Save while the create/update mutation is in flight. */
+  saving: boolean
+  /** Bumped by the page on every duplicate-id 409 from the backend. */
+  duplicateConflict: number
   onSubmit: (values: AccountFormValues) => void
 }
 
@@ -100,7 +103,8 @@ export function AccountFormModal({
   open,
   onOpenChange,
   account,
-  existingIds,
+  saving,
+  duplicateConflict,
   onSubmit,
 }: AccountFormModalProps) {
   const [values, setValues] = useState<AccountFormValues>(EMPTY)
@@ -112,7 +116,7 @@ export function AccountFormModal({
     if (open) {
       const seeded = account
         ? {
-            accountId: account.id,
+            accountId: account.accountId,
             accountName: account.name,
             accountType: account.type,
             status: account.status,
@@ -139,6 +143,18 @@ export function AccountFormModal({
 
   const { guard, dialogProps } = useUnsavedChanges({ when: open && isDirty })
 
+  // A duplicate-id 409 from the backend highlights the Account ID field
+  // inline while the toast carries the same message — the entered values
+  // survive.
+  useEffect(() => {
+    if (duplicateConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        accountId: 'Account ID is already in use.',
+      }))
+    }
+  }, [duplicateConflict])
+
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -160,13 +176,12 @@ export function AccountFormModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
 
     const nextErrors: FormErrors = {}
     const trimmedId = values.accountId.trim()
     if (!trimmedId) {
       nextErrors.accountId = 'Account ID is required.'
-    } else if (trimmedId !== account?.id && existingIds.includes(trimmedId)) {
-      nextErrors.accountId = 'Account ID is already in use.'
     }
     if (!values.accountName.trim()) {
       nextErrors.accountName = 'Account name is required.'
@@ -221,6 +236,7 @@ export function AccountFormModal({
         onOpenChange={handleOpenChange}
         size="lg"
         disableOutsideClose
+        loading={saving}
         title={account ? 'Edit account' : 'Add account'}
         description={
           account
@@ -236,7 +252,10 @@ export function AccountFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" form="account-form">
+            <Button type="submit" form="account-form" disabled={saving}>
+              {saving && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {account ? 'Save changes' : 'Create account'}
             </Button>
           </>
