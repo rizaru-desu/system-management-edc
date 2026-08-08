@@ -3,6 +3,7 @@ import {
   Building2,
   CreditCard,
   Database,
+  FileSignature,
   Settings,
   Wrench,
 } from 'lucide-react'
@@ -131,6 +132,22 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         path: 'contracts',
         allowedRoles: ['System_Administrator', 'Contract_Manager'],
         masked: true,
+      },
+    ],
+  },
+  {
+    parent: 'Contract Management',
+    icon: FileSignature,
+    submenus: [
+      {
+        title: 'Account',
+        path: 'accounts',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Contract_Manager',
+        ],
+        directRoute: '/accounts',
       },
     ],
   },
