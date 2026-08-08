@@ -16,6 +16,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedSplatRouteImport } from './routes/_authed/$'
+import { Route as AuthedAddAccountRouteImport } from './routes/_authed/add-account'
 import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
@@ -56,6 +57,11 @@ const AuthedSplatRoute = AuthedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAddAccountRoute = AuthedAddAccountRouteImport.update({
+  id: '/add-account',
+  path: '/add-account',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAppReleasesRoute = AuthedAppReleasesRouteImport.update({
   id: '/app-releases',
   path: '/app-releases',
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/add-account': typeof AuthedAddAccountRoute
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
@@ -102,6 +109,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/add-account': typeof AuthedAddAccountRoute
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
@@ -117,6 +125,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authed/$': typeof AuthedSplatRoute
+  '/_authed/add-account': typeof AuthedAddAccountRoute
   '/_authed/app-releases': typeof AuthedAppReleasesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/merchants': typeof AuthedMerchantsRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/add-account'
     | '/app-releases'
     | '/dashboard'
     | '/merchants'
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/add-account'
     | '/app-releases'
     | '/dashboard'
     | '/merchants'
@@ -159,6 +170,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/_authed/$'
+    | '/_authed/add-account'
     | '/_authed/app-releases'
     | '/_authed/dashboard'
     | '/_authed/merchants'
@@ -226,6 +238,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSplatRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/add-account': {
+      id: '/_authed/add-account'
+      path: '/add-account'
+      fullPath: '/add-account'
+      preLoaderRoute: typeof AuthedAddAccountRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/app-releases': {
       id: '/_authed/app-releases'
       path: '/app-releases'
@@ -266,6 +285,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedSplatRoute: typeof AuthedSplatRoute
+  AuthedAddAccountRoute: typeof AuthedAddAccountRoute
   AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedMerchantsRoute: typeof AuthedMerchantsRoute
@@ -275,6 +295,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSplatRoute: AuthedSplatRoute,
+  AuthedAddAccountRoute: AuthedAddAccountRoute,
   AuthedAppReleasesRoute: AuthedAppReleasesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedMerchantsRoute: AuthedMerchantsRoute,
@@ -296,12 +317,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
