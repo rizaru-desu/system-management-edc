@@ -30,7 +30,7 @@ export function DeleteAccountDialog({
         <>
           You are about to delete{' '}
           <span className="font-semibold text-brand-900">{account.name}</span> (
-          {account.id}). This action cannot be undone.
+          {account.accountId}). This action cannot be undone.
         </>
       }
       confirmLabel="Delete"

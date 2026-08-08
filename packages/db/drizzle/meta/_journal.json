@@ -85,6 +85,13 @@
       "when": 1786037242355,
       "tag": "0011_add_coverage_radius_and_import_distance",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786210440235,
+      "tag": "0012_add_accounts",
+      "breakpoints": true
     }
   ]
 }
