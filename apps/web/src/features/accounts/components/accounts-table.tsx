@@ -3,13 +3,29 @@ import { flexRender } from '@tanstack/react-table'
 import type { OnChangeFn, PaginationState } from '@tanstack/react-table'
 import { getCoreRowModel, useLegacyTable } from '@tanstack/react-table/legacy'
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy'
-import { ChevronLeft, ChevronRight, IdCard, SearchX } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleArrowDown,
+  CircleArrowUp,
+  EllipsisVertical,
+  IdCard,
+  Pencil,
+  SearchX,
+  Trash2,
+} from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx'
 import {
   Select,
   SelectContent,
@@ -59,6 +75,9 @@ interface AccountsTableProps {
   /** True while a search/type/status filter is active. */
   isFiltering: boolean
   onClearFilters: () => void
+  onEdit: (record: AccountRecord) => void
+  onStatusToggle: (record: AccountRecord) => void
+  onDelete: (record: AccountRecord) => void
 }
 
 export function AccountsTable({
@@ -68,6 +87,9 @@ export function AccountsTable({
   onPaginationChange,
   isFiltering,
   onClearFilters,
+  onEdit,
+  onStatusToggle,
+  onDelete,
 }: AccountsTableProps) {
   const columns = useMemo<Array<LegacyColumnDef<AccountRecord>>>(
     () => [
@@ -120,8 +142,71 @@ export function AccountsTable({
             <span className="text-brand-900/40">—</span>
           ),
       },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+          const record = row.original
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Actions"
+                    className="text-primary hover:text-foreground"
+                    // Keep the trigger click from reaching the row.
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <EllipsisVertical className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DropdownMenuItem onSelect={() => onEdit(record)}>
+                    <Pencil
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    Edit account
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onStatusToggle(record)}>
+                    {record.status === 'active' ? (
+                      <>
+                        <CircleArrowDown
+                          className="h-4 w-4 text-primary"
+                          strokeWidth={1.75}
+                        />
+                        Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <CircleArrowUp
+                          className="h-4 w-4 text-primary"
+                          strokeWidth={1.75}
+                        />
+                        Activate
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => onDelete(record)}
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
+      },
     ],
-    [],
+    [onEdit, onStatusToggle, onDelete],
   )
 
   const table = useLegacyTable({
@@ -153,7 +238,10 @@ export function AccountsTable({
               {headerGroup.headers.map((header) => (
                 <th
                   key={header.id}
-                  className="px-5 py-3 font-semibold whitespace-nowrap"
+                  className={cn(
+                    'px-5 py-3 font-semibold whitespace-nowrap',
+                    header.column.id === 'actions' && 'text-right',
+                  )}
                 >
                   {flexRender(
                     header.column.columnDef.header,

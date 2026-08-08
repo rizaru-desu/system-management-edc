@@ -17,22 +17,7 @@ import {
   ACCOUNT_TYPE_OPTIONS,
 } from '../data/accounts.ts'
 import type { AccountStatus } from '../data/accounts.ts'
-
-export interface AccountFormValues {
-  accountId: string
-  accountName: string
-  /** Account type label; '' = not chosen yet. */
-  accountType: string
-  status: AccountStatus
-  billingName: string
-  taxId: string
-  billingAddress: string
-  city: string
-  region: string
-  picName: string
-  picPhone: string
-  picEmail: string
-}
+import type { AccountFormValues } from './account-form-modal.tsx'
 
 const EMPTY: AccountFormValues = {
   accountId: '',

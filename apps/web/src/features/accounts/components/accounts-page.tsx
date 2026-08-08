@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { UserRoundPlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -17,17 +16,49 @@ import {
   ACCOUNT_STATUS_OPTIONS,
   ACCOUNT_TYPE_OPTIONS,
 } from '../data/accounts.ts'
-import type { AccountStatus } from '../data/accounts.ts'
+import type {
+  AccountRecord,
+  AccountStatus,
+  AccountType,
+} from '../data/accounts.ts'
+import { AccountFormModal } from './account-form-modal.tsx'
+import type { AccountFormValues } from './account-form-modal.tsx'
 import { AccountsTable } from './accounts-table.tsx'
+import { DeleteAccountDialog } from './delete-account-dialog.tsx'
+import { ToggleAccountStatusDialog } from './toggle-account-status-dialog.tsx'
+
+const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
+
+/** Maps the dialog's string fields onto the account record shape. */
+function recordFromForm(values: AccountFormValues): AccountRecord {
+  return {
+    id: values.accountId,
+    name: values.accountName,
+    // The form validates the type against the catalogue before submitting.
+    type: values.accountType as AccountType,
+    status: values.status,
+    billingName: blankOrNull(values.billingName),
+    taxId: blankOrNull(values.taxId),
+    billingAddress: blankOrNull(values.billingAddress),
+    city: blankOrNull(values.city),
+    region: blankOrNull(values.region),
+    picName: blankOrNull(values.picName),
+    picPhone: blankOrNull(values.picPhone),
+    picEmail: blankOrNull(values.picEmail),
+  }
+}
 
 /**
  * Contract Management → Account. The index/list view over the account
- * catalogue: search, type/status filters and pagination all run client-side
- * over the local placeholder list until the backend endpoint lands; the
- * "Add Account" action routes to the existing Master Data form.
+ * catalogue: search, type/status filters and pagination run client-side, and
+ * add/edit/delete/status changes go through the same modal + confirmation
+ * dialogs as the other modules — all against the local placeholder list
+ * until the backend endpoint lands.
  */
 export function AccountsPage() {
-  const navigate = useNavigate()
+  // The catalogue lives in state so the form modal and the confirmation
+  // dialogs mutate it in place (in memory only, until the API exists).
+  const [accounts, setAccounts] = useState<Array<AccountRecord>>(ACCOUNTS)
 
   // ── Search & filters (client-side over the local list) ─────────────────
   const [search, setSearch] = useState('')
@@ -59,7 +90,7 @@ export function AccountsPage() {
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return ACCOUNTS.filter((account) => {
+    return accounts.filter((account) => {
       if (typeFilter !== 'all' && account.type !== typeFilter) return false
       if (statusFilter !== 'all' && account.status !== statusFilter) {
         return false
@@ -71,12 +102,76 @@ export function AccountsPage() {
         (account.picName?.toLowerCase().includes(term) ?? false)
       )
     })
-  }, [search, typeFilter, statusFilter])
+  }, [accounts, search, typeFilter, statusFilter])
 
   const pageRows = useMemo(() => {
     const start = pagination.pageIndex * pagination.pageSize
     return filtered.slice(start, start + pagination.pageSize)
   }, [filtered, pagination])
+
+  // ── Modals ─────────────────────────────────────────────────────────────
+  const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState<AccountRecord | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState<AccountRecord | null>(null)
+  const [statusOpen, setStatusOpen] = useState(false)
+  const [toggling, setToggling] = useState<AccountRecord | null>(null)
+
+  const openCreate = () => {
+    setEditing(null)
+    setFormOpen(true)
+  }
+
+  const openEdit = (record: AccountRecord) => {
+    setEditing(record)
+    setFormOpen(true)
+  }
+
+  const openDelete = (record: AccountRecord) => {
+    setDeleting(record)
+    setDeleteOpen(true)
+  }
+
+  const openStatusToggle = (record: AccountRecord) => {
+    setToggling(record)
+    setStatusOpen(true)
+  }
+
+  // ── CRUD (in-memory list updates) ──────────────────────────────────────
+  const handleSubmit = (values: AccountFormValues) => {
+    const record = recordFromForm(values)
+    setAccounts((previous) =>
+      editing
+        ? previous.map((account) =>
+            account.id === editing.id ? record : account,
+          )
+        : [...previous, record],
+    )
+    setFormOpen(false)
+  }
+
+  const handleDelete = () => {
+    if (!deleting) return
+    setAccounts((previous) =>
+      previous.filter((account) => account.id !== deleting.id),
+    )
+    setDeleting(null)
+  }
+
+  const handleStatusToggle = () => {
+    if (!toggling) return
+    setAccounts((previous) =>
+      previous.map((account) =>
+        account.id === toggling.id
+          ? {
+              ...account,
+              status: account.status === 'active' ? 'inactive' : 'active',
+            }
+          : account,
+      ),
+    )
+    setToggling(null)
+  }
 
   return (
     <div className="animate-fade-up">
@@ -95,7 +190,7 @@ export function AccountsPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={() => navigate({ to: '/add-account' })}>
+          <Button onClick={openCreate}>
             <UserRoundPlus className="h-4 w-4" strokeWidth={1.75} />
             Add Account
           </Button>
@@ -151,6 +246,29 @@ export function AccountsPage() {
         onPaginationChange={setPagination}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
+        onEdit={openEdit}
+        onStatusToggle={openStatusToggle}
+        onDelete={openDelete}
+      />
+
+      <AccountFormModal
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        account={editing}
+        existingIds={accounts.map((account) => account.id)}
+        onSubmit={handleSubmit}
+      />
+      <DeleteAccountDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        account={deleting}
+        onConfirm={handleDelete}
+      />
+      <ToggleAccountStatusDialog
+        open={statusOpen}
+        onOpenChange={setStatusOpen}
+        account={toggling}
+        onConfirm={handleStatusToggle}
       />
     </div>
   )
