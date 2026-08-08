@@ -284,3 +284,40 @@ export async function softDeleteAccount(
     return { ok: true as const };
   });
 }
+
+/** Full account profile of one seed row (same shape as a create). */
+export type AccountSeed = AccountInput;
+
+/**
+ * Idempotent seed upsert keyed by `accountId` (the live-unique business
+ * key): existing rows are updated in place, missing ones inserted, so
+ * re-running the seed never duplicates records.
+ */
+export async function upsertAccountsByAccountId(
+  seeds: AccountSeed[],
+): Promise<{ created: string[]; updated: string[] }> {
+  const created: string[] = [];
+  const updated: string[] = [];
+
+  await db.transaction(async (tx) => {
+    for (const seed of seeds) {
+      const [existing] = await tx
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(and(eq(accounts.accountId, seed.accountId), notDeleted));
+
+      if (existing) {
+        await tx
+          .update(accounts)
+          .set(seed)
+          .where(eq(accounts.id, existing.id));
+        updated.push(seed.accountId);
+      } else {
+        await tx.insert(accounts).values(seed);
+        created.push(seed.accountId);
+      }
+    }
+  });
+
+  return { created, updated };
+}
