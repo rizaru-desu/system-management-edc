@@ -30,7 +30,7 @@ export function DeleteProjectDialog({
         <>
           You are about to delete{' '}
           <span className="font-semibold text-brand-900">{project.name}</span> (
-          {project.id}). This action cannot be undone.
+          {project.code}). This action cannot be undone.
         </>
       }
       confirmLabel="Delete"

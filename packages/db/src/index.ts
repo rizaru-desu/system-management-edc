@@ -96,6 +96,22 @@ export {
   type UpdateAccountResult,
 } from "./queries/accounts.js";
 export {
+  createProject,
+  findProjectById,
+  listProjects,
+  softDeleteProject,
+  updateProject,
+  upsertProjectsByCode,
+  type CreateProjectResult,
+  type DeleteProjectResult,
+  type ListProjectsOptions,
+  type ProjectInput,
+  type ProjectListPage,
+  type ProjectRow,
+  type ProjectSeed,
+  type UpdateProjectResult,
+} from "./queries/projects.js";
+export {
   listUserServicePointAssignments,
   replaceUserServicePointAssignments,
   seedDefaultAssignmentByEmail,

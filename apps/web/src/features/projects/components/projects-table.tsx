@@ -13,11 +13,13 @@ import {
   Pencil,
   SearchX,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
 import {
   DropdownMenu,
@@ -36,6 +38,9 @@ import { cn } from '#/lib/utils.ts'
 import type { ProjectRecord } from '../data/projects.ts'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+/** Column count used by the loading-skeleton rows. */
+const SKELETON_ROWS = 6
 
 /**
  * Numbered pagination items: first/last always visible, a window around the
@@ -71,6 +76,10 @@ interface ProjectsTableProps {
   total: number
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
+  isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while a search/status filter is active. */
   isFiltering: boolean
   onClearFilters: () => void
@@ -84,6 +93,10 @@ export function ProjectsTable({
   total,
   pagination,
   onPaginationChange,
+  isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onClearFilters,
   onEdit,
@@ -97,7 +110,7 @@ export function ProjectsTable({
         header: 'Project Code',
         cell: ({ row }) => (
           <span className="font-medium whitespace-nowrap text-brand-900/80 tabular-nums">
-            {row.original.id}
+            {row.original.code}
           </span>
         ),
       },
@@ -201,8 +214,8 @@ export function ProjectsTable({
     columns,
     state: { pagination },
     onPaginationChange,
-    // The page filters and slices the full local list itself, so the table
-    // only renders the given rows and drives the page controls off the
+    // Search, filter and pagination run server-side, so the table only
+    // renders the given page rows and drives the page controls off the
     // filtered total.
     manualPagination: true,
     rowCount: total,
@@ -240,7 +253,39 @@ export function ProjectsTable({
           ))}
         </thead>
         <tbody>
-          {total === 0 && (
+          {isPending &&
+            Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              <tr key={index} className="border-b border-brand-100">
+                {columns.map((column) => (
+                  <td key={column.id} className="px-5 py-3.5">
+                    <Skeleton
+                      className={cn(
+                        'h-4',
+                        column.id === 'name' ? 'w-32' : 'w-16',
+                        column.id === 'actions' && 'ml-auto w-8',
+                      )}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -270,22 +315,23 @@ export function ProjectsTable({
               </td>
             </tr>
           )}
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.original.id}
-              className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-5 py-3.5">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {!isPending &&
+            table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.id}
+                className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-5 py-3.5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
 
-      {total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} projects
