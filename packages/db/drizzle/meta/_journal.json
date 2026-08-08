@@ -92,6 +92,13 @@
       "when": 1786210440235,
       "tag": "0012_add_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786216532217,
+      "tag": "0013_add_projects",
+      "breakpoints": true
     }
   ]
 }

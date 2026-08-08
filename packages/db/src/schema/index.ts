@@ -5,4 +5,5 @@ export * from "./mobile-device.js";
 export * from "./service-point.js";
 export * from "./merchant.js";
 export * from "./account.js";
+export * from "./project.js";
 

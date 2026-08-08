@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { FolderPlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -11,7 +12,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { PROJECT_STATUS_OPTIONS, PROJECTS } from '../data/projects.ts'
+import { useCreateProject } from '../api/create-project.ts'
+import type { ProjectPayload } from '../api/create-project.ts'
+import { useDeleteProject } from '../api/delete-project.ts'
+import {
+  isDuplicateCodeError,
+  projectsListQueryOptions,
+} from '../api/list-projects.ts'
+import { useSetProjectStatus, useUpdateProject } from '../api/update-project.ts'
+import { PROJECT_STATUS_OPTIONS } from '../data/projects.ts'
 import type { ProjectRecord, ProjectStatus } from '../data/projects.ts'
 import { DeleteProjectDialog } from './delete-project-dialog.tsx'
 import { ProjectFormModal } from './project-form-modal.tsx'
@@ -21,10 +30,10 @@ import { ToggleProjectStatusDialog } from './toggle-project-status-dialog.tsx'
 
 const blankOrNull = (value: string) => (value.trim() ? value.trim() : null)
 
-/** Maps the dialog's string fields onto the project record shape. */
-function recordFromForm(values: ProjectFormValues): ProjectRecord {
+/** Maps the dialog's string fields onto the API payload shape. */
+function payloadFromForm(values: ProjectFormValues): ProjectPayload {
   return {
-    id: values.code,
+    code: values.code,
     name: values.name,
     description: blankOrNull(values.description),
     status: values.status,
@@ -32,29 +41,32 @@ function recordFromForm(values: ProjectFormValues): ProjectRecord {
 }
 
 /**
- * Contract Management → Projects. The index/list view over the project
- * catalogue: search, status filter and pagination run client-side, and
- * add/edit/delete/status changes go through the same modal + confirmation
- * dialogs as the other modules — all against the local placeholder list
- * until the backend endpoint lands.
+ * Contract Management → Projects. Search, status filter and pagination all
+ * run server-side (GET /projects), and every CRUD action goes through the
+ * backend API; the mutation hooks own toasts and cache invalidation, so the
+ * table refreshes after every write.
  */
 export function ProjectsPage() {
-  // The catalogue lives in state so the form modal and the confirmation
-  // dialogs mutate it in place (in memory only, until the API exists).
-  const [projects, setProjects] = useState<Array<ProjectRecord>>(PROJECTS)
-
-  // ── Search & filter (client-side over the local list) ──────────────────
+  // ── Search & filter (server-side) ──────────────────────────────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | ProjectStatus>('all')
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
 
-  const isFiltering = search.trim() !== '' || statusFilter !== 'all'
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const isFiltering = debouncedSearch.trim() !== '' || statusFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setStatusFilter('all')
   }
 
-  // ── Pagination (client-side) ───────────────────────────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -66,30 +78,25 @@ export function ProjectsPage() {
     setPagination((previous) =>
       previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
     )
-  }, [search, statusFilter])
+  }, [debouncedSearch, statusFilter])
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return projects.filter((project) => {
-      if (statusFilter !== 'all' && project.status !== statusFilter) {
-        return false
-      }
-      if (!term) return true
-      return (
-        project.id.toLowerCase().includes(term) ||
-        project.name.toLowerCase().includes(term)
-      )
-    })
-  }, [projects, search, statusFilter])
-
-  const pageRows = useMemo(() => {
-    const start = pagination.pageIndex * pagination.pageSize
-    return filtered.slice(start, start + pagination.pageSize)
-  }, [filtered, pagination])
+  const listQuery = useQuery(
+    projectsListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const projects = listQuery.data?.projects ?? []
+  const total = listQuery.data?.total ?? 0
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ProjectRecord | null>(null)
+  // Bumped on every duplicate-code 409 so the form modal highlights the
+  // code field without losing the entered values.
+  const [duplicateConflict, setDuplicateConflict] = useState(0)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState<ProjectRecord | null>(null)
   const [statusOpen, setStatusOpen] = useState(false)
@@ -97,11 +104,13 @@ export function ProjectsPage() {
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: ProjectRecord) => {
     setEditing(record)
+    setDuplicateConflict(0)
     setFormOpen(true)
   }
 
@@ -115,39 +124,46 @@ export function ProjectsPage() {
     setStatusOpen(true)
   }
 
-  // ── CRUD (in-memory list updates) ──────────────────────────────────────
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createProject = useCreateProject()
+  const updateProject = useUpdateProject()
+  const deleteProject = useDeleteProject()
+  const setProjectStatus = useSetProjectStatus()
+
+  const saving = createProject.isPending || updateProject.isPending
+
+  // The form stays open (with its submit disabled) until the save lands, so
+  // a rejected payload keeps the user's input intact. A duplicate-code 409
+  // additionally highlights the code field inline.
   const handleSubmit = (values: ProjectFormValues) => {
-    const record = recordFromForm(values)
-    setProjects((previous) =>
-      editing
-        ? previous.map((project) =>
-            project.id === editing.id ? record : project,
-          )
-        : [...previous, record],
-    )
-    setFormOpen(false)
+    const payload = payloadFromForm(values)
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateCodeError(error)) {
+          setDuplicateConflict((previous) => previous + 1)
+        }
+      },
+    }
+    if (editing) {
+      updateProject.mutate({ id: editing.id, ...payload }, callbacks)
+      return
+    }
+    createProject.mutate(payload, callbacks)
   }
 
   const handleDelete = () => {
     if (!deleting) return
-    setProjects((previous) =>
-      previous.filter((project) => project.id !== deleting.id),
-    )
+    deleteProject.mutate({ id: deleting.id, name: deleting.name })
     setDeleting(null)
   }
 
   const handleStatusToggle = () => {
     if (!toggling) return
-    setProjects((previous) =>
-      previous.map((project) =>
-        project.id === toggling.id
-          ? {
-              ...project,
-              status: project.status === 'active' ? 'inactive' : 'active',
-            }
-          : project,
-      ),
-    )
+    setProjectStatus.mutate({
+      id: toggling.id,
+      status: toggling.status === 'active' ? 'inactive' : 'active',
+    })
     setToggling(null)
   }
 
@@ -182,6 +198,7 @@ export function ProjectsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search code or name…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -205,10 +222,18 @@ export function ProjectsPage() {
 
       {/* Project table */}
       <ProjectsTable
-        rows={pageRows}
-        total={filtered.length}
+        rows={projects}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load projects.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEdit={openEdit}
@@ -220,7 +245,8 @@ export function ProjectsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         project={editing}
-        existingCodes={projects.map((project) => project.id)}
+        saving={saving}
+        duplicateConflict={duplicateConflict}
         onSubmit={handleSubmit}
       />
       <DeleteProjectDialog

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -29,8 +30,10 @@ interface ProjectFormModalProps {
   onOpenChange: (open: boolean) => void
   /** When set the modal edits this record; otherwise it creates a new one. */
   project: ProjectRecord | null
-  /** Codes already in the catalogue — a new project may not reuse one. */
-  existingCodes: Array<string>
+  /** Disables Save while the create/update mutation is in flight. */
+  saving: boolean
+  /** Bumped by the page on every duplicate-code 409 from the backend. */
+  duplicateConflict: number
   onSubmit: (values: ProjectFormValues) => void
 }
 
@@ -55,7 +58,8 @@ export function ProjectFormModal({
   open,
   onOpenChange,
   project,
-  existingCodes,
+  saving,
+  duplicateConflict,
   onSubmit,
 }: ProjectFormModalProps) {
   const [values, setValues] = useState<ProjectFormValues>(EMPTY)
@@ -67,7 +71,7 @@ export function ProjectFormModal({
     if (open) {
       const seeded = project
         ? {
-            code: project.id,
+            code: project.code,
             name: project.name,
             description: project.description ?? '',
             status: project.status,
@@ -85,6 +89,17 @@ export function ProjectFormModal({
   )
 
   const { guard, dialogProps } = useUnsavedChanges({ when: open && isDirty })
+
+  // A duplicate-code 409 from the backend highlights the code field inline
+  // while the toast carries the same message — the entered values survive.
+  useEffect(() => {
+    if (duplicateConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        code: 'Project code is already in use.',
+      }))
+    }
+  }, [duplicateConflict])
 
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
@@ -107,16 +122,12 @@ export function ProjectFormModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
 
     const nextErrors: FormErrors = {}
     const trimmedCode = values.code.trim()
     if (!trimmedCode) {
       nextErrors.code = 'Project code is required.'
-    } else if (
-      trimmedCode !== project?.id &&
-      existingCodes.includes(trimmedCode)
-    ) {
-      nextErrors.code = 'Project code is already in use.'
     }
     if (!values.name.trim()) {
       nextErrors.name = 'Project name is required.'
@@ -153,6 +164,7 @@ export function ProjectFormModal({
         onOpenChange={handleOpenChange}
         size="md"
         disableOutsideClose
+        loading={saving}
         title={project ? 'Edit project' : 'Add project'}
         description={
           project
@@ -168,7 +180,10 @@ export function ProjectFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" form="project-form">
+            <Button type="submit" form="project-form" disabled={saving}>
+              {saving && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {project ? 'Save changes' : 'Create project'}
             </Button>
           </>
