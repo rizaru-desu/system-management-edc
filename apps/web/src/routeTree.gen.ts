@@ -16,6 +16,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthedSplatRouteImport } from './routes/_authed/$'
+import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as AuthedAddAccountRouteImport } from './routes/_authed/add-account'
 import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
@@ -57,6 +58,11 @@ const AuthedSplatRoute = AuthedSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedAccountsRoute = AuthedAccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedAddAccountRoute = AuthedAddAccountRouteImport.update({
   id: '/add-account',
   path: '/add-account',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/accounts': typeof AuthedAccountsRoute
   '/add-account': typeof AuthedAddAccountRoute
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
@@ -109,6 +116,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/$': typeof AuthedSplatRoute
+  '/accounts': typeof AuthedAccountsRoute
   '/add-account': typeof AuthedAddAccountRoute
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authed/$': typeof AuthedSplatRoute
+  '/_authed/accounts': typeof AuthedAccountsRoute
   '/_authed/add-account': typeof AuthedAddAccountRoute
   '/_authed/app-releases': typeof AuthedAppReleasesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/accounts'
     | '/add-account'
     | '/app-releases'
     | '/dashboard'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/$'
+    | '/accounts'
     | '/add-account'
     | '/app-releases'
     | '/dashboard'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/_authed/$'
+    | '/_authed/accounts'
     | '/_authed/add-account'
     | '/_authed/app-releases'
     | '/_authed/dashboard'
@@ -238,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedSplatRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/accounts': {
+      id: '/_authed/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AuthedAccountsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/add-account': {
       id: '/_authed/add-account'
       path: '/add-account'
@@ -285,6 +304,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthedRouteChildren {
   AuthedSplatRoute: typeof AuthedSplatRoute
+  AuthedAccountsRoute: typeof AuthedAccountsRoute
   AuthedAddAccountRoute: typeof AuthedAddAccountRoute
   AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
@@ -295,6 +315,7 @@ interface AuthedRouteChildren {
 
 const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSplatRoute: AuthedSplatRoute,
+  AuthedAccountsRoute: AuthedAccountsRoute,
   AuthedAddAccountRoute: AuthedAddAccountRoute,
   AuthedAppReleasesRoute: AuthedAppReleasesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
