@@ -121,6 +121,10 @@ export interface ContractLinesQueryFilters {
   search?: string
   status?: ContractLineStatus | 'all'
   documentStatus?: DocumentStatus | 'all'
+  /** Lines belonging to this account only (database cuid). */
+  accountId?: string
+  /** Lines belonging to this project only (database cuid). */
+  projectId?: string
   /** 1-based page number. */
   page?: number
   pageSize?: number
@@ -155,6 +159,8 @@ const fetchContractLines = createServerFn({ method: 'GET' })
           ...(data.documentStatus && data.documentStatus !== 'all'
             ? { documentStatus: toBackendDocumentStatus(data.documentStatus) }
             : undefined),
+          ...(data.accountId ? { accountId: data.accountId } : undefined),
+          ...(data.projectId ? { projectId: data.projectId } : undefined),
           page: data.page ?? 1,
           pageSize: data.pageSize ?? 50,
         },
@@ -180,6 +186,8 @@ export const contractLinesListQueryOptions = ({
   search = '',
   status = 'all',
   documentStatus = 'all',
+  accountId = '',
+  projectId = '',
   page = 1,
   pageSize = 50,
 }: ContractLinesQueryFilters = {}) =>
@@ -189,12 +197,22 @@ export const contractLinesListQueryOptions = ({
       search.trim(),
       status,
       documentStatus,
+      accountId,
+      projectId,
       page,
       pageSize,
     ],
     queryFn: () =>
       fetchContractLines({
-        data: { search, status, documentStatus, page, pageSize },
+        data: {
+          search,
+          status,
+          documentStatus,
+          accountId,
+          projectId,
+          page,
+          pageSize,
+        },
       }),
     staleTime: 30_000,
     // Keep showing the previous result while a new search term or page
