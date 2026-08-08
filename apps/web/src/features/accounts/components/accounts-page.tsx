@@ -12,6 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import {
+  ContractListModal,
+  contractLinesListQueryOptions,
+} from '#/features/contract-lines/index.ts'
 import { useCreateAccount } from '../api/create-account.ts'
 import type { AccountPayload } from '../api/create-account.ts'
 import { useDeleteAccount } from '../api/delete-account.ts'
@@ -123,6 +127,9 @@ export function AccountsPage() {
   const [deleting, setDeleting] = useState<AccountRecord | null>(null)
   const [statusOpen, setStatusOpen] = useState(false)
   const [toggling, setToggling] = useState<AccountRecord | null>(null)
+  const [contractsOpen, setContractsOpen] = useState(false)
+  const [viewingContracts, setViewingContracts] =
+    useState<AccountRecord | null>(null)
 
   const openCreate = () => {
     setEditing(null)
@@ -145,6 +152,24 @@ export function AccountsPage() {
     setToggling(record)
     setStatusOpen(true)
   }
+
+  const openViewContracts = (record: AccountRecord) => {
+    setViewingContracts(record)
+    setContractsOpen(true)
+  }
+
+  // The modal lists the actual contract line documents of one account,
+  // fetched on demand from GET /contract-lines with the accountId filter —
+  // only while the modal is open, so table renders stay cheap. Placeholder
+  // data is disabled so a different account never flashes stale rows.
+  const contractsQuery = useQuery({
+    ...contractLinesListQueryOptions({
+      accountId: viewingContracts?.id ?? '',
+      pageSize: 100,
+    }),
+    placeholderData: undefined,
+    enabled: contractsOpen && viewingContracts !== null,
+  })
 
   // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
   const createAccount = useCreateAccount()
@@ -277,6 +302,7 @@ export function AccountsPage() {
         onEdit={openEdit}
         onStatusToggle={openStatusToggle}
         onDelete={openDelete}
+        onViewContracts={openViewContracts}
       />
 
       <AccountFormModal
@@ -298,6 +324,13 @@ export function AccountsPage() {
         onOpenChange={setStatusOpen}
         account={toggling}
         onConfirm={handleStatusToggle}
+      />
+      <ContractListModal
+        isOpen={contractsOpen}
+        onClose={() => setContractsOpen(false)}
+        contracts={contractsQuery.data?.contractLines ?? []}
+        title={viewingContracts?.name}
+        loading={contractsQuery.isLoading}
       />
     </div>
   )

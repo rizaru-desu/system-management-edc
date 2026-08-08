@@ -87,6 +87,8 @@ interface AccountsTableProps {
   onEdit: (record: AccountRecord) => void
   onStatusToggle: (record: AccountRecord) => void
   onDelete: (record: AccountRecord) => void
+  /** Opens the contract list modal for the row's account. */
+  onViewContracts: (record: AccountRecord) => void
 }
 
 export function AccountsTable({
@@ -103,6 +105,7 @@ export function AccountsTable({
   onEdit,
   onStatusToggle,
   onDelete,
+  onViewContracts,
 }: AccountsTableProps) {
   const columns = useMemo<Array<LegacyColumnDef<AccountRecord>>>(
     () => [
@@ -158,18 +161,21 @@ export function AccountsTable({
       {
         id: 'contractLineCount',
         header: 'Total Contracts',
-        cell: ({ row }) => (
-          <span
-            className={cn(
-              'tabular-nums',
-              row.original.contractLineCount > 0
-                ? 'text-brand-900/70'
-                : 'text-brand-900/40',
-            )}
-          >
-            {row.original.contractLineCount}
-          </span>
-        ),
+        // The count is a button opening the contract list modal; a zero
+        // stays plain muted text — there is nothing to show behind it.
+        cell: ({ row }) =>
+          row.original.contractLineCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => onViewContracts(row.original)}
+              aria-label={`View the ${row.original.contractLineCount} contracts of ${row.original.name}`}
+              className="tabular-nums text-brand-900/70 underline-offset-2 transition-colors hover:text-brand-900 hover:underline"
+            >
+              {row.original.contractLineCount}
+            </button>
+          ) : (
+            <span className="tabular-nums text-brand-900/40">0</span>
+          ),
       },
       {
         id: 'actions',
@@ -235,7 +241,7 @@ export function AccountsTable({
         },
       },
     ],
-    [onEdit, onStatusToggle, onDelete],
+    [onEdit, onStatusToggle, onDelete, onViewContracts],
   )
 
   const table = useLegacyTable({

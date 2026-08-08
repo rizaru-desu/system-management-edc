@@ -1,6 +1,7 @@
 export { ContractLinesPage } from './components/contract-lines-page.tsx'
 export { ContractLinesTable } from './components/contract-lines-table.tsx'
 export { ContractLineFormModal } from './components/contract-line-form-modal.tsx'
+export { ContractListModal } from './components/contract-list-modal.tsx'
 export { DeleteContractLineDialog } from './components/delete-contract-line-dialog.tsx'
 export { ToggleContractLineStatusDialog } from './components/toggle-contract-line-status-dialog.tsx'
 export type {
