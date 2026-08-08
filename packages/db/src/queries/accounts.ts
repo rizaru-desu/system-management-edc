@@ -74,10 +74,13 @@ const rowColumns = {
   picPhone: accounts.picPhone,
   picEmail: accounts.picEmail,
   // Correlated count instead of a join, so the payload stays one row per
-  // account no matter how many lines reference it.
+  // account no matter how many lines reference it. The outer reference is
+  // written fully qualified by hand: drizzle renders interpolated columns
+  // unqualified in single-table selects, and inside the subquery an
+  // unqualified "id" would resolve to contract_lines.id instead.
   contractLineCount: sql<number>`(
     select count(*) from ${contractLines}
-    where ${contractLines.accountId} = ${accounts.id}
+    where ${contractLines.accountId} = ${accounts}."id"
       and ${contractLines.deletedAt} is null
   )`.mapWith(Number),
   createdAt: accounts.createdAt,
