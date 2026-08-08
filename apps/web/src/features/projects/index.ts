@@ -1,0 +1,8 @@
+export { ProjectsPage } from './components/projects-page.tsx'
+export { ProjectsTable } from './components/projects-table.tsx'
+export { ProjectFormModal } from './components/project-form-modal.tsx'
+export { DeleteProjectDialog } from './components/delete-project-dialog.tsx'
+export { ToggleProjectStatusDialog } from './components/toggle-project-status-dialog.tsx'
+export type { ProjectFormValues } from './components/project-form-modal.tsx'
+export { PROJECT_STATUS_OPTIONS, PROJECTS } from './data/projects.ts'
+export type { ProjectRecord, ProjectStatus } from './data/projects.ts'

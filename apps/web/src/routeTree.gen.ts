@@ -20,6 +20,7 @@ import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
+import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
 
@@ -77,6 +78,11 @@ const AuthedMerchantsRoute = AuthedMerchantsRouteImport.update({
   path: '/merchants',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedProjectsRoute = AuthedProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedServicePointsRoute = AuthedServicePointsRouteImport.update({
   id: '/service-points',
   path: '/service-points',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
+  '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
 }
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/app-releases': typeof AuthedAppReleasesRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/merchants': typeof AuthedMerchantsRoute
+  '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
 }
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/_authed/app-releases': typeof AuthedAppReleasesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/merchants': typeof AuthedMerchantsRoute
+  '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
 }
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/app-releases'
     | '/dashboard'
     | '/merchants'
+    | '/projects'
     | '/service-points'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/app-releases'
     | '/dashboard'
     | '/merchants'
+    | '/projects'
     | '/service-points'
     | '/users'
   id:
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authed/app-releases'
     | '/_authed/dashboard'
     | '/_authed/merchants'
+    | '/_authed/projects'
     | '/_authed/service-points'
     | '/_authed/users'
   fileRoutesById: FileRoutesById
@@ -266,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedMerchantsRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/projects': {
+      id: '/_authed/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthedProjectsRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/service-points': {
       id: '/_authed/service-points'
       path: '/service-points'
@@ -289,6 +308,7 @@ interface AuthedRouteChildren {
   AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
   AuthedMerchantsRoute: typeof AuthedMerchantsRoute
+  AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
 }
@@ -299,6 +319,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAppReleasesRoute: AuthedAppReleasesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
   AuthedMerchantsRoute: AuthedMerchantsRoute,
+  AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,
 }
