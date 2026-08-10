@@ -251,6 +251,16 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         directRoute: '/service-points',
       },
       {
+        title: 'Item Categories',
+        path: 'item-categories',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Inventory_Controller',
+        ],
+        directRoute: '/item-categories',
+      },
+      {
         title: 'App Releases',
         path: 'app-releases',
         allowedRoles: ['System_Administrator'],
