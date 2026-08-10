@@ -113,6 +113,13 @@
       "when": 1786371379705,
       "tag": "0015_add_item_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786377677625,
+      "tag": "0016_add_warehouses",
+      "breakpoints": true
     }
   ]
 }

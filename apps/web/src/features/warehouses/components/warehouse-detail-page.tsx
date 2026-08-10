@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -6,9 +7,11 @@ import {
   CalendarDays,
   Contact,
   CreditCard,
+  Loader2,
   MapPin,
   Network,
   SearchX,
+  TriangleAlert,
   UserRound,
   Warehouse,
 } from 'lucide-react'
@@ -19,9 +22,9 @@ import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
-import { WAREHOUSE_TYPE_LABELS, getWarehouses } from '../data/warehouses.ts'
+import { warehouseDetailQueryOptions } from '../api/warehouse-detail.ts'
+import { WAREHOUSE_TYPE_LABELS } from '../data/warehouses.ts'
 import type { WarehouseType } from '../data/warehouses.ts'
-import { buildHierarchyPath } from '../lib/tree.ts'
 
 /** Same per-type badge looks as the list table. */
 const TYPE_BADGE_VARIANTS: Record<
@@ -62,18 +65,50 @@ interface WarehouseDetailPageProps {
 }
 
 /**
- * Inventory → Warehouses → detail. Reads the shared mock store (same data
- * the list page manages); the child list links onwards through the
- * hierarchy, and the Terminals / Stock Movements sections are placeholders
- * until those modules land.
+ * Inventory → Warehouses → detail, backed by GET /warehouses/:id (the row
+ * plus its parent and direct children). The child list links onwards
+ * through the hierarchy, and the Terminals / Stock Movements sections are
+ * placeholders until those modules land.
  */
 export function WarehouseDetailPage({ warehouseId }: WarehouseDetailPageProps) {
-  // Snapshot per navigation is enough for the mock stage — the store only
-  // changes on the list page, which unmounts this one.
-  const records = getWarehouses()
-  const warehouse = records.find((record) => record.id === warehouseId) ?? null
+  const detailQuery = useQuery(warehouseDetailQueryOptions(warehouseId))
 
-  if (!warehouse) {
+  if (detailQuery.isPending) {
+    return (
+      <div className="animate-fade-up flex items-center justify-center py-24 text-sm text-brand-900/50">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />
+        Loading warehouse…
+      </div>
+    )
+  }
+
+  if (detailQuery.isError) {
+    return (
+      <div className="animate-fade-up">
+        <EmptyState
+          icon={TriangleAlert}
+          tone="danger"
+          title={
+            detailQuery.error instanceof Error
+              ? detailQuery.error.message
+              : 'Failed to load the warehouse.'
+          }
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => detailQuery.refetch()}
+            >
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
+
+  // A 404 resolves to null (see the detail server fn).
+  if (detailQuery.data === null) {
     return (
       <div className="animate-fade-up">
         <EmptyState
@@ -94,11 +129,15 @@ export function WarehouseDetailPage({ warehouseId }: WarehouseDetailPageProps) {
     )
   }
 
-  const parent = warehouse.parentId
-    ? (records.find((record) => record.id === warehouse.parentId) ?? null)
-    : null
-  const children = records.filter((record) => record.parentId === warehouse.id)
-  const hierarchyPath = buildHierarchyPath(records, warehouse.id)
+  const { warehouse, parent, children } = detailQuery.data
+
+  // Central → Regional → this; the parent row carries the grandparent name
+  // via the backend's self-join, which covers the three-level ladder.
+  const hierarchyPath = [
+    parent?.parentName ?? null,
+    parent?.name ?? null,
+    warehouse.name,
+  ].filter((name): name is string => name !== null)
 
   return (
     <div className="animate-fade-up">

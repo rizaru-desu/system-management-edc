@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -15,13 +17,13 @@ import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { UnsavedChangesDialog } from '#/components/UnsavedChangesDialog.tsx'
 import { useUnsavedChanges } from '#/hooks/use-unsaved-changes.ts'
+import { eligibleParentsQueryOptions } from '../api/eligible-parents.ts'
 import {
   WAREHOUSE_PARENT_TYPE,
   WAREHOUSE_TYPES,
   WAREHOUSE_TYPE_LABELS,
 } from '../data/warehouses.ts'
 import type { WarehouseRecord, WarehouseType } from '../data/warehouses.ts'
-import type { ParentOption } from '../lib/tree.ts'
 
 export interface WarehouseFormValues {
   name: string
@@ -45,17 +47,18 @@ interface WarehouseFormModalProps {
   /** When set the modal edits this record; otherwise it creates a new one. */
   warehouse: WarehouseRecord | null
   /**
-   * True when the edited record has children — its type is locked, since
-   * changing the level would orphan the subtree's parent rules.
+   * True when the edited record has children — its type is locked (the
+   * backend refuses the change too), since changing the level would orphan
+   * the subtree's parent rules.
    */
   hasChildren: boolean
+  /** True while the create/update mutation is in flight. */
+  saving: boolean
   /**
-   * Valid parent choices for a given type (only the one level above it;
-   * the page pre-excludes the edited record and its descendants).
+   * Bumped by the page on every duplicate-code 409 from the backend, so
+   * the code field highlights inline without losing the entered values.
    */
-  getParentOptions: (type: WarehouseType) => Array<ParentOption>
-  /** True when another warehouse already uses `code` (mock uniqueness). */
-  isCodeTaken: (code: string) => boolean
+  duplicateCodeConflict: number
   onSubmit: (values: WarehouseFormValues) => void
 }
 
@@ -97,8 +100,8 @@ export function WarehouseFormModal({
   onOpenChange,
   warehouse,
   hasChildren,
-  getParentOptions,
-  isCodeTaken,
+  saving,
+  duplicateCodeConflict,
   onSubmit,
 }: WarehouseFormModalProps) {
   const [values, setValues] = useState<WarehouseFormValues>(EMPTY)
@@ -129,6 +132,17 @@ export function WarehouseFormModal({
     }
   }, [open, warehouse])
 
+  // A duplicate-code 409 from the backend highlights the code field inline
+  // while the toast carries the same message — the entered values survive.
+  useEffect(() => {
+    if (duplicateCodeConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        code: 'A warehouse with this code already exists.',
+      }))
+    }
+  }, [duplicateCodeConflict])
+
   const isDirty = useMemo(
     () => JSON.stringify(values) !== JSON.stringify(initialValues),
     [values, initialValues],
@@ -139,6 +153,7 @@ export function WarehouseFormModal({
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      if (saving) return
       guard(() => onOpenChange(false))
       return
     }
@@ -166,22 +181,27 @@ export function WarehouseFormModal({
   }
 
   const parentType = values.type ? WAREHOUSE_PARENT_TYPE[values.type] : null
-  const parentOptions = useMemo(
-    () => (values.type ? getParentOptions(values.type) : []),
-    [values.type, getParentOptions],
-  )
+
+  // The option list comes from GET /warehouses/eligible-parents — refetched
+  // per selected type, with the edited record excluded server-side. Only
+  // fetched while the modal is open on a type that actually takes a parent.
+  const parentsQuery = useQuery({
+    ...eligibleParentsQueryOptions(
+      values.type || 'central',
+      warehouse?.id ?? null,
+    ),
+    enabled: open && values.type !== '' && parentType !== null,
+  })
+  const parentOptions = parentsQuery.data ?? []
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
     const nextErrors: FormErrors = {}
     const name = values.name.trim()
     const code = values.code.trim()
     if (!name) nextErrors.name = 'Warehouse name is required.'
-    if (!code) {
-      nextErrors.code = 'Warehouse code is required.'
-    } else if (isCodeTaken(code)) {
-      nextErrors.code = 'A warehouse with this code already exists.'
-    }
+    if (!code) nextErrors.code = 'Warehouse code is required.'
     if (!values.type) {
       nextErrors.type = 'Warehouse type is required.'
     } else if (parentType === null) {
@@ -208,6 +228,8 @@ export function WarehouseFormModal({
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
+    // Code uniqueness and the full hierarchy rules stay the backend's call
+    // (409/400) — the page keeps the modal open and surfaces the message.
     onSubmit({
       ...values,
       name,
@@ -218,7 +240,6 @@ export function WarehouseFormModal({
       picContact: values.picContact.trim(),
       capacity: values.capacity.trim(),
     })
-    onOpenChange(false)
   }
 
   const fieldClasses =
@@ -231,6 +252,7 @@ export function WarehouseFormModal({
         onOpenChange={handleOpenChange}
         size="lg"
         disableOutsideClose
+        loading={saving}
         title={warehouse ? 'Edit warehouse' : 'Add warehouse'}
         description={
           warehouse
@@ -246,7 +268,10 @@ export function WarehouseFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" form="warehouse-form">
+            <Button type="submit" form="warehouse-form" disabled={saving}>
+              {saving && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {warehouse ? 'Save changes' : 'Create warehouse'}
             </Button>
           </>
@@ -344,7 +369,7 @@ export function WarehouseFormModal({
               )}
             </div>
             {/* Central has no parent, so the field only renders for the
-              nested levels — with options limited to the one valid type. */}
+              nested levels — options come from the eligible-parents API. */}
             {values.type !== '' && parentType !== null && (
               <div className="space-y-1.5">
                 <Label htmlFor="wh-parent" className="text-[#0E2748]">
@@ -356,7 +381,9 @@ export function WarehouseFormModal({
                 <Select
                   value={values.parentId ?? ''}
                   onValueChange={(value) => setField('parentId', value)}
-                  disabled={parentOptions.length === 0}
+                  disabled={
+                    parentsQuery.isPending || parentOptions.length === 0
+                  }
                 >
                   <SelectTrigger
                     id="wh-parent"
@@ -364,7 +391,11 @@ export function WarehouseFormModal({
                     className={`w-full ${fieldClasses}`}
                   >
                     <SelectValue
-                      placeholder={`Select a ${WAREHOUSE_TYPE_LABELS[parentType]} warehouse`}
+                      placeholder={
+                        parentsQuery.isPending
+                          ? 'Loading parent warehouses…'
+                          : `Select a ${WAREHOUSE_TYPE_LABELS[parentType]} warehouse`
+                      }
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -377,7 +408,12 @@ export function WarehouseFormModal({
                 </Select>
                 {errors.parentId ? (
                   <p className="text-xs text-rose-600">{errors.parentId}</p>
+                ) : parentsQuery.isError ? (
+                  <p className="text-xs text-rose-600">
+                    Failed to load parent warehouses — close and try again.
+                  </p>
                 ) : (
+                  !parentsQuery.isPending &&
                   parentOptions.length === 0 && (
                     <p className="text-xs text-rose-600">
                       No {WAREHOUSE_TYPE_LABELS[parentType]} warehouse exists

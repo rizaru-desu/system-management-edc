@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { ListTree, ListX, PackagePlus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -13,48 +13,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { useCreateWarehouse } from '../api/create-warehouse.ts'
+import { useDeleteWarehouse } from '../api/delete-warehouse.ts'
 import {
-  WAREHOUSE_PARENT_TYPE,
-  WAREHOUSE_TYPES,
-  WAREHOUSE_TYPE_LABELS,
-  getWarehouses,
-  saveWarehouses,
-} from '../data/warehouses.ts'
+  useToggleWarehouseStatus,
+  useUpdateWarehouse,
+} from '../api/update-warehouse.ts'
+import {
+  isDuplicateCodeError,
+  warehouseTreeQueryOptions,
+} from '../api/warehouse-tree.ts'
+import { WAREHOUSE_TYPES, WAREHOUSE_TYPE_LABELS } from '../data/warehouses.ts'
 import type { WarehouseRecord, WarehouseType } from '../data/warehouses.ts'
 import {
-  buildParentOptions,
   buildWarehouseTree,
   collectParentIds,
   filterWarehouseTree,
   flattenVisibleRows,
 } from '../lib/tree.ts'
+import { DeleteWarehouseDialog } from './delete-warehouse-dialog.tsx'
 import { WarehouseFormModal } from './warehouse-form-modal.tsx'
 import type { WarehouseFormValues } from './warehouse-form-modal.tsx'
 import { WarehousesTable } from './warehouses-table.tsx'
 
-/** Monotonic id for mock-created rows (cuid-style ids come with the API). */
-function nextMockId(records: Array<WarehouseRecord>): string {
-  return `wh-${String(records.length + 1).padStart(3, '0')}-${Date.now().toString(36)}`
-}
-
 /**
  * Inventory → Warehouses: the Central → Regional → Service Point warehouse
  * hierarchy that Terminals, Inbound Shipments and the stock modules will
- * reference. UI-only for now — the catalogue lives in a module-level mock
- * store (shared with the detail page); search, type/region filters,
- * expand/collapse and pagination all run client-side over the full tree.
+ * reference. The hierarchy comes from GET /warehouses/tree (flattened back
+ * to `parentId` records — search, type/region filters, expand/collapse and
+ * pagination all stay client-side over the full tree so matches keep their
+ * ancestor context), and every CRUD action goes through the backend API;
+ * the mutation hooks own toasts and cache invalidation.
  */
 export function WarehousesPage() {
   const navigate = useNavigate()
-  const [records, setRecords] = useState<Array<WarehouseRecord>>(getWarehouses)
+  const treeQuery = useQuery(warehouseTreeQueryOptions())
+  const records = useMemo(() => treeQuery.data ?? [], [treeQuery.data])
+  const isPending = treeQuery.isPending
 
-  /** Every mutation writes both the page state and the shared mock store. */
-  const commit = (next: Array<WarehouseRecord>) => {
-    setRecords(next)
-    saveWarehouses(next)
-  }
-
-  // Start fully expanded so the hierarchy is visible at first glance.
+  // Start fully expanded so the hierarchy is visible at first glance —
+  // once, when the tree first arrives; later refetches keep the user's
+  // expand/collapse state.
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const expandedInitialized = useRef(false)
   useEffect(() => {
@@ -135,8 +134,8 @@ export function WarehousesPage() {
     )
   }, [debouncedSearch, typeFilter, regionFilter])
 
-  // Collapsing branches can shrink the row set below the current page —
-  // clamp to the last page that still exists.
+  // Collapsing branches (or deleting rows) can shrink the row set below the
+  // current page — clamp to the last page that still exists.
   useEffect(() => {
     setPagination((previous) => {
       const lastPage = Math.max(
@@ -174,18 +173,30 @@ export function WarehousesPage() {
   const expandAll = () => setExpandedIds(collectParentIds(records))
   const collapseAll = () => setExpandedIds(new Set())
 
-  // ── Modal ──────────────────────────────────────────────────────────────
+  // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<WarehouseRecord | null>(null)
+  // Bumped on every duplicate-code 409 so the form modal highlights the
+  // code field without losing the entered values.
+  const [duplicateCodeConflict, setDuplicateCodeConflict] = useState(0)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState<WarehouseRecord | null>(null)
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: WarehouseRecord) => {
     setEditing(record)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
+  }
+
+  const openDelete = (record: WarehouseRecord) => {
+    setDeleting(record)
+    setDeleteOpen(true)
   }
 
   const openDetail = (record: WarehouseRecord) => {
@@ -202,56 +213,55 @@ export function WarehousesPage() {
     [records, editing],
   )
 
-  const getParentOptions = (type: WarehouseType) =>
-    buildParentOptions(records, type, editing?.id ?? null)
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createWarehouse = useCreateWarehouse()
+  const updateWarehouse = useUpdateWarehouse()
+  const deleteWarehouse = useDeleteWarehouse()
+  const toggleStatus = useToggleWarehouseStatus()
 
-  /** Mock uniqueness check on code, ignoring the record being edited. */
-  const isCodeTaken = (code: string) => {
-    const candidate = code.trim().toLowerCase()
-    return records.some(
-      (record) =>
-        record.id !== editing?.id &&
-        record.code.trim().toLowerCase() === candidate,
-    )
-  }
+  const saving = createWarehouse.isPending || updateWarehouse.isPending
 
-  // ── Mock CRUD (local store only until the backend exists) ──────────────
+  // The form stays open (with its submit disabled) until the save lands, so
+  // a rejected payload — duplicate code, parent-ladder violation, cycle —
+  // keeps the user's input intact; the backend message shows as a toast and
+  // a duplicate-code 409 additionally highlights the code field inline.
   const handleSubmit = (values: WarehouseFormValues) => {
-    // The form validated type/parent rules before submitting.
-    const type = values.type as WarehouseType
-    const shared = {
+    // The form validated type/parent presence before submitting.
+    const payload = {
       name: values.name,
       code: values.code,
-      type,
-      parentId: WAREHOUSE_PARENT_TYPE[type] === null ? null : values.parentId,
+      type: values.type as WarehouseType,
+      parentId: values.parentId,
       region: values.region,
       address: values.address,
       picName: values.picName,
       picContact: values.picContact,
-      capacity: values.capacity.trim() ? Number(values.capacity) : null,
+      capacity: values.capacity,
       status: values.status,
     }
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateCodeError(error)) {
+          setDuplicateCodeConflict((previous) => previous + 1)
+        }
+      },
+    }
     if (editing) {
-      commit(
-        records.map((record) =>
-          record.id === editing.id ? { ...record, ...shared } : record,
-        ),
-      )
-      toast.success(`Warehouse “${values.name}” updated.`)
+      updateWarehouse.mutate({ id: editing.id, ...payload }, callbacks)
       return
     }
-    const created: WarehouseRecord = {
-      ...shared,
-      id: nextMockId(records),
-      terminalCount: 0,
-      createdAt: new Date().toISOString().slice(0, 10),
-    }
-    commit([...records, created])
-    // Reveal the new row immediately, wherever it landed in the tree.
-    if (created.parentId) {
-      setExpandedIds((previous) => new Set([...previous, created.parentId!]))
-    }
-    toast.success(`Warehouse “${values.name}” created.`)
+    createWarehouse.mutate(payload, callbacks)
+  }
+
+  const handleDelete = () => {
+    if (!deleting) return
+    deleteWarehouse.mutate({ id: deleting.id, name: deleting.name })
+    setDeleting(null)
+  }
+
+  const handleToggleStatus = (record: WarehouseRecord) => {
+    toggleStatus.mutate({ id: record.id })
   }
 
   return (
@@ -283,6 +293,7 @@ export function WarehousesPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name or code…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={treeQuery.isFetching && !treeQuery.isPending}
         />
         <Select
           value={typeFilter}
@@ -316,13 +327,17 @@ export function WarehousesPage() {
           </SelectContent>
         </Select>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" disabled={isFiltering} onClick={expandAll}>
+          <Button
+            variant="outline"
+            disabled={isPending || isFiltering}
+            onClick={expandAll}
+          >
             <ListTree className="h-4 w-4 text-primary" strokeWidth={1.75} />
             Expand tree
           </Button>
           <Button
             variant="outline"
-            disabled={isFiltering}
+            disabled={isPending || isFiltering}
             onClick={collapseAll}
           >
             <ListX className="h-4 w-4 text-primary" strokeWidth={1.75} />
@@ -337,11 +352,21 @@ export function WarehousesPage() {
         total={visibleRows.length}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={isPending}
+        isError={treeQuery.isError}
+        errorMessage={
+          treeQuery.error instanceof Error
+            ? treeQuery.error.message
+            : 'Failed to load warehouses.'
+        }
+        onRetry={() => treeQuery.refetch()}
         isFiltering={isFiltering}
         onToggleExpand={toggleExpand}
         onClearFilters={clearFilters}
         onView={openDetail}
         onEdit={openEdit}
+        onToggleStatus={handleToggleStatus}
+        onDelete={openDelete}
       />
 
       <WarehouseFormModal
@@ -349,9 +374,15 @@ export function WarehousesPage() {
         onOpenChange={setFormOpen}
         warehouse={editing}
         hasChildren={editingHasChildren}
-        getParentOptions={getParentOptions}
-        isCodeTaken={isCodeTaken}
+        saving={saving}
+        duplicateCodeConflict={duplicateCodeConflict}
         onSubmit={handleSubmit}
+      />
+      <DeleteWarehouseDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        warehouse={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   )
