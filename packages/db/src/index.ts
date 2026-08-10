@@ -156,3 +156,21 @@ export {
   type UserSessionRecord,
 } from "./queries/mobile-device.js";
 
+export {
+  createItemCategory,
+  findItemCategoryById,
+  listItemCategories,
+  softDeleteItemCategory,
+  toggleItemCategoryStatus,
+  updateItemCategory,
+  upsertItemCategoriesByName,
+  type CreateItemCategoryResult,
+  type DeleteItemCategoryResult,
+  type ItemCategoryInput,
+  type ItemCategoryListPage,
+  type ItemCategoryRow,
+  type ItemCategorySeed,
+  type ListItemCategoriesOptions,
+  type ToggleItemCategoryStatusResult,
+  type UpdateItemCategoryResult,
+} from "./queries/item-categories.js";

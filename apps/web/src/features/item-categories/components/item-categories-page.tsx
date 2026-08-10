@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { PackagePlus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -12,14 +12,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { useCreateItemCategory } from '../api/create-item-category.ts'
+import { useDeleteItemCategory } from '../api/delete-item-category.ts'
 import {
-  ACCESSORY_CATEGORIES,
-  SEED_ITEM_CATEGORIES,
-} from '../data/item-categories.ts'
+  isDuplicateCodeError,
+  isDuplicateNameError,
+  itemCategoriesListQueryOptions,
+} from '../api/list-item-categories.ts'
+import {
+  useToggleItemCategoryStatus,
+  useUpdateItemCategory,
+} from '../api/update-item-category.ts'
+import { ACCESSORY_CATEGORIES } from '../data/item-categories.ts'
 import type {
   AccessoryCategory,
   ItemCategoryRecord,
 } from '../data/item-categories.ts'
+import { DeleteItemCategoryDialog } from './delete-item-category-dialog.tsx'
 import { ItemCategoryFormModal } from './item-category-form-modal.tsx'
 import type { ItemCategoryFormValues } from './item-category-form-modal.tsx'
 import { ItemCategoriesTable } from './item-categories-table.tsx'
@@ -27,20 +36,18 @@ import { ItemCategoriesTable } from './item-categories-table.tsx'
 /**
  * Administration → Item Categories: the master catalogue of completeness/
  * accessory items (chargers, cables, receipt rolls…) that Products will
- * reference as their standard box contents. UI-only for now — the list lives
- * in local state seeded from mock data; search, category filter, pagination
- * and the quick status toggle all run client-side until a backend exists.
+ * reference as their standard box contents. Search, category filter and
+ * pagination all run server-side (GET /item-categories), and every CRUD
+ * action goes through the backend API; the mutation hooks own toasts and
+ * cache invalidation, so the table refreshes after every write.
  */
 export function ItemCategoriesPage() {
-  const [records, setRecords] =
-    useState<Array<ItemCategoryRecord>>(SEED_ITEM_CATEGORIES)
-
-  // ── Search & filter ────────────────────────────────────────────────────
+  // ── Search & filter (server-side) ──────────────────────────────────────
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<
     'all' | AccessoryCategory
   >('all')
-  // Debounced copy of `search` so the list isn't re-filtered per keystroke.
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
@@ -56,18 +63,7 @@ export function ItemCategoriesPage() {
     setCategoryFilter('all')
   }
 
-  const filteredRecords = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase()
-    return records.filter((record) => {
-      const matchesTerm =
-        term === '' || record.name.toLowerCase().includes(term)
-      const matchesCategory =
-        categoryFilter === 'all' || record.category === categoryFilter
-      return matchesTerm && matchesCategory
-    })
-  }, [records, debouncedSearch, categoryFilter])
-
-  // ── Pagination (client-side over the filtered list) ────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -81,43 +77,60 @@ export function ItemCategoriesPage() {
     )
   }, [debouncedSearch, categoryFilter])
 
-  const pageRows = useMemo(
-    () =>
-      filteredRecords.slice(
-        pagination.pageIndex * pagination.pageSize,
-        (pagination.pageIndex + 1) * pagination.pageSize,
-      ),
-    [filteredRecords, pagination],
+  const listQuery = useQuery(
+    itemCategoriesListQueryOptions({
+      search: debouncedSearch,
+      category: categoryFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
   )
+  const itemCategories = listQuery.data?.itemCategories ?? []
+  const total = listQuery.data?.total ?? 0
 
-  // ── Modal ──────────────────────────────────────────────────────────────
+  // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ItemCategoryRecord | null>(null)
+  // Bumped on every duplicate 409 so the form modal highlights the
+  // conflicting field without losing the entered values.
+  const [duplicateNameConflict, setDuplicateNameConflict] = useState(0)
+  const [duplicateCodeConflict, setDuplicateCodeConflict] = useState(0)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState<ItemCategoryRecord | null>(null)
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateNameConflict(0)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: ItemCategoryRecord) => {
     setEditing(record)
+    setDuplicateNameConflict(0)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
   }
 
-  /** Case-insensitive duplicate check, ignoring the record being edited. */
-  const isNameTaken = (name: string) => {
-    const candidate = name.trim().toLowerCase()
-    return records.some(
-      (record) =>
-        record.id !== editing?.id &&
-        record.name.trim().toLowerCase() === candidate,
-    )
+  const openDelete = (record: ItemCategoryRecord) => {
+    setDeleting(record)
+    setDeleteOpen(true)
   }
 
-  // ── Mock CRUD (local state only until the backend exists) ──────────────
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createItemCategory = useCreateItemCategory()
+  const updateItemCategory = useUpdateItemCategory()
+  const deleteItemCategory = useDeleteItemCategory()
+  const toggleStatus = useToggleItemCategoryStatus()
+
+  const saving = createItemCategory.isPending || updateItemCategory.isPending
+
+  // The form stays open (with its submit disabled) until the save lands, so
+  // a rejected payload keeps the user's input intact. A duplicate name/code
+  // 409 additionally highlights the conflicting field inline.
   const handleSubmit = (values: ItemCategoryFormValues) => {
     // The form validated category/unit as non-empty before submitting.
-    const shared = {
+    const payload = {
       name: values.name,
       code: values.code,
       category: values.category as AccessoryCategory,
@@ -125,39 +138,31 @@ export function ItemCategoriesPage() {
       description: values.description,
       status: values.status,
     }
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateNameError(error)) {
+          setDuplicateNameConflict((previous) => previous + 1)
+        } else if (isDuplicateCodeError(error)) {
+          setDuplicateCodeConflict((previous) => previous + 1)
+        }
+      },
+    }
     if (editing) {
-      setRecords((previous) =>
-        previous.map((record) =>
-          record.id === editing.id ? { ...record, ...shared } : record,
-        ),
-      )
-      toast.success(`Item “${values.name}” updated.`)
+      updateItemCategory.mutate({ id: editing.id, ...payload }, callbacks)
       return
     }
-    setRecords((previous) => [
-      ...previous,
-      {
-        ...shared,
-        id: crypto.randomUUID(),
-        productUsageCount: 0,
-        createdAt: new Date().toISOString().slice(0, 10),
-      },
-    ])
-    toast.success(`Item “${values.name}” created.`)
+    createItemCategory.mutate(payload, callbacks)
+  }
+
+  const handleDelete = () => {
+    if (!deleting) return
+    deleteItemCategory.mutate({ id: deleting.id, name: deleting.name })
+    setDeleting(null)
   }
 
   const handleToggleStatus = (record: ItemCategoryRecord) => {
-    const nextStatus = record.status === 'active' ? 'inactive' : 'active'
-    setRecords((previous) =>
-      previous.map((entry) =>
-        entry.id === record.id ? { ...entry, status: nextStatus } : entry,
-      ),
-    )
-    toast.success(
-      nextStatus === 'active'
-        ? `Item “${record.name}” activated.`
-        : `Item “${record.name}” deactivated.`,
-    )
+    toggleStatus.mutate({ id: record.id })
   }
 
   return (
@@ -189,6 +194,7 @@ export function ItemCategoriesPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search by item name…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={categoryFilter}
@@ -212,22 +218,39 @@ export function ItemCategoriesPage() {
 
       {/* Table */}
       <ItemCategoriesTable
-        rows={pageRows}
-        total={filteredRecords.length}
+        rows={itemCategories}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load item categories.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEdit={openEdit}
         onToggleStatus={handleToggleStatus}
+        onDelete={openDelete}
       />
 
       <ItemCategoryFormModal
         open={formOpen}
         onOpenChange={setFormOpen}
         item={editing}
-        isNameTaken={isNameTaken}
+        saving={saving}
+        duplicateNameConflict={duplicateNameConflict}
+        duplicateCodeConflict={duplicateCodeConflict}
         onSubmit={handleSubmit}
+      />
+      <DeleteItemCategoryDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        item={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   )

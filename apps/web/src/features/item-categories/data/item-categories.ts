@@ -1,7 +1,8 @@
 /**
- * Accessory categories an EDC completeness item can belong to. The values are
- * the master-data labels themselves (Indonesian, per the ops vocabulary) so
- * they render verbatim in dropdowns and table badges.
+ * Accessory categories an EDC completeness item can belong to, as display
+ * labels (the backend stores uppercase enum values — see the api layer's
+ * mappers). The values are the master-data labels themselves (Indonesian,
+ * per the ops vocabulary) so they render verbatim in dropdowns and badges.
  */
 export const ACCESSORY_CATEGORIES = [
   'Power',
@@ -21,7 +22,8 @@ export type ItemUnit = (typeof ITEM_UNITS)[number]
 export type ItemCategoryStatus = 'active' | 'inactive'
 
 /**
- * One completeness/accessory item in the master catalogue. Products will
+ * One completeness/accessory item in the shape the console consumes
+ * (mapped from the backend's /item-categories rows). Products will
  * reference these records to describe their standard box contents.
  */
 export interface ItemCategoryRecord {
@@ -34,83 +36,14 @@ export interface ItemCategoryRecord {
   description: string
   status: ItemCategoryStatus
   /**
-   * Display-only count of products whose standard completeness list includes
-   * this item. Dummy until the Products module wires up real references.
+   * Display-only count of products whose standard completeness list
+   * includes this item; served by the backend (0 until the Products module
+   * wires up real references).
    */
   productUsageCount: number
-  /** ISO date (yyyy-mm-dd) — string so SSR and client render identically. */
+  /** ISO timestamp from the backend. */
   createdAt: string
 }
 
-/**
- * Mock catalogue backing the UI until the backend exists. Mirrors the shape
- * the future items endpoint is expected to serve.
- */
-export const SEED_ITEM_CATEGORIES: Array<ItemCategoryRecord> = [
-  {
-    id: 'item-001',
-    name: 'Charger/Adaptor',
-    code: 'ACC-001',
-    category: 'Power',
-    unit: 'Pcs',
-    description: 'Adaptor daya bawaan untuk terminal EDC.',
-    status: 'active',
-    productUsageCount: 8,
-    createdAt: '2026-05-04',
-  },
-  {
-    id: 'item-002',
-    name: 'Kabel USB',
-    code: 'ACC-002',
-    category: 'Konektivitas',
-    unit: 'Pcs',
-    description: 'Kabel data/charging USB untuk koneksi terminal.',
-    status: 'active',
-    productUsageCount: 6,
-    createdAt: '2026-05-04',
-  },
-  {
-    id: 'item-003',
-    name: 'SIM Card',
-    code: 'ACC-003',
-    category: 'Konektivitas',
-    unit: 'Pcs',
-    description: 'Kartu SIM data untuk terminal dengan koneksi seluler.',
-    status: 'active',
-    productUsageCount: 5,
-    createdAt: '2026-05-12',
-  },
-  {
-    id: 'item-004',
-    name: 'Kertas Struk',
-    code: 'ACC-004',
-    category: 'Dokumen',
-    unit: 'Roll',
-    description: 'Kertas thermal untuk pencetakan struk transaksi.',
-    status: 'active',
-    productUsageCount: 7,
-    createdAt: '2026-05-12',
-  },
-  {
-    id: 'item-005',
-    name: 'Kartu Garansi',
-    code: 'ACC-005',
-    category: 'Dokumen',
-    unit: 'Pcs',
-    description: 'Kartu garansi resmi yang menyertai setiap unit.',
-    status: 'inactive',
-    productUsageCount: 2,
-    createdAt: '2026-06-02',
-  },
-  {
-    id: 'item-006',
-    name: 'Dus/Box',
-    code: 'ACC-006',
-    category: 'Kemasan',
-    unit: 'Pcs',
-    description: 'Kemasan karton standar untuk pengiriman terminal.',
-    status: 'active',
-    productUsageCount: 8,
-    createdAt: '2026-06-02',
-  },
-]
+// The former SEED_ITEM_CATEGORIES list is gone: the page now fetches the
+// real catalogue from the backend via `api/list-item-categories.ts`.

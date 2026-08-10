@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 
 import { Button } from '#/components/ui/button.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -37,16 +38,21 @@ interface ItemCategoryFormModalProps {
   onOpenChange: (open: boolean) => void
   /** When set the modal edits this record; otherwise it creates a new one. */
   item: ItemCategoryRecord | null
+  /** True while the create/update mutation is in flight. */
+  saving: boolean
   /**
-   * Case-insensitive duplicate check against the current catalogue; the page
-   * already excludes the record being edited.
+   * Bumped by the page on every duplicate-name 409 from the backend, so the
+   * Item name field highlights inline without losing the entered values.
    */
-  isNameTaken: (name: string) => boolean
+  duplicateNameConflict: number
+  /** Same as {@link duplicateNameConflict}, for the Item code field. */
+  duplicateCodeConflict: number
   onSubmit: (values: ItemCategoryFormValues) => void
 }
 
 interface FormErrors {
   name?: string
+  code?: string
   category?: string
   unit?: string
 }
@@ -64,7 +70,9 @@ export function ItemCategoryFormModal({
   open,
   onOpenChange,
   item,
-  isNameTaken,
+  saving,
+  duplicateNameConflict,
+  duplicateCodeConflict,
   onSubmit,
 }: ItemCategoryFormModalProps) {
   const [values, setValues] = useState<ItemCategoryFormValues>(EMPTY)
@@ -91,6 +99,27 @@ export function ItemCategoryFormModal({
     }
   }, [open, item])
 
+  // A duplicate-name 409 from the backend highlights the Item name field
+  // inline while the toast carries the same message — the entered values
+  // survive.
+  useEffect(() => {
+    if (duplicateNameConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        name: 'An item with this name already exists.',
+      }))
+    }
+  }, [duplicateNameConflict])
+
+  useEffect(() => {
+    if (duplicateCodeConflict > 0) {
+      setErrors((previous) => ({
+        ...previous,
+        code: 'An item with this code already exists.',
+      }))
+    }
+  }, [duplicateCodeConflict])
+
   const isDirty = useMemo(
     () => JSON.stringify(values) !== JSON.stringify(initialValues),
     [values, initialValues],
@@ -101,6 +130,7 @@ export function ItemCategoryFormModal({
   /** Routes dirty close attempts through the custom confirmation dialog. */
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
+      if (saving) return
       guard(() => onOpenChange(false))
       return
     }
@@ -119,12 +149,11 @@ export function ItemCategoryFormModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (saving) return
     const nextErrors: FormErrors = {}
     const name = values.name.trim()
     if (!name) {
       nextErrors.name = 'Item name is required.'
-    } else if (isNameTaken(name)) {
-      nextErrors.name = 'An item with this name already exists.'
     }
     if (!values.category) {
       nextErrors.category = 'Accessory category is required.'
@@ -136,13 +165,14 @@ export function ItemCategoryFormModal({
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
+    // Duplicate name/code stay the backend's call (409) — the page keeps the
+    // modal open and bumps the conflict counters to highlight the field.
     onSubmit({
       ...values,
       name,
       code: values.code.trim(),
       description: values.description.trim(),
     })
-    onOpenChange(false)
   }
 
   const fieldClasses =
@@ -155,6 +185,7 @@ export function ItemCategoryFormModal({
         onOpenChange={handleOpenChange}
         size="md"
         disableOutsideClose
+        loading={saving}
         title={item ? 'Edit completeness item' : 'Add completeness item'}
         description={
           item
@@ -170,7 +201,10 @@ export function ItemCategoryFormModal({
             >
               Cancel
             </Button>
-            <Button type="submit" form="item-category-form">
+            <Button type="submit" form="item-category-form" disabled={saving}>
+              {saving && (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              )}
               {item ? 'Save changes' : 'Create item'}
             </Button>
           </>
@@ -214,8 +248,12 @@ export function ItemCategoryFormModal({
                 value={values.code}
                 onChange={(event) => setField('code', event.target.value)}
                 placeholder="e.g. ACC-001"
+                aria-invalid={Boolean(errors.code)}
                 className={fieldClasses}
               />
+              {errors.code && (
+                <p className="text-xs text-rose-600">{errors.code}</p>
+              )}
             </div>
           </div>
 

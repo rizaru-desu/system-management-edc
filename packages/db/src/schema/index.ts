@@ -7,4 +7,5 @@ export * from "./merchant.js";
 export * from "./account.js";
 export * from "./project.js";
 export * from "./contract-line.js";
+export * from "./item-category.js";
 
