@@ -1,5 +1,4 @@
-import { WAREHOUSE_PARENT_TYPE } from '../data/warehouses.ts'
-import type { WarehouseRecord, WarehouseType } from '../data/warehouses.ts'
+import type { WarehouseRecord } from '../data/warehouses.ts'
 
 export interface WarehouseNode {
   record: WarehouseRecord
@@ -129,50 +128,11 @@ export function collectDescendantIds(
   return descendants
 }
 
+/**
+ * One entry of the form's parent dropdown, served by GET
+ * /warehouses/eligible-parents (see `api/eligible-parents.ts`).
+ */
 export interface ParentOption {
   id: string
   label: string
-}
-
-/**
- * Parent choices for the add/edit form given the selected warehouse type:
- * only warehouses of the one valid parent level (Regional → Central,
- * Service Point → Regional), excluding — when editing — the record itself
- * and its subtree, so a warehouse can never become its own ancestor.
- * Central returns an empty list (it has no parent by definition).
- */
-export function buildParentOptions(
-  records: Array<WarehouseRecord>,
-  type: WarehouseType | '',
-  excludeId: string | null,
-): Array<ParentOption> {
-  if (type === '') return []
-  const parentType = WAREHOUSE_PARENT_TYPE[type]
-  if (parentType === null) return []
-  const excluded = excludeId
-    ? new Set([excludeId, ...collectDescendantIds(records, excludeId)])
-    : new Set<string>()
-  return records
-    .filter((record) => record.type === parentType && !excluded.has(record.id))
-    .map((record) => ({
-      id: record.id,
-      label: `${record.name} (${record.code})`,
-    }))
-}
-
-/** Names from the root down to `id`, e.g. Central → Regional → this. */
-export function buildHierarchyPath(
-  records: Array<WarehouseRecord>,
-  id: string,
-): Array<string> {
-  const byId = new Map(records.map((record) => [record.id, record]))
-  const path: Array<string> = []
-  const seen = new Set<string>()
-  let current = byId.get(id)
-  while (current && !seen.has(current.id)) {
-    seen.add(current.id)
-    path.unshift(current.name)
-    current = current.parentId ? byId.get(current.parentId) : undefined
-  }
-  return path
 }

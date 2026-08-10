@@ -18,6 +18,7 @@
     "seed:mobile-version": "pnpm run build:deps && nest build && node dist/scripts/seed-mobile-version.js",
     "seed:item-categories": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js",
     "seed:service-points": "pnpm run build:deps && nest build && node dist/scripts/seed-service-points.js",
+    "seed:warehouses": "pnpm run build:deps && nest build && node dist/scripts/seed-warehouses.js",
     "seed:merchants": "pnpm run build:deps && nest build && node dist/scripts/seed-merchants.js",
     "seed:accounts": "pnpm run build:deps && nest build && node dist/scripts/seed-accounts.js",
     "seed:projects": "pnpm run build:deps && nest build && node dist/scripts/seed-projects.js",

@@ -8,4 +8,5 @@ export * from "./account.js";
 export * from "./project.js";
 export * from "./contract-line.js";
 export * from "./item-category.js";
+export * from "./warehouse.js";
 

@@ -9,8 +9,11 @@ import {
   CreditCard,
   EllipsisVertical,
   Eye,
+  Loader2,
   Pencil,
   SearchX,
+  Trash2,
+  TriangleAlert,
   Warehouse,
 } from 'lucide-react'
 
@@ -32,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { Switch } from '#/components/ui/switch.tsx'
 import {
   Tooltip,
   TooltipContent,
@@ -91,6 +95,10 @@ interface WarehousesTableProps {
   total: number
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
+  isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while the tree is being pruned by an active search/filter. */
   isFiltering: boolean
   /** Expansion is locked while filtering — matches must stay visible. */
@@ -98,6 +106,9 @@ interface WarehousesTableProps {
   onClearFilters: () => void
   onView: (record: WarehouseRecord) => void
   onEdit: (record: WarehouseRecord) => void
+  /** Flips the row's active status straight from the table. */
+  onToggleStatus: (record: WarehouseRecord) => void
+  onDelete: (record: WarehouseRecord) => void
 }
 
 export function WarehousesTable({
@@ -105,11 +116,17 @@ export function WarehousesTable({
   total,
   pagination,
   onPaginationChange,
+  isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onToggleExpand,
   onClearFilters,
   onView,
   onEdit,
+  onToggleStatus,
+  onDelete,
 }: WarehousesTableProps) {
   const columns = useMemo<Array<LegacyColumnDef<WarehouseRow>>>(
     () => [
@@ -222,9 +239,26 @@ export function WarehousesTable({
       {
         id: 'status',
         header: 'Status',
-        cell: ({ row }) => (
-          <StatusPill active={row.original.record.status === 'active'} />
-        ),
+        cell: ({ row }) => {
+          const record = row.original.record
+          const active = record.status === 'active'
+          return (
+            <div className="flex items-center gap-2.5">
+              <Switch
+                size="sm"
+                checked={active}
+                onCheckedChange={() => onToggleStatus(record)}
+                aria-label={
+                  active
+                    ? `Deactivate ${record.name}`
+                    : `Activate ${record.name}`
+                }
+                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+              />
+              <StatusPill active={active} />
+            </div>
+          )
+        },
       },
       {
         id: 'terminals',
@@ -281,6 +315,13 @@ export function WarehousesTable({
                     />
                     Edit warehouse
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => onDelete(record)}
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                    Delete
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -288,7 +329,7 @@ export function WarehousesTable({
         },
       },
     ],
-    [isFiltering, onToggleExpand, onView, onEdit],
+    [isFiltering, onToggleExpand, onView, onEdit, onToggleStatus, onDelete],
   )
 
   const table = useLegacyTable({
@@ -335,7 +376,39 @@ export function WarehousesTable({
           ))}
         </thead>
         <tbody>
-          {total === 0 && (
+          {isPending && (
+            <tr>
+              <td
+                colSpan={columns.length}
+                className="px-5 py-12 text-center text-sm text-brand-900/50"
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    strokeWidth={1.75}
+                  />
+                  Loading...
+                </div>
+              </td>
+            </tr>
+          )}
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -380,7 +453,7 @@ export function WarehousesTable({
         </tbody>
       </table>
 
-      {total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} visible warehouses

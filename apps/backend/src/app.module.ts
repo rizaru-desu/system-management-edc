@@ -15,6 +15,7 @@ import { ProjectModule } from './projects/project.module';
 import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
 import { ServicePointModule } from './service-points/service-point.module';
 import { UsersModule } from './users/users.module';
+import { WarehouseModule } from './warehouses/warehouse.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module';
     ProjectModule,
     ServicePointModule,
     ServicePointAssignmentModule,
+    WarehouseModule,
   ],
   controllers: [AppController],
   providers: [AppService],
