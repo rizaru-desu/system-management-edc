@@ -6,6 +6,7 @@ import { ContractLineModule } from './contract-lines/contract-line.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppReleaseModule } from './app-releases/app-release.module';
+import { ItemCategoryModule } from './item-categories/item-category.module';
 import { MailModule } from './mail/mail.module';
 import { MerchantModule } from './merchants/merchant.module';
 import { MobileModule } from './mobile/mobile.module';
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
     AccountModule,
     AppReleaseModule,
     ContractLineModule,
+    ItemCategoryModule,
     UsersModule,
     PermissionsModule,
     MailModule,
