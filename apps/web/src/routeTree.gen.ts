@@ -20,6 +20,7 @@ import { Route as AuthedAccountsRouteImport } from './routes/_authed/accounts'
 import { Route as AuthedAppReleasesRouteImport } from './routes/_authed/app-releases'
 import { Route as AuthedContractLinesRouteImport } from './routes/_authed/contract-lines'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
+import { Route as AuthedItemCategoriesRouteImport } from './routes/_authed/item-categories'
 import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
@@ -79,6 +80,11 @@ const AuthedDashboardRoute = AuthedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedItemCategoriesRoute = AuthedItemCategoriesRouteImport.update({
+  id: '/item-categories',
+  path: '/item-categories',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedMerchantsRoute = AuthedMerchantsRouteImport.update({
   id: '/merchants',
   path: '/merchants',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/app-releases': typeof AuthedAppReleasesRoute
   '/contract-lines': typeof AuthedContractLinesRoute
   '/dashboard': typeof AuthedDashboardRoute
+  '/item-categories': typeof AuthedItemCategoriesRoute
   '/merchants': typeof AuthedMerchantsRoute
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
@@ -127,6 +134,7 @@ export interface FileRoutesByTo {
   '/app-releases': typeof AuthedAppReleasesRoute
   '/contract-lines': typeof AuthedContractLinesRoute
   '/dashboard': typeof AuthedDashboardRoute
+  '/item-categories': typeof AuthedItemCategoriesRoute
   '/merchants': typeof AuthedMerchantsRoute
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
@@ -145,6 +153,7 @@ export interface FileRoutesById {
   '/_authed/app-releases': typeof AuthedAppReleasesRoute
   '/_authed/contract-lines': typeof AuthedContractLinesRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
+  '/_authed/item-categories': typeof AuthedItemCategoriesRoute
   '/_authed/merchants': typeof AuthedMerchantsRoute
   '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/app-releases'
     | '/contract-lines'
     | '/dashboard'
+    | '/item-categories'
     | '/merchants'
     | '/projects'
     | '/service-points'
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/app-releases'
     | '/contract-lines'
     | '/dashboard'
+    | '/item-categories'
     | '/merchants'
     | '/projects'
     | '/service-points'
@@ -196,6 +207,7 @@ export interface FileRouteTypes {
     | '/_authed/app-releases'
     | '/_authed/contract-lines'
     | '/_authed/dashboard'
+    | '/_authed/item-categories'
     | '/_authed/merchants'
     | '/_authed/projects'
     | '/_authed/service-points'
@@ -290,6 +302,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedDashboardRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/item-categories': {
+      id: '/_authed/item-categories'
+      path: '/item-categories'
+      fullPath: '/item-categories'
+      preLoaderRoute: typeof AuthedItemCategoriesRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/merchants': {
       id: '/_authed/merchants'
       path: '/merchants'
@@ -327,6 +346,7 @@ interface AuthedRouteChildren {
   AuthedAppReleasesRoute: typeof AuthedAppReleasesRoute
   AuthedContractLinesRoute: typeof AuthedContractLinesRoute
   AuthedDashboardRoute: typeof AuthedDashboardRoute
+  AuthedItemCategoriesRoute: typeof AuthedItemCategoriesRoute
   AuthedMerchantsRoute: typeof AuthedMerchantsRoute
   AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
@@ -339,6 +359,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedAppReleasesRoute: AuthedAppReleasesRoute,
   AuthedContractLinesRoute: AuthedContractLinesRoute,
   AuthedDashboardRoute: AuthedDashboardRoute,
+  AuthedItemCategoriesRoute: AuthedItemCategoriesRoute,
   AuthedMerchantsRoute: AuthedMerchantsRoute,
   AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
