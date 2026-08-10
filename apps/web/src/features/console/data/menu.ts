@@ -191,6 +191,7 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         title: 'Warehouses',
         path: 'warehouses',
         allowedRoles: ['System_Administrator', 'Inventory_Controller'],
+        directRoute: '/warehouses',
       },
       {
         title: 'Stock Levels',
