@@ -25,6 +25,8 @@ import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
+import { Route as AuthedWarehousesIndexRouteImport } from './routes/_authed/warehouses/index'
+import { Route as AuthedWarehousesWarehouseIdRouteImport } from './routes/_authed/warehouses/$warehouseId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -105,6 +107,17 @@ const AuthedUsersRoute = AuthedUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedWarehousesIndexRoute = AuthedWarehousesIndexRouteImport.update({
+  id: '/warehouses/',
+  path: '/warehouses/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedWarehousesWarehouseIdRoute =
+  AuthedWarehousesWarehouseIdRouteImport.update({
+    id: '/warehouses/$warehouseId',
+    path: '/warehouses/$warehouseId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -122,6 +135,8 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -139,6 +154,8 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/warehouses': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -158,6 +175,8 @@ export interface FileRoutesById {
   '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
+  '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/_authed/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +196,8 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/warehouses/$warehouseId'
+    | '/warehouses/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -194,6 +215,8 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/warehouses/$warehouseId'
+    | '/warehouses'
   id:
     | '__root__'
     | '/'
@@ -212,6 +235,8 @@ export interface FileRouteTypes {
     | '/_authed/projects'
     | '/_authed/service-points'
     | '/_authed/users'
+    | '/_authed/warehouses/$warehouseId'
+    | '/_authed/warehouses/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -337,6 +362,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/warehouses/': {
+      id: '/_authed/warehouses/'
+      path: '/warehouses'
+      fullPath: '/warehouses/'
+      preLoaderRoute: typeof AuthedWarehousesIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/warehouses/$warehouseId': {
+      id: '/_authed/warehouses/$warehouseId'
+      path: '/warehouses/$warehouseId'
+      fullPath: '/warehouses/$warehouseId'
+      preLoaderRoute: typeof AuthedWarehousesWarehouseIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -351,6 +390,8 @@ interface AuthedRouteChildren {
   AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
+  AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
+  AuthedWarehousesIndexRoute: typeof AuthedWarehousesIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -364,6 +405,8 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,
+  AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
+  AuthedWarehousesIndexRoute: AuthedWarehousesIndexRoute,
 }
 
 const AuthedRouteWithChildren =
