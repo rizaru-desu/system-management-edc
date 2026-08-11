@@ -10,4 +10,5 @@ export * from "./contract-line.js";
 export * from "./item-category.js";
 export * from "./warehouse.js";
 export * from "./product.js";
+export * from "./terminal.js";
 

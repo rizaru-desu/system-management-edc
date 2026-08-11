@@ -67,7 +67,13 @@ function escapeLike(value: string): string {
 
 const parent = alias(warehouses, "parent");
 
-const terminalCountSql = sql<number>`0`.mapWith(Number);
+/** Live terminals currently sitting at the warehouse — the count column. */
+const terminalCountSql = sql<number>`coalesce((
+  select count(*)
+  from terminals t
+  where t.warehouse_id = ${warehouses.id}
+    and t.deleted_at is null
+), 0)`.mapWith(Number);
 
 const rowColumns = {
   id: warehouses.id,

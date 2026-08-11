@@ -510,3 +510,22 @@ export async function insertMerchants(
     return { ok: true as const, inserted: inserted.length };
   });
 }
+
+/** One entry of a merchant dropdown (id + display name). */
+export interface MerchantOption {
+  id: string;
+  merchantName: string;
+}
+
+/**
+ * Every live ACTIVE merchant as a dropdown option, unpaginated and ordered
+ * by name — the terminals form's installed-merchant picker. Served through
+ * the terminals module so it rides the caller's terminals grant.
+ */
+export async function listMerchantOptions(): Promise<MerchantOption[]> {
+  return db
+    .select({ id: merchants.id, merchantName: merchants.merchantName })
+    .from(merchants)
+    .where(and(isNull(merchants.deletedAt), eq(merchants.status, "ACTIVE")))
+    .orderBy(asc(merchants.merchantName));
+}

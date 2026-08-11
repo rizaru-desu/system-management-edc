@@ -69,7 +69,13 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-const terminalCountSql = sql<number>`0`.mapWith(Number);
+/** Live terminals registered with the model — the console's count column. */
+const terminalCountSql = sql<number>`coalesce((
+  select count(*)
+  from terminals t
+  where t.product_id = ${products.id}
+    and t.deleted_at is null
+), 0)`.mapWith(Number);
 
 const completenessItemCountSql = sql<number>`coalesce((
   select count(*)
@@ -492,4 +498,28 @@ export async function upsertProductsByModelName(
   });
 
   return { created, updated };
+}
+
+/** One entry of a product dropdown (id + display fields). */
+export interface ProductOption {
+  id: string;
+  modelName: string;
+  brand: string;
+}
+
+/**
+ * Every live ACTIVE product as a dropdown option, unpaginated and ordered
+ * by model name — the terminals form's product picker. Served through the
+ * terminals module so it rides the caller's terminals grant.
+ */
+export async function listProductOptions(): Promise<ProductOption[]> {
+  return db
+    .select({
+      id: products.id,
+      modelName: products.modelName,
+      brand: products.brand,
+    })
+    .from(products)
+    .where(and(notDeleted, eq(products.status, "ACTIVE")))
+    .orderBy(asc(products.modelName));
 }

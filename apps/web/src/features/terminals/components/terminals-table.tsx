@@ -11,12 +11,14 @@ import {
   Eye,
   Pencil,
   SearchX,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,12 +37,13 @@ import {
   TERMINAL_CONDITION_LABELS,
   TERMINAL_STATUS_BADGE_CLASSES,
   TERMINAL_STATUS_LABELS,
-  findProductOption,
-  findWarehouseOption,
 } from '../data/terminals.ts'
 import type { TerminalRecord } from '../data/terminals.ts'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+/** Column count used by the loading-skeleton rows. */
+const SKELETON_ROWS = 6
 
 /** Same per-type badge looks as the warehouses module. */
 const WAREHOUSE_TYPE_BADGES: Record<
@@ -80,12 +83,16 @@ function paginationItems(
 }
 
 interface TerminalsTableProps {
-  /** The rows of the current (client-side) page only. */
+  /** The rows of the current (server-side) page only. */
   rows: Array<TerminalRecord>
   /** Rows matching the filters across all pages. */
   total: number
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
+  isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while a search/status/warehouse/product filter is active. */
   isFiltering: boolean
   onClearFilters: () => void
@@ -98,6 +105,10 @@ export function TerminalsTable({
   total,
   pagination,
   onPaginationChange,
+  isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onClearFilters,
   onView,
@@ -121,33 +132,31 @@ export function TerminalsTable({
       {
         id: 'product',
         header: 'Product',
-        cell: ({ row }) => {
-          const product = findProductOption(row.original.productId)
-          return product ? (
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate font-medium text-brand-900">
-                {product.modelName}
-              </span>
-              <span className="block truncate text-[11px] text-brand-900/45">
-                {product.brand}
-              </span>
+        cell: ({ row }) => (
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate font-medium text-brand-900">
+              {row.original.productModelName}
             </span>
-          ) : (
-            <span className="text-brand-900/40">—</span>
-          )
-        },
+            <span className="block truncate text-[11px] text-brand-900/45">
+              {row.original.productBrand}
+            </span>
+          </span>
+        ),
       },
       {
         id: 'warehouse',
         header: 'Current Warehouse',
         cell: ({ row }) => {
-          const warehouse = findWarehouseOption(row.original.warehouseId)
-          if (!warehouse) return <span className="text-brand-900/40">—</span>
-          const badge = WAREHOUSE_TYPE_BADGES[warehouse.type]
+          const { warehouseName, warehouseType } = row.original
+          // In-transit units may carry no fixed warehouse.
+          if (!warehouseName || !warehouseType) {
+            return <span className="text-brand-900/40">—</span>
+          }
+          const badge = WAREHOUSE_TYPE_BADGES[warehouseType]
           return (
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate text-brand-900/80">
-                {warehouse.name}
+                {warehouseName}
               </span>
               <Badge variant={badge.variant} size="sm">
                 {badge.label}
@@ -283,7 +292,39 @@ export function TerminalsTable({
           ))}
         </thead>
         <tbody>
-          {total === 0 && (
+          {isPending &&
+            Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              <tr key={index} className="border-b border-brand-100">
+                {columns.map((column) => (
+                  <td key={column.id} className="px-5 py-3.5">
+                    <Skeleton
+                      className={cn(
+                        'h-4',
+                        column.id === 'serialNumber' ? 'w-32' : 'w-16',
+                        column.id === 'actions' && 'ml-auto w-8',
+                      )}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -313,22 +354,23 @@ export function TerminalsTable({
               </td>
             </tr>
           )}
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.original.id}
-              className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-5 py-3.5">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {!isPending &&
+            table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.id}
+                className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-5 py-3.5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
 
-      {total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} terminals

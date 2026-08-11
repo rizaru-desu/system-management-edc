@@ -14,6 +14,7 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { ProductModule } from './products/product.module';
 import { ProjectModule } from './projects/project.module';
 import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
+import { TerminalModule } from './terminals/terminal.module';
 import { ServicePointModule } from './service-points/service-point.module';
 import { UsersModule } from './users/users.module';
 import { WarehouseModule } from './warehouses/warehouse.module';
@@ -34,6 +35,7 @@ import { WarehouseModule } from './warehouses/warehouse.module';
     ProjectModule,
     ServicePointModule,
     ServicePointAssignmentModule,
+    TerminalModule,
     WarehouseModule,
   ],
   controllers: [AppController],

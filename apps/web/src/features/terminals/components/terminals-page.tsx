@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { PackagePlus } from 'lucide-react'
-import { toast } from 'sonner'
 import type { PaginationState } from '@tanstack/react-table'
 
 import { Button } from '#/components/ui/button.tsx'
@@ -13,14 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { useCreateTerminal } from '../api/create-terminal.ts'
 import {
-  PRODUCT_OPTIONS,
-  TERMINAL_STATUSES,
-  TERMINAL_STATUS_LABELS,
-  WAREHOUSE_OPTIONS,
-  getTerminals,
-  saveTerminals,
-} from '../data/terminals.ts'
+  terminalProductOptionsQueryOptions,
+  terminalWarehouseOptionsQueryOptions,
+} from '../api/form-options.ts'
+import {
+  isDuplicateSerialError,
+  terminalsListQueryOptions,
+} from '../api/list-terminals.ts'
+import { useUpdateTerminal } from '../api/update-terminal.ts'
+import { TERMINAL_STATUSES, TERMINAL_STATUS_LABELS } from '../data/terminals.ts'
 import type { TerminalRecord, TerminalStatus } from '../data/terminals.ts'
 import { TerminalFormModal } from './terminal-form-modal.tsx'
 import type { TerminalFormValues } from './terminal-form-modal.tsx'
@@ -29,30 +32,24 @@ import { TerminalsTable } from './terminals-table.tsx'
 /**
  * Terminal Lifecycle → Terminals: the physical EDC units per serial
  * number — the meeting point of Products (the model) and Warehouses (the
- * current location). UI-only for now — the fleet lives in a module-level
- * mock store (shared with the detail page); search, status/warehouse/
- * product filters and pagination all run client-side. In production units
- * are created by Inbound Shipment inspections; the manual form stays for
- * legacy-data migration and corrections.
+ * current location). Search, status/warehouse/product filters and
+ * pagination all run server-side (GET /terminals, display fields joined),
+ * and every write goes through the backend API; the mutation hooks own
+ * toasts and cache invalidation. In production units are created by
+ * Inbound Shipment inspections; the manual form stays for legacy-data
+ * migration and corrections.
  */
 export function TerminalsPage() {
   const navigate = useNavigate()
-  const [records, setRecords] = useState<Array<TerminalRecord>>(getTerminals)
 
-  /** Every mutation writes both the page state and the shared mock store. */
-  const commit = (next: Array<TerminalRecord>) => {
-    setRecords(next)
-    saveTerminals(next)
-  }
-
-  // ── Search & filters ───────────────────────────────────────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | TerminalStatus>(
     'all',
   )
   const [warehouseFilter, setWarehouseFilter] = useState('all')
   const [productFilter, setProductFilter] = useState('all')
-  // Debounced copy of `search` so the list isn't re-filtered per keystroke.
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
@@ -74,22 +71,13 @@ export function TerminalsPage() {
     setProductFilter('all')
   }
 
-  const filteredRecords = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase()
-    return records.filter((record) => {
-      const matchesTerm =
-        term === '' || record.serialNumber.toLowerCase().includes(term)
-      const matchesStatus =
-        statusFilter === 'all' || record.status === statusFilter
-      const matchesWarehouse =
-        warehouseFilter === 'all' || record.warehouseId === warehouseFilter
-      const matchesProduct =
-        productFilter === 'all' || record.productId === productFilter
-      return matchesTerm && matchesStatus && matchesWarehouse && matchesProduct
-    })
-  }, [records, debouncedSearch, statusFilter, warehouseFilter, productFilter])
+  // Warehouse/product filter dropdowns share the form's options endpoints.
+  const warehouseOptionsQuery = useQuery(terminalWarehouseOptionsQueryOptions())
+  const productOptionsQuery = useQuery(terminalProductOptionsQueryOptions())
+  const warehouseOptions = warehouseOptionsQuery.data ?? []
+  const productOptions = productOptionsQuery.data ?? []
 
-  // ── Pagination (client-side over the filtered list) ────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -103,26 +91,35 @@ export function TerminalsPage() {
     )
   }, [debouncedSearch, statusFilter, warehouseFilter, productFilter])
 
-  const pageRows = useMemo(
-    () =>
-      filteredRecords.slice(
-        pagination.pageIndex * pagination.pageSize,
-        (pagination.pageIndex + 1) * pagination.pageSize,
-      ),
-    [filteredRecords, pagination],
+  const listQuery = useQuery(
+    terminalsListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      warehouseId: warehouseFilter,
+      productId: productFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
   )
+  const terminals = listQuery.data?.terminals ?? []
+  const total = listQuery.data?.total ?? 0
 
-  // ── Modal ──────────────────────────────────────────────────────────────
+  // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<TerminalRecord | null>(null)
+  // Bumped on every duplicate-serial 409 so the form modal highlights the
+  // serial field without losing the entered values.
+  const [duplicateSerialConflict, setDuplicateSerialConflict] = useState(0)
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateSerialConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: TerminalRecord) => {
     setEditing(record)
+    setDuplicateSerialConflict(0)
     setFormOpen(true)
   }
 
@@ -133,40 +130,40 @@ export function TerminalsPage() {
     })
   }
 
-  /** Mock uniqueness check on serial, ignoring the record being edited. */
-  const isSerialTaken = (serial: string) => {
-    const candidate = serial.trim().toLowerCase()
-    return records.some(
-      (record) =>
-        record.id !== editing?.id &&
-        record.serialNumber.trim().toLowerCase() === candidate,
-    )
-  }
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createTerminal = useCreateTerminal()
+  const updateTerminal = useUpdateTerminal()
 
-  // ── Mock CRUD (local store only until the backend exists) ──────────────
+  const saving = createTerminal.isPending || updateTerminal.isPending
+
+  // The form stays open (with its submit disabled) until the save lands,
+  // so a rejected payload keeps the user's input intact; a duplicate-serial
+  // 409 additionally highlights the field inline.
   const handleSubmit = (values: TerminalFormValues) => {
     // The form validated the required selects before submitting.
-    const shared = {
+    const payload = {
       serialNumber: values.serialNumber,
       productId: values.productId,
-      warehouseId: values.warehouseId,
+      warehouseId: values.warehouseId || null,
       status: values.status as TerminalStatus,
       condition: values.condition as TerminalRecord['condition'],
-      merchantName: values.merchantName,
+      merchantId: values.merchantId || null,
       entryDate: values.entryDate,
       notes: values.notes,
     }
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateSerialError(error)) {
+          setDuplicateSerialConflict((previous) => previous + 1)
+        }
+      },
+    }
     if (editing) {
-      commit(
-        records.map((record) =>
-          record.id === editing.id ? { ...record, ...shared } : record,
-        ),
-      )
-      toast.success(`Terminal “${values.serialNumber}” updated.`)
+      updateTerminal.mutate({ id: editing.id, ...payload }, callbacks)
       return
     }
-    commit([...records, { ...shared, id: `trm-${Date.now().toString(36)}` }])
-    toast.success(`Terminal “${values.serialNumber}” created.`)
+    createTerminal.mutate(payload, callbacks)
   }
 
   return (
@@ -198,6 +195,7 @@ export function TerminalsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search serial number…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -223,7 +221,7 @@ export function TerminalsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All warehouses</SelectItem>
-            {WAREHOUSE_OPTIONS.map((warehouse) => (
+            {warehouseOptions.map((warehouse) => (
               <SelectItem key={warehouse.id} value={warehouse.id}>
                 {/* Figure-space indent mirrors the tree depth. */}
                 {'  '.repeat(warehouse.depth)}
@@ -238,7 +236,7 @@ export function TerminalsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All products</SelectItem>
-            {PRODUCT_OPTIONS.map((product) => (
+            {productOptions.map((product) => (
               <SelectItem key={product.id} value={product.id}>
                 {product.modelName}
               </SelectItem>
@@ -249,10 +247,18 @@ export function TerminalsPage() {
 
       {/* Table */}
       <TerminalsTable
-        rows={pageRows}
-        total={filteredRecords.length}
+        rows={terminals}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load terminals.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onView={openDetail}
@@ -263,7 +269,8 @@ export function TerminalsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         terminal={editing}
-        isSerialTaken={isSerialTaken}
+        saving={saving}
+        duplicateSerialConflict={duplicateSerialConflict}
         onSubmit={handleSubmit}
       />
     </div>

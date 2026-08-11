@@ -19,6 +19,7 @@
     "seed:item-categories": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js",
     "seed:products": "pnpm run build:deps && nest build && node dist/scripts/seed-products.js",
     "seed:service-points": "pnpm run build:deps && nest build && node dist/scripts/seed-service-points.js",
+    "seed:terminals": "pnpm run build:deps && nest build && node dist/scripts/seed-terminals.js",
     "seed:warehouses": "pnpm run build:deps && nest build && node dist/scripts/seed-warehouses.js",
     "seed:merchants": "pnpm run build:deps && nest build && node dist/scripts/seed-merchants.js",
     "seed:accounts": "pnpm run build:deps && nest build && node dist/scripts/seed-accounts.js",
