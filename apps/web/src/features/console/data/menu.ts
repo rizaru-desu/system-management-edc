@@ -162,6 +162,16 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
     parent: 'Terminal Lifecycle',
     icon: CreditCard,
     submenus: [
+      {
+        title: 'Products',
+        path: 'products',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Inventory_Controller',
+        ],
+        directRoute: '/products',
+      },
       { title: 'Terminals', path: 'terminals', allowedRoles: ALL },
       {
         title: 'Deployments',

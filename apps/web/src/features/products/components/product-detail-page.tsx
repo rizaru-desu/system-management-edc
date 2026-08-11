@@ -1,0 +1,623 @@
+import { useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import {
+  ArrowLeft,
+  ImagePlus,
+  PackagePlus,
+  Save,
+  SearchX,
+  Trash2,
+} from 'lucide-react'
+import { toast } from 'sonner'
+
+import { Badge } from '#/components/ui/badge.tsx'
+import { Button } from '#/components/ui/button.tsx'
+import { Card } from '#/components/ui/card.tsx'
+import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { Input } from '#/components/ui/input.tsx'
+import { Label } from '#/components/ui/label.tsx'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select.tsx'
+import { StatusPill } from '#/components/ui/status-pill.tsx'
+import { Switch } from '#/components/ui/switch.tsx'
+import { Textarea } from '#/components/ui/textarea.tsx'
+import { cn } from '#/lib/utils.ts'
+import {
+  COMPLETENESS_ITEM_OPTIONS,
+  PRODUCT_CATEGORIES,
+  getProducts,
+  saveProducts,
+} from '../data/products.ts'
+import type {
+  ProductCategory,
+  ProductCompletenessItem,
+  ProductRecord,
+} from '../data/products.ts'
+
+/** One editable row of the standard-completeness table. */
+interface CompletenessRow {
+  /** Stable render key, independent of the picked item. */
+  key: number
+  /** '' until the user picks an item — required, validated on save. */
+  itemCategoryId: string
+  required: boolean
+  /** Qty as entered; validated as a positive whole number on save. */
+  qty: string
+}
+
+interface GeneralErrors {
+  modelName?: string
+  brand?: string
+  category?: string
+}
+
+const TABS = [
+  { key: 'general', label: 'General Information' },
+  { key: 'completeness', label: 'Standard Completeness' },
+] as const
+
+type TabKey = (typeof TABS)[number]['key']
+
+interface ProductDetailPageProps {
+  /** null renders the create flow; otherwise edits the given product. */
+  productId: string | null
+}
+
+/**
+ * Terminal Lifecycle → Products → detail. One page serves both create and
+ * edit, split over two tabs: the general product fields, and the standard
+ * completeness list (item + required flag + qty) that the Inbound Shipment
+ * module will consume as its per-unit inspection checklist. UI-only for
+ * now — reads/writes go to the shared mock store; the completeness item
+ * options mirror the Item Categories master until the backend lands.
+ */
+export function ProductDetailPage({ productId }: ProductDetailPageProps) {
+  const navigate = useNavigate()
+  // Snapshot per navigation is enough for the mock stage — the store only
+  // changes through this page's save, which navigates away.
+  const records = getProducts()
+  const product = productId
+    ? (records.find((record) => record.id === productId) ?? null)
+    : null
+
+  const [activeTab, setActiveTab] = useState<TabKey>('general')
+
+  // ── General information ────────────────────────────────────────────────
+  const [modelName, setModelName] = useState(product?.modelName ?? '')
+  const [brand, setBrand] = useState(product?.brand ?? '')
+  const [category, setCategory] = useState<ProductCategory | ''>(
+    product?.category ?? '',
+  )
+  const [description, setDescription] = useState(product?.description ?? '')
+  const [status, setStatus] = useState<ProductRecord['status']>(
+    product?.status ?? 'active',
+  )
+  const [generalErrors, setGeneralErrors] = useState<GeneralErrors>({})
+
+  // ── Standard completeness rows ─────────────────────────────────────────
+  const rowKeyRef = useRef(0)
+  const [rows, setRows] = useState<Array<CompletenessRow>>(() =>
+    (product?.completenessItems ?? []).map((item) => ({
+      key: rowKeyRef.current++,
+      itemCategoryId: item.itemCategoryId,
+      required: item.required,
+      qty: String(item.standardQty),
+    })),
+  )
+  /** Per-row validation message, keyed by the row's render key. */
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
+
+  const usedItemIds = useMemo(
+    () => new Set(rows.map((row) => row.itemCategoryId).filter(Boolean)),
+    [rows],
+  )
+  const allItemsUsed = usedItemIds.size >= COMPLETENESS_ITEM_OPTIONS.length
+
+  const addRow = () => {
+    setRows((previous) => [
+      ...previous,
+      {
+        key: rowKeyRef.current++,
+        itemCategoryId: '',
+        required: true,
+        qty: '1',
+      },
+    ])
+  }
+
+  const updateRow = (key: number, patch: Partial<CompletenessRow>) => {
+    setRows((previous) =>
+      previous.map((row) => (row.key === key ? { ...row, ...patch } : row)),
+    )
+    setRowErrors((previous) => ({ ...previous, [key]: '' }))
+  }
+
+  const removeRow = (key: number) => {
+    setRows((previous) => previous.filter((row) => row.key !== key))
+    setRowErrors((previous) => ({ ...previous, [key]: '' }))
+  }
+
+  // ── Save ───────────────────────────────────────────────────────────────
+  const handleSave = () => {
+    const nextGeneralErrors: GeneralErrors = {}
+    if (!modelName.trim()) {
+      nextGeneralErrors.modelName = 'Model name is required.'
+    }
+    if (!brand.trim()) nextGeneralErrors.brand = 'Brand is required.'
+    if (!category) nextGeneralErrors.category = 'Category is required.'
+    setGeneralErrors(nextGeneralErrors)
+
+    const nextRowErrors: Record<number, string> = {}
+    for (const row of rows) {
+      if (!row.itemCategoryId) {
+        nextRowErrors[row.key] = 'Pick a completeness item.'
+        continue
+      }
+      const qty = Number(row.qty)
+      if (!row.qty.trim() || Number.isNaN(qty) || !Number.isInteger(qty)) {
+        nextRowErrors[row.key] = 'Qty must be a whole number.'
+      } else if (qty <= 0) {
+        nextRowErrors[row.key] = 'Qty must be at least 1.'
+      }
+    }
+    setRowErrors(nextRowErrors)
+
+    // Land the user on the first tab that still has a problem.
+    if (Object.keys(nextGeneralErrors).length > 0) {
+      setActiveTab('general')
+      return
+    }
+    if (Object.keys(nextRowErrors).length > 0) {
+      setActiveTab('completeness')
+      return
+    }
+
+    const completenessItems: Array<ProductCompletenessItem> = rows.map(
+      (row) => ({
+        itemCategoryId: row.itemCategoryId,
+        required: row.required,
+        standardQty: Number(row.qty),
+      }),
+    )
+    const shared = {
+      modelName: modelName.trim(),
+      brand: brand.trim(),
+      category: category as ProductCategory,
+      description: description.trim(),
+      status,
+      completenessItems,
+    }
+
+    if (product) {
+      saveProducts(
+        records.map((record) =>
+          record.id === product.id ? { ...record, ...shared } : record,
+        ),
+      )
+      toast.success(`Product “${shared.modelName}” updated.`)
+    } else {
+      saveProducts([
+        ...records,
+        {
+          ...shared,
+          id: `prd-${Date.now().toString(36)}`,
+          photoUrl: '',
+          terminalCount: 0,
+          createdAt: new Date().toISOString().slice(0, 10),
+        },
+      ])
+      toast.success(`Product “${shared.modelName}” created.`)
+    }
+    void navigate({ to: '/products' })
+  }
+
+  // Unknown id — the mock store resets on full reload, so stale links land
+  // here instead of an empty form pretending to edit something.
+  if (productId && !product) {
+    return (
+      <div className="animate-fade-up">
+        <EmptyState
+          icon={SearchX}
+          iconChip
+          title="Product not found"
+          description="It may have been removed, or the link is out of date."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/products">
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+                Back to products
+              </Link>
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
+
+  const fieldClasses =
+    'border-[#DDE0EC] bg-white text-[#0E2748] placeholder:text-[#0E2748]/40 dark:border-[#DDE0EC] dark:bg-white'
+
+  return (
+    <div className="animate-fade-up">
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-500">
+            Terminal Lifecycle · Products
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="outline" size="icon-sm" asChild>
+              <Link to="/products" aria-label="Back to products">
+                <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+              </Link>
+            </Button>
+            <h1 className="font-display text-3xl font-bold tracking-tight text-brand-900 md:text-4xl">
+              {product ? product.modelName : 'New Product'}
+            </h1>
+            {product && (
+              <>
+                <Badge variant="soft">{product.category}</Badge>
+                <StatusPill active={product.status === 'active'} />
+              </>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-brand-900/60">
+            {product
+              ? 'Update the model details and its standard completeness list.'
+              : 'Register an EDC model and define the completeness shipped with every unit.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link to="/products">Cancel</Link>
+          </Button>
+          <Button onClick={handleSave}>
+            <Save className="h-4 w-4" strokeWidth={1.75} />
+            {product ? 'Save changes' : 'Create product'}
+          </Button>
+        </div>
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        {/* Tab strip (same treatment as the user device drawer). */}
+        <div className="border-b border-brand-100 bg-white px-6">
+          <div className="flex gap-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  'relative px-4 py-3 text-xs font-bold uppercase tracking-wider transition-colors',
+                  activeTab === tab.key
+                    ? 'text-brand-500'
+                    : 'text-brand-900/50 hover:text-brand-900/80',
+                )}
+              >
+                {tab.label}
+                {tab.key === 'completeness' && (
+                  <span className="ml-1.5 rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-900/60 tabular-nums">
+                    {rows.length}
+                  </span>
+                )}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand-500" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab 1 — General Information */}
+        {activeTab === 'general' && (
+          <div className="space-y-5 p-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="prd-model" className="text-[#0E2748]">
+                  Model name{' '}
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="prd-model"
+                  value={modelName}
+                  onChange={(event) => {
+                    setModelName(event.target.value)
+                    setGeneralErrors((previous) => ({
+                      ...previous,
+                      modelName: undefined,
+                    }))
+                  }}
+                  placeholder="e.g. PAX A920 Pro"
+                  aria-invalid={Boolean(generalErrors.modelName)}
+                  className={fieldClasses}
+                />
+                {generalErrors.modelName && (
+                  <p className="text-xs text-rose-600">
+                    {generalErrors.modelName}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="prd-brand" className="text-[#0E2748]">
+                  Brand{' '}
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Input
+                  id="prd-brand"
+                  value={brand}
+                  onChange={(event) => {
+                    setBrand(event.target.value)
+                    setGeneralErrors((previous) => ({
+                      ...previous,
+                      brand: undefined,
+                    }))
+                  }}
+                  placeholder="e.g. PAX Technology"
+                  aria-invalid={Boolean(generalErrors.brand)}
+                  className={fieldClasses}
+                />
+                {generalErrors.brand && (
+                  <p className="text-xs text-rose-600">{generalErrors.brand}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="prd-category" className="text-[#0E2748]">
+                  Category{' '}
+                  <span className="text-rose-600" aria-hidden="true">
+                    *
+                  </span>
+                </Label>
+                <Select
+                  value={category}
+                  onValueChange={(value) => {
+                    setCategory(value as ProductCategory)
+                    setGeneralErrors((previous) => ({
+                      ...previous,
+                      category: undefined,
+                    }))
+                  }}
+                >
+                  <SelectTrigger
+                    id="prd-category"
+                    aria-invalid={Boolean(generalErrors.category)}
+                    className={`w-full ${fieldClasses}`}
+                  >
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCT_CATEGORIES.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {generalErrors.category && (
+                  <p className="text-xs text-rose-600">
+                    {generalErrors.category}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="prd-description" className="text-[#0E2748]">
+                Description{' '}
+                <span className="font-normal text-[#0E2748]/40">
+                  (optional)
+                </span>
+              </Label>
+              <Textarea
+                id="prd-description"
+                value={description}
+                maxLength={500}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="e.g. Terminal Android genggam dengan printer terintegrasi"
+                className={fieldClasses}
+              />
+            </div>
+
+            {/* Upload placeholder — the real upload flow ships with the
+              backend; this only reserves the layout slot. */}
+            <div className="space-y-1.5">
+              <Label className="text-[#0E2748]">
+                Product photo{' '}
+                <span className="font-normal text-[#0E2748]/40">
+                  (optional)
+                </span>
+              </Label>
+              <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#DDE0EC] bg-brand-50/40 px-6 py-8 text-center">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-500">
+                  <ImagePlus className="h-5 w-5" strokeWidth={1.75} />
+                </span>
+                <p className="text-sm font-medium text-brand-900/70">
+                  Photo upload coming soon
+                </p>
+                <p className="text-xs text-brand-900/45">
+                  Uploading will be enabled once the backend storage is wired
+                  up.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border border-[#DDE0EC] px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium text-[#0E2748]">
+                  Active product
+                </p>
+                <p className="text-xs text-[#0E2748]/50">
+                  Inactive models stay in the catalogue but are hidden from new
+                  terminal registration.
+                </p>
+              </div>
+              <Switch
+                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                checked={status === 'active'}
+                onCheckedChange={(checked) =>
+                  setStatus(checked ? 'active' : 'inactive')
+                }
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2 — Standard Completeness */}
+        {activeTab === 'completeness' && (
+          <div className="p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-brand-900/60">
+                Items shipped with every unit of this model — the Inbound
+                Shipment inspection checklist derives from this list.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addRow}
+                disabled={allItemsUsed}
+              >
+                <PackagePlus
+                  className="h-4 w-4 text-primary"
+                  strokeWidth={1.75}
+                />
+                Add completeness item
+              </Button>
+            </div>
+
+            {rows.length === 0 ? (
+              <EmptyState
+                icon={PackagePlus}
+                iconChip
+                title="No completeness items yet"
+                description="Add the items every unit of this model ships with."
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-brand-100">
+                <table className="w-full min-w-2xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-brand-100 text-[11px] uppercase tracking-wider text-brand-900/50">
+                      <th className="px-4 py-3 font-semibold">
+                        Completeness item
+                      </th>
+                      <th className="px-4 py-3 font-semibold">Required</th>
+                      <th className="px-4 py-3 font-semibold">Standard qty</th>
+                      <th className="px-4 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => {
+                      // Every option not claimed by another row: the same
+                      // item can never be listed twice on one product.
+                      const options = COMPLETENESS_ITEM_OPTIONS.filter(
+                        (option) =>
+                          option.id === row.itemCategoryId ||
+                          !usedItemIds.has(option.id),
+                      )
+                      return (
+                        <tr
+                          key={row.key}
+                          className="border-b border-brand-100 last:border-0"
+                        >
+                          <td className="px-4 py-3 align-top">
+                            <Select
+                              value={row.itemCategoryId}
+                              onValueChange={(value) =>
+                                updateRow(row.key, { itemCategoryId: value })
+                              }
+                            >
+                              <SelectTrigger
+                                aria-invalid={Boolean(rowErrors[row.key])}
+                                className={`w-full min-w-[220px] ${fieldClasses}`}
+                              >
+                                <SelectValue placeholder="Select an item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {options.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name} ({option.code}) —{' '}
+                                    {option.unit}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {rowErrors[row.key] && (
+                              <p className="mt-1 text-xs text-rose-600">
+                                {rowErrors[row.key]}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex items-center gap-2.5 pt-1.5">
+                              <Switch
+                                size="sm"
+                                checked={row.required}
+                                onCheckedChange={(checked) =>
+                                  updateRow(row.key, { required: checked })
+                                }
+                                aria-label="Required item"
+                                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                              />
+                              <span className="text-xs text-brand-900/60">
+                                {row.required ? 'Required' : 'Optional'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              value={row.qty}
+                              onChange={(event) =>
+                                updateRow(row.key, { qty: event.target.value })
+                              }
+                              aria-label="Standard quantity"
+                              aria-invalid={Boolean(rowErrors[row.key])}
+                              className={`w-24 ${fieldClasses}`}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-right align-top">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title="Remove item"
+                              aria-label="Remove completeness item"
+                              className="text-rose-600 hover:text-rose-700"
+                              onClick={() => removeRow(row.key)}
+                            >
+                              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {allItemsUsed && (
+              <p className="mt-3 text-xs text-brand-900/50">
+                Every completeness item from the Item Categories master is
+                already on this product.
+              </p>
+            )}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}

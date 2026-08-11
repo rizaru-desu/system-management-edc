@@ -25,6 +25,9 @@ import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
+import { Route as AuthedProductsIndexRouteImport } from './routes/_authed/products/index'
+import { Route as AuthedProductsProductIdRouteImport } from './routes/_authed/products/$productId'
+import { Route as AuthedProductsNewRouteImport } from './routes/_authed/products/new'
 import { Route as AuthedWarehousesIndexRouteImport } from './routes/_authed/warehouses/index'
 import { Route as AuthedWarehousesWarehouseIdRouteImport } from './routes/_authed/warehouses/$warehouseId'
 
@@ -107,6 +110,21 @@ const AuthedUsersRoute = AuthedUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedProductsIndexRoute = AuthedProductsIndexRouteImport.update({
+  id: '/products/',
+  path: '/products/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProductsProductIdRoute = AuthedProductsProductIdRouteImport.update({
+  id: '/products/$productId',
+  path: '/products/$productId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProductsNewRoute = AuthedProductsNewRouteImport.update({
+  id: '/products/new',
+  path: '/products/new',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedWarehousesIndexRoute = AuthedWarehousesIndexRouteImport.update({
   id: '/warehouses/',
   path: '/warehouses/',
@@ -135,7 +153,10 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/products/$productId': typeof AuthedProductsProductIdRoute
+  '/products/new': typeof AuthedProductsNewRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/products/': typeof AuthedProductsIndexRoute
   '/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -154,7 +175,10 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/products/$productId': typeof AuthedProductsProductIdRoute
+  '/products/new': typeof AuthedProductsNewRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/products': typeof AuthedProductsIndexRoute
   '/warehouses': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesById {
@@ -175,7 +199,10 @@ export interface FileRoutesById {
   '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
+  '/_authed/products/$productId': typeof AuthedProductsProductIdRoute
+  '/_authed/products/new': typeof AuthedProductsNewRoute
   '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/_authed/products/': typeof AuthedProductsIndexRoute
   '/_authed/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRouteTypes {
@@ -196,7 +223,10 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/products/$productId'
+    | '/products/new'
     | '/warehouses/$warehouseId'
+    | '/products/'
     | '/warehouses/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -215,7 +245,10 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/products/$productId'
+    | '/products/new'
     | '/warehouses/$warehouseId'
+    | '/products'
     | '/warehouses'
   id:
     | '__root__'
@@ -235,7 +268,10 @@ export interface FileRouteTypes {
     | '/_authed/projects'
     | '/_authed/service-points'
     | '/_authed/users'
+    | '/_authed/products/$productId'
+    | '/_authed/products/new'
     | '/_authed/warehouses/$warehouseId'
+    | '/_authed/products/'
     | '/_authed/warehouses/'
   fileRoutesById: FileRoutesById
 }
@@ -362,6 +398,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/products/': {
+      id: '/_authed/products/'
+      path: '/products'
+      fullPath: '/products/'
+      preLoaderRoute: typeof AuthedProductsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/products/$productId': {
+      id: '/_authed/products/$productId'
+      path: '/products/$productId'
+      fullPath: '/products/$productId'
+      preLoaderRoute: typeof AuthedProductsProductIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/products/new': {
+      id: '/_authed/products/new'
+      path: '/products/new'
+      fullPath: '/products/new'
+      preLoaderRoute: typeof AuthedProductsNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/warehouses/': {
       id: '/_authed/warehouses/'
       path: '/warehouses'
@@ -390,7 +447,10 @@ interface AuthedRouteChildren {
   AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
+  AuthedProductsProductIdRoute: typeof AuthedProductsProductIdRoute
+  AuthedProductsNewRoute: typeof AuthedProductsNewRoute
   AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
+  AuthedProductsIndexRoute: typeof AuthedProductsIndexRoute
   AuthedWarehousesIndexRoute: typeof AuthedWarehousesIndexRoute
 }
 
@@ -405,7 +465,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,
+  AuthedProductsProductIdRoute: AuthedProductsProductIdRoute,
+  AuthedProductsNewRoute: AuthedProductsNewRoute,
   AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
+  AuthedProductsIndexRoute: AuthedProductsIndexRoute,
   AuthedWarehousesIndexRoute: AuthedWarehousesIndexRoute,
 }
 
