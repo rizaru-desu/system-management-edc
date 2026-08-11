@@ -7,16 +7,26 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  EllipsisVertical,
   Pencil,
   SearchX,
   Smartphone,
+  Trash2,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import { StatusPill } from '#/components/ui/status-pill.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx'
 import {
   Select,
   SelectContent,
@@ -24,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import { Switch } from '#/components/ui/switch.tsx'
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +44,9 @@ import { cn } from '#/lib/utils.ts'
 import type { ProductRecord } from '../data/products.ts'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+/** Column count used by the loading-skeleton rows. */
+const SKELETON_ROWS = 6
 
 /**
  * Numbered pagination items: first/last always visible, a window around the
@@ -62,17 +76,24 @@ function paginationItems(
 }
 
 interface ProductsTableProps {
-  /** The rows of the current (client-side) page only. */
+  /** The rows of the current (server-side) page only. */
   rows: Array<ProductRecord>
   /** Rows matching the filters across all pages. */
   total: number
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
+  isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while a search/category/status filter is active. */
   isFiltering: boolean
   onClearFilters: () => void
   /** Opens the product's detail page (create & edit live there). */
   onOpen: (record: ProductRecord) => void
+  /** Flips the row's active status straight from the table. */
+  onToggleStatus: (record: ProductRecord) => void
+  onDelete: (record: ProductRecord) => void
 }
 
 export function ProductsTable({
@@ -80,9 +101,15 @@ export function ProductsTable({
   total,
   pagination,
   onPaginationChange,
+  isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onClearFilters,
   onOpen,
+  onToggleStatus,
+  onDelete,
 }: ProductsTableProps) {
   const columns = useMemo<Array<LegacyColumnDef<ProductRecord>>>(
     () => [
@@ -145,30 +172,73 @@ export function ProductsTable({
       {
         id: 'status',
         header: 'Status',
-        cell: ({ row }) => (
-          <StatusPill active={row.original.status === 'active'} />
-        ),
+        cell: ({ row }) => {
+          const record = row.original
+          const active = record.status === 'active'
+          return (
+            <div className="flex items-center gap-2.5">
+              <Switch
+                size="sm"
+                checked={active}
+                onCheckedChange={() => onToggleStatus(record)}
+                aria-label={
+                  active
+                    ? `Deactivate ${record.modelName}`
+                    : `Activate ${record.modelName}`
+                }
+                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+              />
+              <StatusPill active={active} />
+            </div>
+          )
+        },
       },
       {
         id: 'actions',
         header: 'Actions',
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              title="Edit product"
-              aria-label={`Edit ${row.original.modelName}`}
-              className="text-primary hover:text-foreground"
-              onClick={() => onOpen(row.original)}
-            >
-              <Pencil className="h-4 w-4" strokeWidth={1.75} />
-            </Button>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const record = row.original
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Actions"
+                    className="text-primary hover:text-foreground"
+                    // Keep the trigger click from reaching the row.
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <EllipsisVertical className="h-4 w-4" strokeWidth={1.75} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DropdownMenuItem onSelect={() => onOpen(record)}>
+                    <Pencil
+                      className="h-4 w-4 text-primary"
+                      strokeWidth={1.75}
+                    />
+                    Edit product
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => onDelete(record)}
+                  >
+                    <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )
+        },
       },
     ],
-    [onOpen],
+    [onOpen, onToggleStatus, onDelete],
   )
 
   const table = useLegacyTable({
@@ -214,7 +284,39 @@ export function ProductsTable({
           ))}
         </thead>
         <tbody>
-          {total === 0 && (
+          {isPending &&
+            Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              <tr key={index} className="border-b border-brand-100">
+                {columns.map((column) => (
+                  <td key={column.id} className="px-5 py-3.5">
+                    <Skeleton
+                      className={cn(
+                        'h-4',
+                        column.id === 'modelName' ? 'w-32' : 'w-16',
+                        column.id === 'actions' && 'ml-auto w-8',
+                      )}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -244,22 +346,23 @@ export function ProductsTable({
               </td>
             </tr>
           )}
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.original.id}
-              className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-5 py-3.5">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {!isPending &&
+            table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.id}
+                className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-5 py-3.5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
 
-      {total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} products

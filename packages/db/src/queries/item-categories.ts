@@ -53,7 +53,18 @@ function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
-const productUsageCountSql = sql<number>`0`.mapWith(Number);
+/**
+ * Live products whose standard completeness list references the item — the
+ * console's "Used in Products" column, kept in the row select so every
+ * read reports the same live number.
+ */
+const productUsageCountSql = sql<number>`coalesce((
+  select count(*)
+  from product_completeness_items pci
+  join products p on p.id = pci.product_id
+  where pci.item_category_id = ${itemCategories.id}
+    and p.deleted_at is null
+), 0)`.mapWith(Number);
 
 const rowColumns = {
   id: itemCategories.id,

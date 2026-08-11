@@ -1,14 +1,16 @@
 import { useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
   ImagePlus,
+  Loader2,
   PackagePlus,
   Save,
   SearchX,
   Trash2,
+  TriangleAlert,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
@@ -27,17 +29,22 @@ import { StatusPill } from '#/components/ui/status-pill.tsx'
 import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { cn } from '#/lib/utils.ts'
-import {
-  COMPLETENESS_ITEM_OPTIONS,
-  PRODUCT_CATEGORIES,
-  getProducts,
-  saveProducts,
-} from '../data/products.ts'
-import type {
-  ProductCategory,
-  ProductCompletenessItem,
-  ProductRecord,
-} from '../data/products.ts'
+import { itemCategoriesListQueryOptions } from '#/features/item-categories/index.ts'
+import { useCreateProduct } from '../api/create-product.ts'
+import type { ProductPayload } from '../api/create-product.ts'
+import { isDuplicateModelNameError } from '../api/list-products.ts'
+import { productDetailQueryOptions } from '../api/product-detail.ts'
+import { useUpdateProduct } from '../api/update-product.ts'
+import { PRODUCT_CATEGORIES } from '../data/products.ts'
+import type { ProductCategory, ProductDetail } from '../data/products.ts'
+
+/** One entry of the completeness dropdown (Item Categories master). */
+interface ItemOption {
+  id: string
+  name: string
+  code: string
+  unit: string
+}
 
 /** One editable row of the standard-completeness table. */
 interface CompletenessRow {
@@ -45,6 +52,8 @@ interface CompletenessRow {
   key: number
   /** '' until the user picks an item — required, validated on save. */
   itemCategoryId: string
+  /** Display fallback when the item is missing from the active options. */
+  itemName: string
   required: boolean
   /** Qty as entered; validated as a positive whole number on save. */
   qty: string
@@ -72,18 +81,80 @@ interface ProductDetailPageProps {
  * Terminal Lifecycle → Products → detail. One page serves both create and
  * edit, split over two tabs: the general product fields, and the standard
  * completeness list (item + required flag + qty) that the Inbound Shipment
- * module will consume as its per-unit inspection checklist. UI-only for
- * now — reads/writes go to the shared mock store; the completeness item
- * options mirror the Item Categories master until the backend lands.
+ * module will consume as its per-unit inspection checklist. The record
+ * comes from GET /products/:id; the completeness dropdown feeds off the
+ * live Item Categories master (active items only), and saves go through
+ * POST/PATCH — the completeness list replaced wholesale server-side.
  */
 export function ProductDetailPage({ productId }: ProductDetailPageProps) {
+  const detailQuery = useQuery({
+    ...productDetailQueryOptions(productId ?? ''),
+    enabled: productId !== null,
+  })
+
+  if (productId !== null) {
+    if (detailQuery.isPending) {
+      return (
+        <div className="animate-fade-up flex items-center justify-center py-24 text-sm text-brand-900/50">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />
+          Loading product…
+        </div>
+      )
+    }
+    if (detailQuery.isError) {
+      return (
+        <div className="animate-fade-up">
+          <EmptyState
+            icon={TriangleAlert}
+            tone="danger"
+            title={
+              detailQuery.error instanceof Error
+                ? detailQuery.error.message
+                : 'Failed to load the product.'
+            }
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => detailQuery.refetch()}
+              >
+                Try again
+              </Button>
+            }
+          />
+        </div>
+      )
+    }
+    // A 404 resolves to null (see the detail server fn).
+    if (detailQuery.data === null) {
+      return (
+        <div className="animate-fade-up">
+          <EmptyState
+            icon={SearchX}
+            iconChip
+            title="Product not found"
+            description="It may have been removed, or the link is out of date."
+            action={
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/products">
+                  <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
+                  Back to products
+                </Link>
+              </Button>
+            }
+          />
+        </div>
+      )
+    }
+  }
+
+  // The editor mounts only once the record is loaded, so its form state
+  // initializers can seed straight from props.
+  return <ProductEditor product={productId ? detailQuery.data! : null} />
+}
+
+function ProductEditor({ product }: { product: ProductDetail | null }) {
   const navigate = useNavigate()
-  // Snapshot per navigation is enough for the mock stage — the store only
-  // changes through this page's save, which navigates away.
-  const records = getProducts()
-  const product = productId
-    ? (records.find((record) => record.id === productId) ?? null)
-    : null
 
   const [activeTab, setActiveTab] = useState<TabKey>('general')
 
@@ -94,7 +165,7 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
     product?.category ?? '',
   )
   const [description, setDescription] = useState(product?.description ?? '')
-  const [status, setStatus] = useState<ProductRecord['status']>(
+  const [status, setStatus] = useState<ProductDetail['status']>(
     product?.status ?? 'active',
   )
   const [generalErrors, setGeneralErrors] = useState<GeneralErrors>({})
@@ -105,6 +176,7 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
     (product?.completenessItems ?? []).map((item) => ({
       key: rowKeyRef.current++,
       itemCategoryId: item.itemCategoryId,
+      itemName: item.itemName,
       required: item.required,
       qty: String(item.standardQty),
     })),
@@ -112,11 +184,29 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
   /** Per-row validation message, keyed by the row's render key. */
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
 
+  // The dropdown options come from the live Item Categories master —
+  // active items only, same source the backend validates against.
+  const itemsQuery = useQuery(
+    itemCategoriesListQueryOptions({ status: 'active', pageSize: 100 }),
+  )
+  const itemOptions = useMemo<Array<ItemOption>>(
+    () =>
+      (itemsQuery.data?.itemCategories ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        code: item.code,
+        unit: item.unit,
+      })),
+    [itemsQuery.data],
+  )
+
   const usedItemIds = useMemo(
     () => new Set(rows.map((row) => row.itemCategoryId).filter(Boolean)),
     [rows],
   )
-  const allItemsUsed = usedItemIds.size >= COMPLETENESS_ITEM_OPTIONS.length
+  const allItemsUsed =
+    itemOptions.length > 0 &&
+    itemOptions.every((option) => usedItemIds.has(option.id))
 
   const addRow = () => {
     setRows((previous) => [
@@ -124,6 +214,7 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
       {
         key: rowKeyRef.current++,
         itemCategoryId: '',
+        itemName: '',
         required: true,
         qty: '1',
       },
@@ -142,8 +233,13 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
     setRowErrors((previous) => ({ ...previous, [key]: '' }))
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────
+  // ── Save (backend API; the mutation hooks own toasts) ─────────────────
+  const createProduct = useCreateProduct()
+  const updateProduct = useUpdateProduct()
+  const saving = createProduct.isPending || updateProduct.isPending
+
   const handleSave = () => {
+    if (saving) return
     const nextGeneralErrors: GeneralErrors = {}
     if (!modelName.trim()) {
       nextGeneralErrors.modelName = 'Model name is required.'
@@ -177,66 +273,39 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
       return
     }
 
-    const completenessItems: Array<ProductCompletenessItem> = rows.map(
-      (row) => ({
-        itemCategoryId: row.itemCategoryId,
-        required: row.required,
-        standardQty: Number(row.qty),
-      }),
-    )
-    const shared = {
+    const payload: ProductPayload = {
       modelName: modelName.trim(),
       brand: brand.trim(),
       category: category as ProductCategory,
       description: description.trim(),
       status,
-      completenessItems,
+      completenessItems: rows.map((row) => ({
+        itemCategoryId: row.itemCategoryId,
+        required: row.required,
+        standardQty: Number(row.qty),
+      })),
     }
 
+    // The page stays open on failure so the input survives; a duplicate
+    // model-name 409 additionally highlights the field inline (the toast
+    // carries the backend message either way).
+    const callbacks = {
+      onSuccess: () => void navigate({ to: '/products' }),
+      onError: (error: unknown) => {
+        if (isDuplicateModelNameError(error)) {
+          setGeneralErrors((previous) => ({
+            ...previous,
+            modelName: 'A product with this model name already exists.',
+          }))
+          setActiveTab('general')
+        }
+      },
+    }
     if (product) {
-      saveProducts(
-        records.map((record) =>
-          record.id === product.id ? { ...record, ...shared } : record,
-        ),
-      )
-      toast.success(`Product “${shared.modelName}” updated.`)
-    } else {
-      saveProducts([
-        ...records,
-        {
-          ...shared,
-          id: `prd-${Date.now().toString(36)}`,
-          photoUrl: '',
-          terminalCount: 0,
-          createdAt: new Date().toISOString().slice(0, 10),
-        },
-      ])
-      toast.success(`Product “${shared.modelName}” created.`)
+      updateProduct.mutate({ id: product.id, ...payload }, callbacks)
+      return
     }
-    void navigate({ to: '/products' })
-  }
-
-  // Unknown id — the mock store resets on full reload, so stale links land
-  // here instead of an empty form pretending to edit something.
-  if (productId && !product) {
-    return (
-      <div className="animate-fade-up">
-        <EmptyState
-          icon={SearchX}
-          iconChip
-          title="Product not found"
-          description="It may have been removed, or the link is out of date."
-          action={
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/products">
-                <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
-                Back to products
-              </Link>
-            </Button>
-          }
-        />
-      </div>
-    )
+    createProduct.mutate(payload, callbacks)
   }
 
   const fieldClasses =
@@ -276,8 +345,12 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
           <Button variant="outline" asChild>
             <Link to="/products">Cancel</Link>
           </Button>
-          <Button onClick={handleSave}>
-            <Save className="h-4 w-4" strokeWidth={1.75} />
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+            ) : (
+              <Save className="h-4 w-4" strokeWidth={1.75} />
+            )}
             {product ? 'Save changes' : 'Create product'}
           </Button>
         </div>
@@ -429,8 +502,8 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
               />
             </div>
 
-            {/* Upload placeholder — the real upload flow ships with the
-              backend; this only reserves the layout slot. */}
+            {/* Upload placeholder — the real upload flow ships with backend
+              storage; this only reserves the layout slot. */}
             <div className="space-y-1.5">
               <Label className="text-[#0E2748]">
                 Product photo{' '}
@@ -485,7 +558,7 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
                 variant="outline"
                 size="sm"
                 onClick={addRow}
-                disabled={allItemsUsed}
+                disabled={itemsQuery.isPending || allItemsUsed}
               >
                 <PackagePlus
                   className="h-4 w-4 text-primary"
@@ -494,6 +567,20 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
                 Add completeness item
               </Button>
             </div>
+
+            {itemsQuery.isError && (
+              <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                Failed to load the Item Categories master — the item dropdown
+                may be incomplete.{' '}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2"
+                  onClick={() => itemsQuery.refetch()}
+                >
+                  Try again
+                </button>
+              </p>
+            )}
 
             {rows.length === 0 ? (
               <EmptyState
@@ -519,13 +606,28 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
                   </thead>
                   <tbody>
                     {rows.map((row) => {
-                      // Every option not claimed by another row: the same
-                      // item can never be listed twice on one product.
-                      const options = COMPLETENESS_ITEM_OPTIONS.filter(
+                      // Every active option not claimed by another row (the
+                      // same item can never be listed twice), plus the row's
+                      // own pick even when it is no longer active so an
+                      // existing checklist still renders and round-trips.
+                      const options: Array<ItemOption> = itemOptions.filter(
                         (option) =>
                           option.id === row.itemCategoryId ||
                           !usedItemIds.has(option.id),
                       )
+                      if (
+                        row.itemCategoryId &&
+                        !options.some(
+                          (option) => option.id === row.itemCategoryId,
+                        )
+                      ) {
+                        options.unshift({
+                          id: row.itemCategoryId,
+                          name: `${row.itemName} (inactive)`,
+                          code: '',
+                          unit: '',
+                        })
+                      }
                       return (
                         <tr
                           key={row.key}
@@ -535,20 +637,34 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
                             <Select
                               value={row.itemCategoryId}
                               onValueChange={(value) =>
-                                updateRow(row.key, { itemCategoryId: value })
+                                updateRow(row.key, {
+                                  itemCategoryId: value,
+                                  itemName:
+                                    itemOptions.find(
+                                      (option) => option.id === value,
+                                    )?.name ?? row.itemName,
+                                })
                               }
+                              disabled={itemsQuery.isPending}
                             >
                               <SelectTrigger
                                 aria-invalid={Boolean(rowErrors[row.key])}
                                 className={`w-full min-w-[220px] ${fieldClasses}`}
                               >
-                                <SelectValue placeholder="Select an item" />
+                                <SelectValue
+                                  placeholder={
+                                    itemsQuery.isPending
+                                      ? 'Loading items…'
+                                      : 'Select an item'
+                                  }
+                                />
                               </SelectTrigger>
                               <SelectContent>
                                 {options.map((option) => (
                                   <SelectItem key={option.id} value={option.id}>
-                                    {option.name} ({option.code}) —{' '}
-                                    {option.unit}
+                                    {option.name}
+                                    {option.code ? ` (${option.code})` : ''}
+                                    {option.unit ? ` — ${option.unit}` : ''}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -611,8 +727,8 @@ export function ProductDetailPage({ productId }: ProductDetailPageProps) {
 
             {allItemsUsed && (
               <p className="mt-3 text-xs text-brand-900/50">
-                Every completeness item from the Item Categories master is
-                already on this product.
+                Every active completeness item from the Item Categories master
+                is already on this product.
               </p>
             )}
           </div>
