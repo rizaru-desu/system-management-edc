@@ -11,6 +11,7 @@ import { MailModule } from './mail/mail.module';
 import { MerchantModule } from './merchants/merchant.module';
 import { MobileModule } from './mobile/mobile.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { ProductModule } from './products/product.module';
 import { ProjectModule } from './projects/project.module';
 import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
 import { ServicePointModule } from './service-points/service-point.module';
@@ -29,6 +30,7 @@ import { WarehouseModule } from './warehouses/warehouse.module';
     MailModule,
     MerchantModule,
     MobileModule,
+    ProductModule,
     ProjectModule,
     ServicePointModule,
     ServicePointAssignmentModule,

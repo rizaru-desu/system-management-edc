@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { PackagePlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
@@ -12,35 +13,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
-import { PRODUCT_CATEGORIES, getProducts } from '../data/products.ts'
+import { useDeleteProduct } from '../api/delete-product.ts'
+import { productsListQueryOptions } from '../api/list-products.ts'
+import { useToggleProductStatus } from '../api/update-product.ts'
+import { PRODUCT_CATEGORIES } from '../data/products.ts'
 import type {
   ProductCategory,
   ProductRecord,
   ProductStatus,
 } from '../data/products.ts'
+import { DeleteProductDialog } from './delete-product-dialog.tsx'
 import { ProductsTable } from './products-table.tsx'
 
 /**
  * Terminal Lifecycle → Products: the master catalogue of EDC models each
- * individual Terminal (per serial number) will reference, with the
- * standard completeness list the Inbound Shipment inspection checklist
- * derives from. UI-only for now — the catalogue lives in a module-level
- * mock store (shared with the detail page); search, category/status
- * filters and pagination all run client-side.
+ * individual Terminal (per serial number) will reference. Search,
+ * category/status filters and pagination all run server-side
+ * (GET /products), and every action goes through the backend API; the
+ * mutation hooks own toasts and cache invalidation, so the table refreshes
+ * after every write. Create and edit live on the detail page.
  */
 export function ProductsPage() {
   const navigate = useNavigate()
-  // Snapshot per navigation is enough for the mock stage — edits happen on
-  // the detail page, which navigates back here and remounts.
-  const [records] = useState<Array<ProductRecord>>(getProducts)
 
-  // ── Search & filters ───────────────────────────────────────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'all' | ProductCategory>(
     'all',
   )
   const [statusFilter, setStatusFilter] = useState<'all' | ProductStatus>('all')
-  // Debounced copy of `search` so the list isn't re-filtered per keystroke.
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
   useEffect(() => {
@@ -60,22 +62,7 @@ export function ProductsPage() {
     setStatusFilter('all')
   }
 
-  const filteredRecords = useMemo(() => {
-    const term = debouncedSearch.trim().toLowerCase()
-    return records.filter((record) => {
-      const matchesTerm =
-        term === '' ||
-        record.modelName.toLowerCase().includes(term) ||
-        record.brand.toLowerCase().includes(term)
-      const matchesCategory =
-        categoryFilter === 'all' || record.category === categoryFilter
-      const matchesStatus =
-        statusFilter === 'all' || record.status === statusFilter
-      return matchesTerm && matchesCategory && matchesStatus
-    })
-  }, [records, debouncedSearch, categoryFilter, statusFilter])
-
-  // ── Pagination (client-side over the filtered list) ────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -89,14 +76,17 @@ export function ProductsPage() {
     )
   }, [debouncedSearch, categoryFilter, statusFilter])
 
-  const pageRows = useMemo(
-    () =>
-      filteredRecords.slice(
-        pagination.pageIndex * pagination.pageSize,
-        (pagination.pageIndex + 1) * pagination.pageSize,
-      ),
-    [filteredRecords, pagination],
+  const listQuery = useQuery(
+    productsListQueryOptions({
+      search: debouncedSearch,
+      category: categoryFilter,
+      status: statusFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
   )
+  const products = listQuery.data?.products ?? []
+  const total = listQuery.data?.total ?? 0
 
   // ── Navigation (create & edit both live on the detail page) ────────────
   const openCreate = () => {
@@ -108,6 +98,28 @@ export function ProductsPage() {
       to: '/products/$productId',
       params: { productId: record.id },
     })
+  }
+
+  // ── Mutations (the hooks own toasts + cache invalidation) ─────────────
+  const toggleStatus = useToggleProductStatus()
+  const deleteProduct = useDeleteProduct()
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState<ProductRecord | null>(null)
+
+  const openDelete = (record: ProductRecord) => {
+    setDeleting(record)
+    setDeleteOpen(true)
+  }
+
+  const handleDelete = () => {
+    if (!deleting) return
+    deleteProduct.mutate({ id: deleting.id, modelName: deleting.modelName })
+    setDeleting(null)
+  }
+
+  const handleToggleStatus = (record: ProductRecord) => {
+    toggleStatus.mutate({ id: record.id })
   }
 
   return (
@@ -139,6 +151,7 @@ export function ProductsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search model or brand…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={categoryFilter}
@@ -177,13 +190,30 @@ export function ProductsPage() {
 
       {/* Table */}
       <ProductsTable
-        rows={pageRows}
-        total={filteredRecords.length}
+        rows={products}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load products.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onOpen={openDetail}
+        onToggleStatus={handleToggleStatus}
+        onDelete={openDelete}
+      />
+
+      <DeleteProductDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        product={deleting}
+        onConfirm={handleDelete}
       />
     </div>
   )
