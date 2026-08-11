@@ -172,7 +172,12 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         ],
         directRoute: '/products',
       },
-      { title: 'Terminals', path: 'terminals', allowedRoles: ALL },
+      {
+        title: 'Terminals',
+        path: 'terminals',
+        allowedRoles: ALL,
+        directRoute: '/terminals',
+      },
       {
         title: 'Deployments',
         path: 'deployments',
