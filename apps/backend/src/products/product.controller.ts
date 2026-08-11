@@ -8,7 +8,11 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import type { ProductDetailRow, ProductListPage } from '@repo/db';
+import type {
+  ItemCategoryOption,
+  ProductDetailRow,
+  ProductListPage,
+} from '@repo/db';
 import { RequirePermission } from '../permissions/require-permission.decorator';
 import { parseCreateProductDto } from './dto/create-product.dto';
 import { parseListProductsDto } from './dto/list-products.dto';
@@ -28,6 +32,15 @@ export class ProductController {
   @Get()
   list(@Query() query: unknown): Promise<ProductListPage> {
     return this.productService.list(parseListProductsDto(query));
+  }
+
+  /**
+   * Completeness-item choices for the editor dropdown. A static segment
+   * declared before ':id' so the router never shadows it.
+   */
+  @Get('completeness-item-options')
+  completenessItemOptions(): Promise<ItemCategoryOption[]> {
+    return this.productService.completenessItemOptions();
   }
 
   /** The row plus its full standard completeness list (joined item data). */

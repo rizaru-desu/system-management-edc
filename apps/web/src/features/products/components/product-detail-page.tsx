@@ -29,7 +29,7 @@ import { StatusPill } from '#/components/ui/status-pill.tsx'
 import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { cn } from '#/lib/utils.ts'
-import { itemCategoriesListQueryOptions } from '#/features/item-categories/index.ts'
+import { completenessItemOptionsQueryOptions } from '../api/completeness-item-options.ts'
 import { useCreateProduct } from '../api/create-product.ts'
 import type { ProductPayload } from '../api/create-product.ts'
 import { isDuplicateModelNameError } from '../api/list-products.ts'
@@ -38,13 +38,7 @@ import { useUpdateProduct } from '../api/update-product.ts'
 import { PRODUCT_CATEGORIES } from '../data/products.ts'
 import type { ProductCategory, ProductDetail } from '../data/products.ts'
 
-/** One entry of the completeness dropdown (Item Categories master). */
-interface ItemOption {
-  id: string
-  name: string
-  code: string
-  unit: string
-}
+import type { CompletenessItemOption as ItemOption } from '../api/completeness-item-options.ts'
 
 /** One editable row of the standard-completeness table. */
 interface CompletenessRow {
@@ -184,19 +178,12 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
   /** Per-row validation message, keyed by the row's render key. */
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
 
-  // The dropdown options come from the live Item Categories master —
-  // active items only, same source the backend validates against.
-  const itemsQuery = useQuery(
-    itemCategoriesListQueryOptions({ status: 'active', pageSize: 100 }),
-  )
+  // The dropdown options come from the live Item Categories master (active
+  // items only), served through the products module's own endpoint so the
+  // editor works with the products grant alone.
+  const itemsQuery = useQuery(completenessItemOptionsQueryOptions())
   const itemOptions = useMemo<Array<ItemOption>>(
-    () =>
-      (itemsQuery.data?.itemCategories ?? []).map((item) => ({
-        id: item.id,
-        name: item.name,
-        code: item.code,
-        unit: item.unit,
-      })),
+    () => itemsQuery.data ?? [],
     [itemsQuery.data],
   )
 
@@ -570,8 +557,10 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
 
             {itemsQuery.isError && (
               <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
-                Failed to load the Item Categories master — the item dropdown
-                may be incomplete.{' '}
+                {itemsQuery.error instanceof Error
+                  ? itemsQuery.error.message
+                  : 'Failed to load the completeness items.'}{' '}
+                The item dropdown may be incomplete.{' '}
                 <button
                   type="button"
                   className="font-semibold underline underline-offset-2"

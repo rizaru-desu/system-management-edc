@@ -16,6 +16,8 @@ export {
   productsQueryKey,
 } from './api/list-products.ts'
 export { productDetailQueryOptions } from './api/product-detail.ts'
+export { completenessItemOptionsQueryOptions } from './api/completeness-item-options.ts'
+export type { CompletenessItemOption } from './api/completeness-item-options.ts'
 export { useCreateProduct } from './api/create-product.ts'
 export type { ProductPayload } from './api/create-product.ts'
 export {

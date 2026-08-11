@@ -7,12 +7,14 @@ import {
 import {
   createProduct,
   findProductById,
+  listItemCategoryOptions,
   listProducts,
   softDeleteProduct,
   toggleProductStatus,
   updateProduct,
 } from '@repo/db';
 import type {
+  ItemCategoryOption,
   ListProductsOptions,
   ProductDetailRow,
   ProductListPage,
@@ -28,6 +30,15 @@ export class ProductService {
    */
   list(options: ListProductsOptions): Promise<ProductListPage> {
     return listProducts(options);
+  }
+
+  /**
+   * The completeness-item choices of the product editor: every live ACTIVE
+   * item category, served under the products grant so the editor never
+   * needs the item-categories module grant on top of it.
+   */
+  completenessItemOptions(): Promise<ItemCategoryOption[]> {
+    return listItemCategoryOptions();
   }
 
   /** One product with its full standard completeness list. */
