@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, ne, sql } from "drizzle-orm";
 import { db } from "../client.js";
 import { itemCategories } from "../schema/item-category.js";
 import type {
@@ -146,6 +146,35 @@ export async function findItemCategoryById(
     .from(itemCategories)
     .where(and(eq(itemCategories.id, id), notDeleted));
   return row ?? null;
+}
+
+/** One entry of a completeness-item dropdown (id + display fields). */
+export interface ItemCategoryOption {
+  id: string;
+  name: string;
+  code: string | null;
+  unit: ItemCategoryUnit;
+}
+
+/**
+ * Every live ACTIVE item category as a dropdown option, unpaginated and
+ * ordered by name — the product editor's completeness picker. Served
+ * through the products module so it rides the caller's products grant
+ * instead of requiring the item-categories module grant.
+ */
+export async function listItemCategoryOptions(): Promise<
+  ItemCategoryOption[]
+> {
+  return db
+    .select({
+      id: itemCategories.id,
+      name: itemCategories.name,
+      code: itemCategories.code,
+      unit: itemCategories.unit,
+    })
+    .from(itemCategories)
+    .where(and(notDeleted, eq(itemCategories.status, "ACTIVE")))
+    .orderBy(asc(itemCategories.name));
 }
 
 export interface ItemCategoryInput {
