@@ -28,6 +28,8 @@ import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
 import { Route as AuthedProductsIndexRouteImport } from './routes/_authed/products/index'
 import { Route as AuthedProductsProductIdRouteImport } from './routes/_authed/products/$productId'
 import { Route as AuthedProductsNewRouteImport } from './routes/_authed/products/new'
+import { Route as AuthedTerminalsIndexRouteImport } from './routes/_authed/terminals/index'
+import { Route as AuthedTerminalsTerminalIdRouteImport } from './routes/_authed/terminals/$terminalId'
 import { Route as AuthedWarehousesIndexRouteImport } from './routes/_authed/warehouses/index'
 import { Route as AuthedWarehousesWarehouseIdRouteImport } from './routes/_authed/warehouses/$warehouseId'
 
@@ -125,6 +127,17 @@ const AuthedProductsNewRoute = AuthedProductsNewRouteImport.update({
   path: '/products/new',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedTerminalsIndexRoute = AuthedTerminalsIndexRouteImport.update({
+  id: '/terminals/',
+  path: '/terminals/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTerminalsTerminalIdRoute =
+  AuthedTerminalsTerminalIdRouteImport.update({
+    id: '/terminals/$terminalId',
+    path: '/terminals/$terminalId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedWarehousesIndexRoute = AuthedWarehousesIndexRouteImport.update({
   id: '/warehouses/',
   path: '/warehouses/',
@@ -155,8 +168,10 @@ export interface FileRoutesByFullPath {
   '/users': typeof AuthedUsersRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
+  '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/products/': typeof AuthedProductsIndexRoute
+  '/terminals/': typeof AuthedTerminalsIndexRoute
   '/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -177,8 +192,10 @@ export interface FileRoutesByTo {
   '/users': typeof AuthedUsersRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
+  '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/products': typeof AuthedProductsIndexRoute
+  '/terminals': typeof AuthedTerminalsIndexRoute
   '/warehouses': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRoutesById {
@@ -201,8 +218,10 @@ export interface FileRoutesById {
   '/_authed/users': typeof AuthedUsersRoute
   '/_authed/products/$productId': typeof AuthedProductsProductIdRoute
   '/_authed/products/new': typeof AuthedProductsNewRoute
+  '/_authed/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/_authed/products/': typeof AuthedProductsIndexRoute
+  '/_authed/terminals/': typeof AuthedTerminalsIndexRoute
   '/_authed/warehouses/': typeof AuthedWarehousesIndexRoute
 }
 export interface FileRouteTypes {
@@ -225,8 +244,10 @@ export interface FileRouteTypes {
     | '/users'
     | '/products/$productId'
     | '/products/new'
+    | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
     | '/products/'
+    | '/terminals/'
     | '/warehouses/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -247,8 +268,10 @@ export interface FileRouteTypes {
     | '/users'
     | '/products/$productId'
     | '/products/new'
+    | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
     | '/products'
+    | '/terminals'
     | '/warehouses'
   id:
     | '__root__'
@@ -270,8 +293,10 @@ export interface FileRouteTypes {
     | '/_authed/users'
     | '/_authed/products/$productId'
     | '/_authed/products/new'
+    | '/_authed/terminals/$terminalId'
     | '/_authed/warehouses/$warehouseId'
     | '/_authed/products/'
+    | '/_authed/terminals/'
     | '/_authed/warehouses/'
   fileRoutesById: FileRoutesById
 }
@@ -419,6 +444,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProductsNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/terminals/': {
+      id: '/_authed/terminals/'
+      path: '/terminals'
+      fullPath: '/terminals/'
+      preLoaderRoute: typeof AuthedTerminalsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/terminals/$terminalId': {
+      id: '/_authed/terminals/$terminalId'
+      path: '/terminals/$terminalId'
+      fullPath: '/terminals/$terminalId'
+      preLoaderRoute: typeof AuthedTerminalsTerminalIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/warehouses/': {
       id: '/_authed/warehouses/'
       path: '/warehouses'
@@ -449,8 +488,10 @@ interface AuthedRouteChildren {
   AuthedUsersRoute: typeof AuthedUsersRoute
   AuthedProductsProductIdRoute: typeof AuthedProductsProductIdRoute
   AuthedProductsNewRoute: typeof AuthedProductsNewRoute
+  AuthedTerminalsTerminalIdRoute: typeof AuthedTerminalsTerminalIdRoute
   AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
   AuthedProductsIndexRoute: typeof AuthedProductsIndexRoute
+  AuthedTerminalsIndexRoute: typeof AuthedTerminalsIndexRoute
   AuthedWarehousesIndexRoute: typeof AuthedWarehousesIndexRoute
 }
 
@@ -467,8 +508,10 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedUsersRoute: AuthedUsersRoute,
   AuthedProductsProductIdRoute: AuthedProductsProductIdRoute,
   AuthedProductsNewRoute: AuthedProductsNewRoute,
+  AuthedTerminalsTerminalIdRoute: AuthedTerminalsTerminalIdRoute,
   AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
   AuthedProductsIndexRoute: AuthedProductsIndexRoute,
+  AuthedTerminalsIndexRoute: AuthedTerminalsIndexRoute,
   AuthedWarehousesIndexRoute: AuthedWarehousesIndexRoute,
 }
 
