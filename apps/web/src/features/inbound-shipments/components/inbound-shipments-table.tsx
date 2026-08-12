@@ -12,12 +12,14 @@ import {
   PackageOpen,
   Pencil,
   SearchX,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { Button } from '#/components/ui/button.tsx'
 import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,12 +37,13 @@ import { cn } from '#/lib/utils.ts'
 import {
   SHIPMENT_STATUS_BADGE_CLASSES,
   SHIPMENT_STATUS_LABELS,
-  findShipmentWarehouse,
-  shipmentInspectionProgress,
 } from '../data/inbound-shipments.ts'
-import type { InboundShipmentRecord } from '../data/inbound-shipments.ts'
+import type { InboundShipmentSummaryRecord } from '../data/inbound-shipments.ts'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+
+/** Row count used by the loading-skeleton rows. */
+const SKELETON_ROWS = 6
 
 /** Same per-type badge looks as the warehouses module. */
 const WAREHOUSE_TYPE_BADGES: Record<
@@ -80,16 +83,20 @@ function paginationItems(
 }
 
 interface InboundShipmentsTableProps {
-  /** The rows of the current page only (the page slices the mock list). */
-  rows: Array<InboundShipmentRecord>
+  /** The rows of the current (server-side) page only. */
+  rows: Array<InboundShipmentSummaryRecord>
   /** Rows matching the filters across all pages. */
   total: number
   pagination: PaginationState
   onPaginationChange: OnChangeFn<PaginationState>
+  isPending: boolean
+  isError: boolean
+  errorMessage: string
+  onRetry: () => void
   /** True while a search/status/warehouse/partner filter is active. */
   isFiltering: boolean
   onClearFilters: () => void
-  onOpen: (record: InboundShipmentRecord) => void
+  onOpen: (record: InboundShipmentSummaryRecord) => void
 }
 
 export function InboundShipmentsTable({
@@ -97,11 +104,15 @@ export function InboundShipmentsTable({
   total,
   pagination,
   onPaginationChange,
+  isPending,
+  isError,
+  errorMessage,
+  onRetry,
   isFiltering,
   onClearFilters,
   onOpen,
 }: InboundShipmentsTableProps) {
-  const columns = useMemo<Array<LegacyColumnDef<InboundShipmentRecord>>>(
+  const columns = useMemo<Array<LegacyColumnDef<InboundShipmentSummaryRecord>>>(
     () => [
       {
         id: 'doNumber',
@@ -129,13 +140,11 @@ export function InboundShipmentsTable({
         id: 'warehouse',
         header: 'Destination Warehouse',
         cell: ({ row }) => {
-          const warehouse = findShipmentWarehouse(row.original.warehouseId)
-          if (!warehouse) return <span className="text-brand-900/40">—</span>
-          const badge = WAREHOUSE_TYPE_BADGES[warehouse.type]
+          const badge = WAREHOUSE_TYPE_BADGES[row.original.warehouseType]
           return (
             <span className="flex min-w-0 items-center gap-2">
               <span className="truncate text-brand-900/80">
-                {warehouse.name}
+                {row.original.warehouseName}
               </span>
               <Badge variant={badge.variant} size="sm">
                 {badge.label}
@@ -174,24 +183,18 @@ export function InboundShipmentsTable({
       {
         id: 'units',
         header: 'EDC Units',
-        cell: ({ row }) => {
-          const manifest = row.original.units.filter(
-            (unit) => !unit.unlisted,
-          ).length
-          return (
-            <span className="whitespace-nowrap text-brand-900/70 tabular-nums">
-              {manifest}
-            </span>
-          )
-        },
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-brand-900/70 tabular-nums">
+            {row.original.manifestUnitCount}
+          </span>
+        ),
       },
       {
         id: 'inspected',
         header: 'Inspected',
         cell: ({ row }) => {
-          const { inspected, total: unitTotal } = shipmentInspectionProgress(
-            row.original,
-          )
+          const inspected = row.original.inspectedUnitCount
+          const unitTotal = row.original.totalUnitCount
           if (unitTotal === 0) {
             return <span className="text-brand-900/40">—</span>
           }
@@ -278,8 +281,8 @@ export function InboundShipmentsTable({
     columns,
     state: { pagination },
     onPaginationChange,
-    // The page slices the filtered mock list itself, so the table only
-    // renders the given page rows and drives the controls off the total.
+    // The backend returns one page at a time, so the table only renders
+    // the given rows and drives the controls off the filtered total.
     manualPagination: true,
     rowCount: total,
     getCoreRowModel: getCoreRowModel(),
@@ -316,7 +319,39 @@ export function InboundShipmentsTable({
           ))}
         </thead>
         <tbody>
-          {total === 0 && (
+          {isPending &&
+            Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              <tr key={index} className="border-b border-brand-100">
+                {columns.map((column) => (
+                  <td key={column.id} className="px-5 py-3.5">
+                    <Skeleton
+                      className={cn(
+                        'h-4',
+                        column.id === 'doNumber' ? 'w-40' : 'w-16',
+                        column.id === 'actions' && 'ml-auto w-8',
+                      )}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          {isError && (
+            <tr>
+              <td colSpan={columns.length} className="px-5">
+                <EmptyState
+                  icon={TriangleAlert}
+                  tone="danger"
+                  title={errorMessage}
+                  action={
+                    <Button variant="outline" size="sm" onClick={onRetry}>
+                      Try again
+                    </Button>
+                  }
+                />
+              </td>
+            </tr>
+          )}
+          {!isPending && !isError && total === 0 && (
             <tr>
               <td colSpan={columns.length} className="px-5">
                 {isFiltering ? (
@@ -346,22 +381,23 @@ export function InboundShipmentsTable({
               </td>
             </tr>
           )}
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.original.id}
-              className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
-            >
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-5 py-3.5">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {!isPending &&
+            table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.original.id}
+                className="border-b border-brand-100 last:border-0 hover:bg-brand-50/60"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} className="px-5 py-3.5">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
 
-      {total > 0 && (
+      {!isPending && !isError && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
           <p className="text-xs text-brand-900/60">
             Showing {rangeStart}–{rangeEnd} of {total} shipments

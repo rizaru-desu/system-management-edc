@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { PackagePlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
@@ -13,76 +14,66 @@ import {
   SelectValue,
 } from '#/components/ui/select.tsx'
 import {
-  PARTNER_OPTIONS,
+  shipmentPartnerOptionsQueryOptions,
+  shipmentWarehouseOptionsQueryOptions,
+} from '../api/form-options.ts'
+import { shipmentsListQueryOptions } from '../api/list-inbound-shipments.ts'
+import {
   SHIPMENT_STATUSES,
   SHIPMENT_STATUS_LABELS,
-  SHIPMENT_WAREHOUSE_OPTIONS,
-  getShipments,
 } from '../data/inbound-shipments.ts'
 import type {
-  InboundShipmentRecord,
+  InboundShipmentSummaryRecord,
   ShipmentStatus,
 } from '../data/inbound-shipments.ts'
 import { InboundShipmentsTable } from './inbound-shipments-table.tsx'
 
 /**
  * Terminal Lifecycle → Inbound Shipments: the Delivery Orders recorded
- * from partners and their inspection state. UI-only stage — the list reads
- * the shared mock store; a future backend swaps this for GET
- * /inbound-shipments with server-side filters, the same integration path
- * the sibling modules took.
+ * from partners and their inspection state. Search, status/warehouse/
+ * partner filters and pagination all run server-side (GET
+ * /inbound-shipments, partner and warehouse display fields plus the
+ * inspection counters joined).
  */
 export function InboundShipmentsPage() {
   const navigate = useNavigate()
 
-  // ── Search & filters ───────────────────────────────────────────────────
+  // ── Search & filters (server-side) ─────────────────────────────────────
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | ShipmentStatus>(
     'all',
   )
   const [warehouseFilter, setWarehouseFilter] = useState('all')
   const [partnerFilter, setPartnerFilter] = useState('all')
+  // Debounced copy of `search` so the list isn't refetched per keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const isFiltering =
-    search.trim() !== '' ||
+    debouncedSearch.trim() !== '' ||
     statusFilter !== 'all' ||
     warehouseFilter !== 'all' ||
     partnerFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setStatusFilter('all')
     setWarehouseFilter('all')
     setPartnerFilter('all')
   }
 
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return getShipments().filter((shipment) => {
-      if (
-        term &&
-        !shipment.doNumber.toLowerCase().includes(term) &&
-        !shipment.partnerName.toLowerCase().includes(term)
-      ) {
-        return false
-      }
-      if (statusFilter !== 'all' && shipment.status !== statusFilter) {
-        return false
-      }
-      if (
-        warehouseFilter !== 'all' &&
-        shipment.warehouseId !== warehouseFilter
-      ) {
-        return false
-      }
-      if (partnerFilter !== 'all' && shipment.partnerName !== partnerFilter) {
-        return false
-      }
-      return true
-    })
-  }, [search, statusFilter, warehouseFilter, partnerFilter])
+  // The filter dropdowns share the wizard's options endpoints.
+  const warehouseOptionsQuery = useQuery(shipmentWarehouseOptionsQueryOptions())
+  const partnerOptionsQuery = useQuery(shipmentPartnerOptionsQueryOptions())
+  const warehouseOptions = warehouseOptionsQuery.data ?? []
+  const partnerOptions = partnerOptionsQuery.data ?? []
 
-  // ── Pagination ─────────────────────────────────────────────────────────
+  // ── Pagination (server-side) ───────────────────────────────────────────
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -94,14 +85,22 @@ export function InboundShipmentsPage() {
     setPagination((previous) =>
       previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
     )
-  }, [search, statusFilter, warehouseFilter, partnerFilter])
+  }, [debouncedSearch, statusFilter, warehouseFilter, partnerFilter])
 
-  const pageRows = filtered.slice(
-    pagination.pageIndex * pagination.pageSize,
-    (pagination.pageIndex + 1) * pagination.pageSize,
+  const listQuery = useQuery(
+    shipmentsListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      warehouseId: warehouseFilter,
+      partnerAccountId: partnerFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
   )
+  const shipments = listQuery.data?.shipments ?? []
+  const total = listQuery.data?.total ?? 0
 
-  const openShipment = (record: InboundShipmentRecord) => {
+  const openShipment = (record: InboundShipmentSummaryRecord) => {
     // The detail route renders by status: draft → wizard, pending or
     // in-progress → inspection workspace, completed → summary.
     void navigate({
@@ -139,6 +138,7 @@ export function InboundShipmentsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search DO number or partner…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -164,7 +164,7 @@ export function InboundShipmentsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All warehouses</SelectItem>
-            {SHIPMENT_WAREHOUSE_OPTIONS.map((warehouse) => (
+            {warehouseOptions.map((warehouse) => (
               <SelectItem key={warehouse.id} value={warehouse.id}>
                 {warehouse.name}
               </SelectItem>
@@ -172,14 +172,14 @@ export function InboundShipmentsPage() {
           </SelectContent>
         </Select>
         <Select value={partnerFilter} onValueChange={setPartnerFilter}>
-          <SelectTrigger className="w-[170px]">
+          <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Filter by partner" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All partners</SelectItem>
-            {PARTNER_OPTIONS.map((partner) => (
-              <SelectItem key={partner} value={partner}>
-                {partner}
+            {partnerOptions.map((partner) => (
+              <SelectItem key={partner.id} value={partner.id}>
+                {partner.accountName}
               </SelectItem>
             ))}
           </SelectContent>
@@ -188,10 +188,18 @@ export function InboundShipmentsPage() {
 
       {/* Table */}
       <InboundShipmentsTable
-        rows={pageRows}
-        total={filtered.length}
+        rows={shipments}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load inbound shipments.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onOpen={openShipment}

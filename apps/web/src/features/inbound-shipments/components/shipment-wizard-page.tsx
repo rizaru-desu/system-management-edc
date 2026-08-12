@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
   ArrowRight,
   ClipboardList,
   ListPlus,
+  Loader2,
   PackagePlus,
   Save,
   Trash2,
@@ -26,20 +28,15 @@ import {
 } from '#/components/ui/select.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import {
-  PARTNER_OPTIONS,
-  SHIPMENT_ITEM_OPTIONS,
-  SHIPMENT_PRODUCT_OPTIONS,
-  SHIPMENT_WAREHOUSE_OPTIONS,
-  buildUnitChecklist,
-  findShipmentItem,
-  findShipmentProduct,
-  findShipmentWarehouse,
-  upsertShipment,
-} from '../data/inbound-shipments.ts'
-import type {
-  InboundShipmentRecord,
-  ShipmentUnit,
-} from '../data/inbound-shipments.ts'
+  shipmentItemOptionsQueryOptions,
+  shipmentPartnerOptionsQueryOptions,
+  shipmentProductOptionsQueryOptions,
+  shipmentWarehouseOptionsQueryOptions,
+} from '../api/form-options.ts'
+import { isDuplicateDoNumberError } from '../api/list-inbound-shipments.ts'
+import { useCreateShipment, useUpdateShipment } from '../api/save-shipment.ts'
+import type { ShipmentPayload } from '../api/save-shipment.ts'
+import type { InboundShipmentRecord } from '../data/inbound-shipments.ts'
 import { WizardStepper } from './wizard-stepper.tsx'
 import type { WizardStep } from './wizard-stepper.tsx'
 
@@ -68,14 +65,14 @@ interface UnitRow {
 
 interface PeripheralRow {
   key: number
-  itemCode: string
+  itemCategoryId: string
   documentedQty: string
 }
 
 interface HeaderErrors {
   doNumber?: string
-  partnerName?: string
-  warehouseId?: string
+  partnerAccountId?: string
+  destinationWarehouseId?: string
   receivedDate?: string
 }
 
@@ -97,16 +94,38 @@ interface ShipmentWizardPageProps {
 /**
  * Terminal Lifecycle → Inbound Shipments → the 4-step recording wizard:
  * shipment header, EDC units manifest (with bulk paste), peripherals
- * manifest, then review. Saving keeps a Draft or submits the shipment as
- * Pending Inspection. UI-only stage — writes go to the shared mock store.
+ * manifest, then review. The steps build the payload locally and POST once
+ * on the review step — the backend records the header and both manifests
+ * in a single transaction, so a rejected payload never leaves a
+ * half-recorded Delivery Order behind (the per-step save the other option
+ * would need has no counterpart anywhere else in this console).
  */
 export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const navigate = useNavigate()
   const [step, setStep] = useState(0)
 
+  // Dropdown sources come from the module's own options endpoints, so the
+  // wizard works with the inbound-shipments grant alone.
+  const partnersQuery = useQuery(shipmentPartnerOptionsQueryOptions())
+  const warehousesQuery = useQuery(shipmentWarehouseOptionsQueryOptions())
+  const productsQuery = useQuery(shipmentProductOptionsQueryOptions())
+  const itemsQuery = useQuery(shipmentItemOptionsQueryOptions())
+  const partnerOptions = partnersQuery.data ?? []
+  const warehouseOptions = warehousesQuery.data ?? []
+  const productOptions = productsQuery.data ?? []
+  const itemOptions = itemsQuery.data ?? []
+
+  const optionsError =
+    partnersQuery.isError ||
+    warehousesQuery.isError ||
+    productsQuery.isError ||
+    itemsQuery.isError
+
   // ── Step 1 — Shipment header ───────────────────────────────────────────
   const [doNumber, setDoNumber] = useState(draft?.doNumber ?? '')
-  const [partnerName, setPartnerName] = useState(draft?.partnerName ?? '')
+  const [partnerAccountId, setPartnerAccountId] = useState(
+    draft?.partnerAccountId ?? '',
+  )
   const [warehouseId, setWarehouseId] = useState(draft?.warehouseId ?? '')
   const [shipmentDate, setShipmentDate] = useState(draft?.shipmentDate ?? '')
   const [receivedDate, setReceivedDate] = useState(
@@ -134,7 +153,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     () =>
       (draft?.peripherals ?? []).map((line) => ({
         key: nextRowKey(),
-        itemCode: line.itemCode,
+        itemCategoryId: line.itemCategoryId,
         documentedQty: String(line.documentedQty),
       })),
   )
@@ -145,8 +164,12 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const validateHeader = (): boolean => {
     const errors: HeaderErrors = {}
     if (!doNumber.trim()) errors.doNumber = 'The DO number is required.'
-    if (!partnerName) errors.partnerName = 'Pick the sending partner.'
-    if (!warehouseId) errors.warehouseId = 'Pick the destination warehouse.'
+    if (!partnerAccountId) {
+      errors.partnerAccountId = 'Pick the sending partner.'
+    }
+    if (!warehouseId) {
+      errors.destinationWarehouseId = 'Pick the destination warehouse.'
+    }
     if (!receivedDate) errors.receivedDate = 'The received date is required.'
     setHeaderErrors(errors)
     return Object.keys(errors).length === 0
@@ -180,27 +203,31 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     return true
   }
 
+  const itemName = (itemCategoryId: string) =>
+    itemOptions.find((option) => option.id === itemCategoryId)?.name ??
+    itemCategoryId
+
   const validatePeripherals = (): boolean => {
     const seen = new Set<string>()
     for (const row of peripheralRows) {
-      if (!row.itemCode) {
+      if (!row.itemCategoryId) {
         setPeripheralsError('Every peripheral row needs an item.')
         return false
       }
       const qty = Number(row.documentedQty)
       if (!Number.isInteger(qty) || qty < 1) {
         setPeripheralsError(
-          `Enter a documented quantity of at least 1 for ${findShipmentItem(row.itemCode)?.name ?? row.itemCode}.`,
+          `Enter a documented quantity of at least 1 for ${itemName(row.itemCategoryId)}.`,
         )
         return false
       }
-      if (seen.has(row.itemCode)) {
+      if (seen.has(row.itemCategoryId)) {
         setPeripheralsError(
-          `${findShipmentItem(row.itemCode)?.name ?? row.itemCode} is listed twice — merge the quantities into one row.`,
+          `${itemName(row.itemCategoryId)} is listed twice — merge the quantities into one row.`,
         )
         return false
       }
-      seen.add(row.itemCode)
+      seen.add(row.itemCategoryId)
     }
     setPeripheralsError('')
     return true
@@ -275,7 +302,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const addPeripheralRow = () => {
     setPeripheralRows((rows) => [
       ...rows,
-      { key: nextRowKey(), itemCode: '', documentedQty: '' },
+      { key: nextRowKey(), itemCategoryId: '', documentedQty: '' },
     ])
     setPeripheralsError('')
   }
@@ -292,71 +319,101 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     setPeripheralsError('')
   }
 
-  const usedItemCodes = new Set(
-    peripheralRows.map((row) => row.itemCode).filter(Boolean),
+  const usedItemIds = new Set(
+    peripheralRows.map((row) => row.itemCategoryId).filter(Boolean),
   )
 
-  // ── Save ───────────────────────────────────────────────────────────────
+  // ── Save (backend API; the mutation hooks own the error toasts) ────────
 
-  const buildShipment = (
-    status: 'draft' | 'pending-inspection',
-  ): InboundShipmentRecord => {
-    const id = draft?.id ?? `shp-${Date.now().toString(36)}`
-    const units: Array<ShipmentUnit> = unitRows.map((row, index) => ({
-      id: `${id}-u${String(index + 1).padStart(2, '0')}`,
+  const createShipment = useCreateShipment()
+  const updateShipment = useUpdateShipment()
+  const saving = createShipment.isPending || updateShipment.isPending
+
+  const buildPayload = (
+    status: 'DRAFT' | 'PENDING_INSPECTION',
+  ): ShipmentPayload => ({
+    doNumber: doNumber.trim(),
+    partnerAccountId,
+    destinationWarehouseId: warehouseId,
+    shipmentDate: shipmentDate || null,
+    receivedDate,
+    notes: notes.trim() ? notes.trim() : null,
+    status,
+    edcItems: unitRows.map((row) => ({
       serialNumber: row.serialNumber.trim(),
       productId: row.productId,
-      unlisted: false,
-      result: 'not-checked',
-      condition: null,
-      checklist: buildUnitChecklist(row.productId),
-      note: '',
-      photoName: null,
-    }))
-    return {
-      id,
-      doNumber: doNumber.trim(),
-      partnerName,
-      warehouseId,
-      shipmentDate,
-      receivedDate,
-      notes: notes.trim(),
-      status,
-      units,
-      peripherals: peripheralRows.map((row, index) => ({
-        id: `${id}-p${index + 1}`,
-        itemCode: row.itemCode,
-        documentedQty: Number(row.documentedQty),
-        actualQty: null,
-        note: '',
-      })),
-    }
-  }
+    })),
+    peripheralItems: peripheralRows.map((row) => ({
+      itemCategoryId: row.itemCategoryId,
+      documentedQty: Number(row.documentedQty),
+    })),
+  })
 
-  const handleSave = (status: 'draft' | 'pending-inspection') => {
+  const handleSave = (status: 'DRAFT' | 'PENDING_INSPECTION') => {
+    if (saving) return
+    // Re-run every step's rules: the review step can be reached and then
+    // edited backwards, and the backend rejects the same violations anyway.
+    if (!validateHeader()) {
+      setStep(0)
+      return
+    }
+    if (!validateUnits()) {
+      setStep(1)
+      return
+    }
+    if (!validatePeripherals()) {
+      setStep(2)
+      return
+    }
     if (unitRows.length === 0 && peripheralRows.length === 0) {
       toast.error('Add at least one EDC unit or peripheral line first.')
+      setStep(1)
       return
     }
-    const shipment = buildShipment(status)
-    upsertShipment(shipment)
-    if (status === 'draft') {
-      toast.success(`Shipment “${shipment.doNumber}” saved as draft.`)
-      void navigate({ to: '/inbound-shipments' })
+
+    const payload = buildPayload(status)
+    const onError = (error: unknown) => {
+      // A duplicate DO number is a header problem — send the user back to
+      // the step that owns the field, with the message already toasted.
+      if (isDuplicateDoNumberError(error)) {
+        setHeaderErrors((errors) => ({
+          ...errors,
+          doNumber: 'A shipment with this DO number already exists.',
+        }))
+        setStep(0)
+      }
+    }
+    const onSuccess = (shipment: InboundShipmentRecord) => {
+      if (status === 'DRAFT') {
+        toast.success(`Shipment “${shipment.doNumber}” saved as draft.`)
+        void navigate({ to: '/inbound-shipments' })
+        return
+      }
+      toast.success(
+        `Shipment “${shipment.doNumber}” is ready for inspection (${shipment.units.length} EDC units, ${shipment.peripherals.length} peripheral lines).`,
+      )
+      void navigate({
+        to: '/inbound-shipments/$shipmentId',
+        params: { shipmentId: shipment.id },
+      })
+    }
+
+    if (draft) {
+      updateShipment.mutate(
+        { id: draft.id, ...payload },
+        { onSuccess, onError },
+      )
       return
     }
-    toast.success(
-      `Shipment “${shipment.doNumber}” is ready for inspection (${shipment.units.length} EDC units, ${shipment.peripherals.length} peripheral lines).`,
-    )
-    void navigate({
-      to: '/inbound-shipments/$shipmentId',
-      params: { shipmentId: shipment.id },
-    })
+    createShipment.mutate(payload, { onSuccess, onError })
   }
 
   // ── Review data ────────────────────────────────────────────────────────
 
-  const warehouse = findShipmentWarehouse(warehouseId)
+  const warehouse = warehouseOptions.find((option) => option.id === warehouseId)
+  const partner = partnerOptions.find(
+    (option) => option.id === partnerAccountId,
+  )
   const unitsByProduct = useMemo(() => {
     const groups = new Map<string, number>()
     for (const row of unitRows) {
@@ -387,6 +444,24 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
           compares the physical goods against this manifest.
         </p>
       </div>
+
+      {optionsError && (
+        <p className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
+          Some dropdown data failed to load, so the lists may be incomplete.{' '}
+          <button
+            type="button"
+            className="font-semibold underline underline-offset-2"
+            onClick={() => {
+              void partnersQuery.refetch()
+              void warehousesQuery.refetch()
+              void productsQuery.refetch()
+              void itemsQuery.refetch()
+            }}
+          >
+            Try again
+          </button>
+        </p>
+      )}
 
       <Card>
         <WizardStepper steps={STEPS} current={step} onStepClick={setStep} />
@@ -420,32 +495,42 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
               <div className="space-y-1.5">
                 <Label>Partner</Label>
                 <Select
-                  value={partnerName}
+                  value={partnerAccountId}
                   onValueChange={(value) => {
-                    setPartnerName(value)
+                    setPartnerAccountId(value)
                     setHeaderErrors((errors) => ({
                       ...errors,
-                      partnerName: undefined,
+                      partnerAccountId: undefined,
                     }))
                   }}
+                  disabled={partnersQuery.isPending}
                 >
                   <SelectTrigger
-                    aria-invalid={Boolean(headerErrors.partnerName)}
+                    aria-invalid={Boolean(headerErrors.partnerAccountId)}
                     className={`w-full ${fieldClasses}`}
                   >
-                    <SelectValue placeholder="Select the sending partner" />
+                    <SelectValue
+                      placeholder={
+                        partnersQuery.isPending
+                          ? 'Loading partners…'
+                          : 'Select the sending partner'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {PARTNER_OPTIONS.map((partner) => (
-                      <SelectItem key={partner} value={partner}>
-                        {partner}
+                    {partnerOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.accountName}
+                        <span className="ml-1 text-brand-900/40">
+                          · {option.accountId}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {headerErrors.partnerName && (
+                {headerErrors.partnerAccountId && (
                   <p className="text-xs text-rose-600">
-                    {headerErrors.partnerName}
+                    {headerErrors.partnerAccountId}
                   </p>
                 )}
               </div>
@@ -457,20 +542,27 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                     setWarehouseId(value)
                     setHeaderErrors((errors) => ({
                       ...errors,
-                      warehouseId: undefined,
+                      destinationWarehouseId: undefined,
                     }))
                   }}
+                  disabled={warehousesQuery.isPending}
                 >
                   <SelectTrigger
-                    aria-invalid={Boolean(headerErrors.warehouseId)}
+                    aria-invalid={Boolean(headerErrors.destinationWarehouseId)}
                     className={`w-full ${fieldClasses}`}
                   >
-                    <SelectValue placeholder="Select the receiving warehouse" />
+                    <SelectValue
+                      placeholder={
+                        warehousesQuery.isPending
+                          ? 'Loading warehouses…'
+                          : 'Select the receiving warehouse'
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Central sites listed first — the usual landing point
-                        for partner stock — but nothing is hard-restricted. */}
-                    {SHIPMENT_WAREHOUSE_OPTIONS.map((option) => (
+                    {/* Central sites come first from the query — the usual
+                        landing point — but nothing is hard-restricted. */}
+                    {warehouseOptions.map((option) => (
                       <SelectItem key={option.id} value={option.id}>
                         {option.name}
                         <span className="ml-1 text-brand-900/40">
@@ -480,9 +572,9 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {headerErrors.warehouseId && (
+                {headerErrors.destinationWarehouseId && (
                   <p className="text-xs text-rose-600">
-                    {headerErrors.warehouseId}
+                    {headerErrors.destinationWarehouseId}
                   </p>
                 )}
               </div>
@@ -558,12 +650,13 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                     <Select
                       value={bulkProductId}
                       onValueChange={setBulkProductId}
+                      disabled={productsQuery.isPending}
                     >
                       <SelectTrigger className={`w-full ${fieldClasses}`}>
                         <SelectValue placeholder="Product for all rows" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SHIPMENT_PRODUCT_OPTIONS.map((product) => (
+                        {productOptions.map((product) => (
                           <SelectItem key={product.id} value={product.id}>
                             {product.modelName}
                           </SelectItem>
@@ -651,14 +744,21 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                               onValueChange={(value) =>
                                 patchUnitRow(row.key, { productId: value })
                               }
+                              disabled={productsQuery.isPending}
                             >
                               <SelectTrigger
                                 className={`h-9 w-full min-w-[200px] ${fieldClasses}`}
                               >
-                                <SelectValue placeholder="Select a product" />
+                                <SelectValue
+                                  placeholder={
+                                    productsQuery.isPending
+                                      ? 'Loading products…'
+                                      : 'Select a product'
+                                  }
+                                />
                               </SelectTrigger>
                               <SelectContent>
-                                {SHIPMENT_PRODUCT_OPTIONS.map((product) => (
+                                {productOptions.map((product) => (
                                   <SelectItem
                                     key={product.id}
                                     value={product.id}
@@ -700,9 +800,8 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                   <span className="font-semibold text-brand-900 tabular-nums">
                     {peripheralRows.length}
                   </span>{' '}
-                  peripheral line item
-                  {peripheralRows.length === 1 ? '' : 's'} — accessories tracked
-                  by quantity only, not per unit
+                  peripheral line item{peripheralRows.length === 1 ? '' : 's'} —
+                  accessories tracked by quantity only, not per unit
                 </p>
                 <Button variant="outline" size="sm" onClick={addPeripheralRow}>
                   <PackagePlus className="h-4 w-4 text-primary" />
@@ -738,7 +837,9 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                     </thead>
                     <tbody>
                       {peripheralRows.map((row, index) => {
-                        const item = findShipmentItem(row.itemCode)
+                        const item = itemOptions.find(
+                          (option) => option.id === row.itemCategoryId,
+                        )
                         return (
                           <tr
                             key={row.key}
@@ -749,32 +850,41 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                             </td>
                             <td className="px-4 py-2">
                               <Select
-                                value={row.itemCode}
+                                value={row.itemCategoryId}
                                 onValueChange={(value) =>
                                   patchPeripheralRow(row.key, {
-                                    itemCode: value,
+                                    itemCategoryId: value,
                                   })
                                 }
+                                disabled={itemsQuery.isPending}
                               >
                                 <SelectTrigger
                                   className={`h-9 w-full min-w-[220px] ${fieldClasses}`}
                                 >
-                                  <SelectValue placeholder="Select an item" />
+                                  <SelectValue
+                                    placeholder={
+                                      itemsQuery.isPending
+                                        ? 'Loading items…'
+                                        : 'Select an item'
+                                    }
+                                  />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {SHIPMENT_ITEM_OPTIONS.map((option) => (
+                                  {itemOptions.map((option) => (
                                     <SelectItem
-                                      key={option.code}
-                                      value={option.code}
+                                      key={option.id}
+                                      value={option.id}
                                       disabled={
-                                        option.code !== row.itemCode &&
-                                        usedItemCodes.has(option.code)
+                                        option.id !== row.itemCategoryId &&
+                                        usedItemIds.has(option.id)
                                       }
                                     >
                                       {option.name}
-                                      <span className="ml-1 text-brand-900/40">
-                                        · {option.code}
-                                      </span>
+                                      {option.code && (
+                                        <span className="ml-1 text-brand-900/40">
+                                          · {option.code}
+                                        </span>
+                                      )}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -845,7 +955,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                       Partner
                     </dt>
                     <dd className="mt-0.5 text-brand-900/80">
-                      {partnerName || '—'}
+                      {partner?.accountName ?? '—'}
                     </dd>
                   </div>
                   <div>
@@ -911,7 +1021,9 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                 ) : (
                   <ul className="space-y-1.5 text-sm text-brand-900/80">
                     {unitsByProduct.map(([productId, count]) => {
-                      const product = findShipmentProduct(productId)
+                      const product = productOptions.find(
+                        (option) => option.id === productId,
+                      )
                       return (
                         <li
                           key={productId || 'unassigned'}
@@ -943,7 +1055,9 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                 ) : (
                   <ul className="space-y-1.5 text-sm text-brand-900/80">
                     {peripheralRows.map((row) => {
-                      const item = findShipmentItem(row.itemCode)
+                      const item = itemOptions.find(
+                        (option) => option.id === row.itemCategoryId,
+                      )
                       return (
                         <li key={row.key} className="flex items-center gap-2">
                           <span className="font-semibold tabular-nums">
@@ -973,7 +1087,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
           <Button
             variant="outline"
             onClick={() => setStep((previous) => Math.max(previous - 1, 0))}
-            disabled={step === 0}
+            disabled={step === 0 || saving}
           >
             <ArrowLeft className="h-4 w-4" strokeWidth={1.75} />
             Back
@@ -985,12 +1099,26 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
             </Button>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" onClick={() => handleSave('draft')}>
+              <Button
+                variant="outline"
+                onClick={() => handleSave('DRAFT')}
+                disabled={saving}
+              >
                 <Save className="h-4 w-4" strokeWidth={1.75} />
                 Save as draft
               </Button>
-              <Button onClick={() => handleSave('pending-inspection')}>
-                <ClipboardList className="h-4 w-4" strokeWidth={1.75} />
+              <Button
+                onClick={() => handleSave('PENDING_INSPECTION')}
+                disabled={saving}
+              >
+                {saving ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    strokeWidth={1.75}
+                  />
+                ) : (
+                  <ClipboardList className="h-4 w-4" strokeWidth={1.75} />
+                )}
                 Submit for inspection
               </Button>
             </div>

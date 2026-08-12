@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ArrowLeft,
   Camera,
   CheckCircle2,
   ClipboardCheck,
+  Loader2,
   ScanBarcode,
   SearchX,
+  TriangleAlert,
   XCircle,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
 import { Badge } from '#/components/ui/badge.tsx'
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -27,22 +29,18 @@ import {
   SelectValue,
 } from '#/components/ui/select.tsx'
 import { cn } from '#/lib/utils.ts'
+import { shipmentProductOptionsQueryOptions } from '../api/form-options.ts'
+import { toEdcItemPatch, useInspectionMutations } from '../api/inspection.ts'
+import { shipmentDetailQueryOptions } from '../api/shipment-detail.ts'
 import {
-  SHIPMENT_PRODUCT_OPTIONS,
   SHIPMENT_STATUS_BADGE_CLASSES,
   SHIPMENT_STATUS_LABELS,
-  buildUnitChecklist,
-  findShipment,
-  findShipmentItem,
-  findShipmentProduct,
-  findShipmentWarehouse,
   isUnitInspected,
   missingRequiredItems,
-  shipmentInspectionProgress,
-  upsertShipment,
 } from '../data/inbound-shipments.ts'
 import type {
   InboundShipmentRecord,
+  ShipmentPeripheral,
   ShipmentUnit,
   UnitCondition,
 } from '../data/inbound-shipments.ts'
@@ -50,14 +48,19 @@ import type {
 const fieldClasses =
   'border-[#DDE0EC] bg-white text-[#0E2748] placeholder:text-[#0E2748]/40 dark:border-[#DDE0EC] dark:bg-white'
 
+/** How long typing/toggling settles before the row's PATCH goes out. */
+const PATCH_DEBOUNCE_MS = 500
+
 /** Two-state segmented control (Found/Missing, Good/Damaged). */
 function SegmentedToggle<T extends string>({
   value,
   options,
+  disabled,
   onChange,
 }: {
   value: T | null
   options: Array<{ value: T; label: string; activeClasses: string }>
+  disabled?: boolean
   onChange: (value: T) => void
 }) {
   return (
@@ -66,9 +69,10 @@ function SegmentedToggle<T extends string>({
         <button
           key={option.value}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(option.value)}
           className={cn(
-            'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors',
+            'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors disabled:opacity-50',
             value === option.value
               ? option.activeClasses
               : 'text-brand-900/50 hover:text-brand-900/80',
@@ -84,12 +88,13 @@ function SegmentedToggle<T extends string>({
 /** One EDC unit's inspection row — stage 1 (found/missing) then stage 2. */
 function UnitInspectionRow({
   unit,
+  readOnly,
   onChange,
 }: {
   unit: ShipmentUnit
-  onChange: (patch: Partial<ShipmentUnit>) => void
+  readOnly: boolean
+  onChange: (next: ShipmentUnit) => void
 }) {
-  const product = findShipmentProduct(unit.productId)
   const missingRequired = missingRequiredItems(unit)
   const found = unit.result === 'found'
 
@@ -121,15 +126,21 @@ function UnitInspectionRow({
                 Not yet checked
               </Badge>
             )}
+            {unit.resultingTerminalId && (
+              <Badge size="sm" variant="success">
+                Registered as terminal
+              </Badge>
+            )}
           </p>
           <p className="mt-0.5 text-xs text-brand-900/50">
-            {product ? `${product.modelName} · ${product.brand}` : '—'}
+            {unit.productModelName} · {unit.productBrand}
           </p>
         </div>
 
         {/* Stage 1 — physical presence against the manifest. */}
         <SegmentedToggle
           value={unit.result === 'not-checked' ? null : unit.result}
+          disabled={readOnly}
           options={[
             {
               value: 'found',
@@ -145,8 +156,13 @@ function UnitInspectionRow({
           onChange={(result) =>
             onChange(
               result === 'found'
-                ? { result, condition: unit.condition ?? 'good' }
+                ? {
+                    ...unit,
+                    result,
+                    condition: unit.condition ?? 'good',
+                  }
                 : {
+                    ...unit,
                     result,
                     condition: null,
                     // A missing unit has nothing to check off.
@@ -163,6 +179,7 @@ function UnitInspectionRow({
         {found && (
           <SegmentedToggle<UnitCondition>
             value={unit.condition}
+            disabled={readOnly}
             options={[
               {
                 value: 'good',
@@ -175,7 +192,7 @@ function UnitInspectionRow({
                 activeClasses: 'bg-amber-500 text-white',
               },
             ]}
-            onChange={(condition) => onChange({ condition })}
+            onChange={(condition) => onChange({ ...unit, condition })}
           />
         )}
       </div>
@@ -201,9 +218,10 @@ function UnitInspectionRow({
               const alert = entry.required && !entry.present
               return (
                 <label
-                  key={entry.itemCode}
+                  key={entry.itemCategoryId}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                    'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                    readOnly ? 'cursor-default' : 'cursor-pointer',
                     entry.present
                       ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                       : alert
@@ -214,10 +232,12 @@ function UnitInspectionRow({
                   <input
                     type="checkbox"
                     checked={entry.present}
+                    disabled={readOnly}
                     onChange={(event) =>
                       onChange({
+                        ...unit,
                         checklist: unit.checklist.map((item) =>
-                          item.itemCode === entry.itemCode
+                          item.itemCategoryId === entry.itemCategoryId
                             ? { ...item, present: event.target.checked }
                             : item,
                         ),
@@ -251,29 +271,33 @@ function UnitInspectionRow({
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Input
             value={unit.note}
-            onChange={(event) => onChange({ note: event.target.value })}
+            disabled={readOnly}
+            onChange={(event) =>
+              onChange({ ...unit, note: event.target.value })
+            }
             placeholder="Inspection note (optional)…"
             className={`h-9 min-w-[220px] flex-1 text-xs ${fieldClasses}`}
           />
-          {found && (
+          {found && !readOnly && (
             <Button
               variant="outline"
               size="sm"
               className={cn(
-                unit.photoName && 'border-emerald-200 text-emerald-700',
+                unit.photoUrl && 'border-emerald-200 text-emerald-700',
               )}
               onClick={() =>
-                // Placeholder for the future upload flow — toggles a mock
-                // attachment so the summary/report can reference it.
+                // Placeholder for the future upload flow — records a mock
+                // attachment URL so the report can reference it.
                 onChange({
-                  photoName: unit.photoName
+                  ...unit,
+                  photoUrl: unit.photoUrl
                     ? null
-                    : `IMG-${unit.serialNumber}.jpg`,
+                    : `https://example.invalid/inspections/${unit.serialNumber}.jpg`,
                 })
               }
             >
               <Camera className="h-4 w-4" strokeWidth={1.75} />
-              {unit.photoName ? unit.photoName : 'Attach photo'}
+              {unit.photoUrl ? 'Photo attached' : 'Attach photo'}
             </Button>
           )}
         </div>
@@ -290,17 +314,43 @@ interface InspectionWorkspacePageProps {
  * Terminal Lifecycle → Inbound Shipments → the inspection workspace. The
  * warehouse team walks the physical goods against the manifest: stage 1
  * found/missing per serial, stage 2 condition + completeness for the found
- * ones, and a quantity check per peripheral line. Every change persists to
- * the mock store immediately (moving the shipment to Inspection In
- * Progress); completing navigates to the summary.
+ * ones, and a quantity check per peripheral line.
+ *
+ * Every interaction updates a local draft immediately (that is the
+ * optimistic half) and schedules a debounced PATCH for just that row, so
+ * rapid toggling or typing costs one request instead of one per click. A
+ * failed request reverts that row to the server's copy; the mutation hook
+ * toasts the reason.
  */
 export function InspectionWorkspacePage({
   shipmentId,
 }: InspectionWorkspacePageProps) {
   const navigate = useNavigate()
-  const [shipment, setShipment] = useState<InboundShipmentRecord | null>(() =>
-    findShipment(shipmentId),
-  )
+  const detailQuery = useQuery(shipmentDetailQueryOptions(shipmentId))
+  const productsQuery = useQuery(shipmentProductOptionsQueryOptions())
+  const { patchEdcItem, addUnlistedItem, patchPeripheralItem } =
+    useInspectionMutations(shipmentId)
+
+  const server = detailQuery.data ?? null
+
+  // Local working copy: the server payload with any not-yet-flushed edits
+  // applied on top, keyed by row id.
+  const [unitDrafts, setUnitDrafts] = useState<Record<string, ShipmentUnit>>({})
+  const [peripheralDrafts, setPeripheralDrafts] = useState<
+    Record<string, ShipmentPeripheral>
+  >({})
+  const timers = useRef<
+    Record<string, ReturnType<typeof setTimeout> | undefined>
+  >({})
+
+  // Drop every pending timer on unmount so a debounce can't fire into a
+  // page the inspector already left.
+  useEffect(() => {
+    const pending = timers.current
+    return () => {
+      for (const timer of Object.values(pending)) clearTimeout(timer)
+    }
+  }, [])
 
   // "Scan/add unexpected serial" modal.
   const [unlistedOpen, setUnlistedOpen] = useState(false)
@@ -308,7 +358,41 @@ export function InspectionWorkspacePage({
   const [unlistedProductId, setUnlistedProductId] = useState('')
   const [unlistedError, setUnlistedError] = useState('')
 
-  if (!shipment) {
+  if (detailQuery.isPending) {
+    return (
+      <div className="animate-fade-up flex items-center justify-center py-24 text-sm text-brand-900/50">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />
+        Loading inspection…
+      </div>
+    )
+  }
+
+  if (detailQuery.isError) {
+    return (
+      <div className="animate-fade-up">
+        <EmptyState
+          icon={TriangleAlert}
+          tone="danger"
+          title={
+            detailQuery.error instanceof Error
+              ? detailQuery.error.message
+              : 'Failed to load the inbound shipment.'
+          }
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => detailQuery.refetch()}
+            >
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
+
+  if (server === null) {
     return (
       <div className="animate-fade-up">
         <EmptyState
@@ -329,40 +413,81 @@ export function InspectionWorkspacePage({
     )
   }
 
-  const warehouse = findShipmentWarehouse(shipment.warehouseId)
-  const progress = shipmentInspectionProgress(shipment)
+  // The rendered shipment: server rows with pending local edits on top.
+  const shipment: InboundShipmentRecord = {
+    ...server,
+    units: server.units.map((unit) => unitDrafts[unit.id] ?? unit),
+    peripherals: server.peripherals.map(
+      (line) => peripheralDrafts[line.id] ?? line,
+    ),
+  }
+  const readOnly = shipment.status === 'completed'
+
+  const inspected = shipment.units.filter(isUnitInspected).length
   const peripheralsCounted = shipment.peripherals.filter(
     (line) => line.actualQty !== null,
   ).length
   const everythingChecked =
-    progress.inspected === progress.total &&
-    peripheralsCounted === shipment.peripherals.length
+    shipment.units.length > 0 || shipment.peripherals.length > 0
+      ? inspected === shipment.units.length &&
+        peripheralsCounted === shipment.peripherals.length
+      : false
 
-  /** Applies an update and persists it — first touch marks In Progress. */
-  const mutate = (
-    updater: (current: InboundShipmentRecord) => InboundShipmentRecord,
-  ) => {
-    setShipment((current) => {
-      if (!current) return current
-      const next = {
-        ...updater(current),
-        status:
-          current.status === 'pending-inspection'
-            ? ('inspection-in-progress' as const)
-            : current.status,
-      }
-      upsertShipment(next)
-      return next
+  /** Schedules one debounced flush per row id, replacing any pending one. */
+  const scheduleFlush = (key: string, flush: () => void) => {
+    const pending = timers.current[key]
+    if (pending) clearTimeout(pending)
+    timers.current[key] = setTimeout(() => {
+      delete timers.current[key]
+      flush()
+    }, PATCH_DEBOUNCE_MS)
+  }
+
+  const changeUnit = (next: ShipmentUnit) => {
+    if (readOnly) return
+    setUnitDrafts((drafts) => ({ ...drafts, [next.id]: next }))
+    scheduleFlush(`unit:${next.id}`, () => {
+      patchEdcItem.mutate(
+        { itemId: next.id, patch: toEdcItemPatch(next) },
+        {
+          // The server response replaces the detail cache, so the draft has
+          // done its job; on failure it is dropped too, which reverts the
+          // row to whatever the server still holds. Identity check: if the
+          // inspector edited the row again while this was in flight, the
+          // newer draft stays and its own flush settles it.
+          onSettled: () =>
+            setUnitDrafts((drafts) => {
+              if (drafts[next.id] !== next) return drafts
+              const { [next.id]: _flushed, ...rest } = drafts
+              return rest
+            }),
+        },
+      )
     })
   }
 
-  const patchUnit = (unitId: string, patch: Partial<ShipmentUnit>) => {
-    mutate((current) => ({
-      ...current,
-      units: current.units.map((unit) =>
-        unit.id === unitId ? { ...unit, ...patch } : unit,
-      ),
-    }))
+  const changePeripheral = (next: ShipmentPeripheral) => {
+    if (readOnly) return
+    setPeripheralDrafts((drafts) => ({ ...drafts, [next.id]: next }))
+    scheduleFlush(`peripheral:${next.id}`, () => {
+      patchPeripheralItem.mutate(
+        {
+          itemId: next.id,
+          patch: {
+            receivedQty: next.actualQty,
+            notes: next.note.trim() ? next.note.trim() : null,
+          },
+        },
+        {
+          onSettled: () =>
+            setPeripheralDrafts((drafts) => {
+              if (drafts[next.id] !== next) return drafts
+              const { [next.id]: _flushed, ...rest } = drafts
+              return rest
+            }),
+        },
+      )
+    })
   }
 
   const addUnlistedUnit = () => {
@@ -375,35 +500,26 @@ export function InspectionWorkspacePage({
       setUnlistedError('Pick which product model the unit is.')
       return
     }
-    const duplicate = shipment.units.some(
-      (unit) => unit.serialNumber.trim().toLowerCase() === serial.toLowerCase(),
-    )
-    if (duplicate) {
+    if (
+      shipment.units.some(
+        (unit) =>
+          unit.serialNumber.trim().toLowerCase() === serial.toLowerCase(),
+      )
+    ) {
       setUnlistedError(`Serial "${serial}" is already on this shipment.`)
       return
     }
-    mutate((current) => ({
-      ...current,
-      units: [
-        ...current.units,
-        {
-          id: `${current.id}-x${current.units.length + 1}`,
-          serialNumber: serial,
-          productId: unlistedProductId,
-          unlisted: true,
-          result: 'found',
-          condition: 'good',
-          checklist: buildUnitChecklist(unlistedProductId),
-          note: '',
-          photoName: null,
+    addUnlistedItem.mutate(
+      { serialNumber: serial, productId: unlistedProductId },
+      {
+        onSuccess: () => {
+          setUnlistedOpen(false)
+          setUnlistedSerial('')
+          setUnlistedProductId('')
+          setUnlistedError('')
         },
-      ],
-    }))
-    toast.success(`Unlisted unit “${serial}” added for inspection.`)
-    setUnlistedOpen(false)
-    setUnlistedSerial('')
-    setUnlistedProductId('')
-    setUnlistedError('')
+      },
+    )
   }
 
   const completeInspection = () => {
@@ -413,6 +529,11 @@ export function InspectionWorkspacePage({
       params: { shipmentId: shipment.id },
     })
   }
+
+  const saving =
+    patchEdcItem.isPending ||
+    patchPeripheralItem.isPending ||
+    addUnlistedItem.isPending
 
   return (
     <div className="animate-fade-up">
@@ -436,8 +557,8 @@ export function InspectionWorkspacePage({
             </Badge>
           </div>
           <p className="mt-1 text-sm text-brand-900/60">
-            {shipment.partnerName} → {warehouse?.name ?? 'Unknown warehouse'} ·
-            received {shipment.receivedDate || '—'}
+            {shipment.partnerName} → {shipment.warehouseName} · received{' '}
+            {shipment.receivedDate}
           </p>
         </div>
         <Button onClick={completeInspection} disabled={!everythingChecked}>
@@ -452,7 +573,7 @@ export function InspectionWorkspacePage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-brand-900/70">
               <span className="font-semibold text-brand-900 tabular-nums">
-                {progress.inspected} of {progress.total}
+                {inspected} of {shipment.units.length}
               </span>{' '}
               EDC units inspected ·{' '}
               <span className="font-semibold text-brand-900 tabular-nums">
@@ -460,7 +581,12 @@ export function InspectionWorkspacePage({
               </span>{' '}
               peripheral lines counted
             </p>
-            {everythingChecked ? (
+            {saving ? (
+              <span className="flex items-center gap-1.5 text-sm text-brand-900/50">
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+                Saving…
+              </span>
+            ) : everythingChecked ? (
               <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
                 <CheckCircle2 className="h-4 w-4" strokeWidth={1.75} />
                 Everything checked — review the summary
@@ -475,10 +601,10 @@ export function InspectionWorkspacePage({
           <Progress
             className="mt-3"
             value={
-              progress.total + shipment.peripherals.length === 0
+              shipment.units.length + shipment.peripherals.length === 0
                 ? 0
-                : ((progress.inspected + peripheralsCounted) /
-                    (progress.total + shipment.peripherals.length)) *
+                : ((inspected + peripheralsCounted) /
+                    (shipment.units.length + shipment.peripherals.length)) *
                   100
             }
           />
@@ -490,14 +616,16 @@ export function InspectionWorkspacePage({
             <h2 className="text-sm font-semibold uppercase tracking-wider text-brand-900/50">
               A · EDC units inspection
             </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setUnlistedOpen(true)}
-            >
-              <ScanBarcode className="h-4 w-4 text-primary" />
-              Add unexpected serial
-            </Button>
+            {!readOnly && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setUnlistedOpen(true)}
+              >
+                <ScanBarcode className="h-4 w-4 text-primary" />
+                Add unexpected serial
+              </Button>
+            )}
           </div>
           {shipment.units.length === 0 ? (
             <EmptyState
@@ -512,7 +640,8 @@ export function InspectionWorkspacePage({
                 <UnitInspectionRow
                   key={unit.id}
                   unit={unit}
-                  onChange={(patch) => patchUnit(unit.id, patch)}
+                  readOnly={readOnly}
+                  onChange={changeUnit}
                 />
               ))}
             </div>
@@ -549,7 +678,6 @@ export function InspectionWorkspacePage({
                 </thead>
                 <tbody>
                   {shipment.peripherals.map((line) => {
-                    const item = findShipmentItem(line.itemCode)
                     const variance =
                       line.actualQty === null
                         ? null
@@ -561,11 +689,10 @@ export function InspectionWorkspacePage({
                       >
                         <td className="px-4 py-2.5">
                           <span className="block font-medium text-brand-900">
-                            {item?.name ?? line.itemCode}
+                            {line.itemName}
                           </span>
                           <span className="text-[11px] text-brand-900/45">
-                            {line.itemCode}
-                            {item ? ` · ${item.unit}` : ''}
+                            {line.itemCode ?? '—'} · {line.itemUnit}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-brand-900/70 tabular-nums">
@@ -575,26 +702,20 @@ export function InspectionWorkspacePage({
                           <Input
                             type="number"
                             min={0}
+                            disabled={readOnly}
                             value={line.actualQty ?? ''}
                             onChange={(event) => {
                               const raw = event.target.value
                               const parsed = Number(raw)
-                              mutate((current) => ({
-                                ...current,
-                                peripherals: current.peripherals.map((row) =>
-                                  row.id === line.id
-                                    ? {
-                                        ...row,
-                                        actualQty:
-                                          raw === '' ||
-                                          !Number.isFinite(parsed) ||
-                                          parsed < 0
-                                            ? null
-                                            : Math.floor(parsed),
-                                      }
-                                    : row,
-                                ),
-                              }))
+                              changePeripheral({
+                                ...line,
+                                actualQty:
+                                  raw === '' ||
+                                  !Number.isFinite(parsed) ||
+                                  parsed < 0
+                                    ? null
+                                    : Math.floor(parsed),
+                              })
                             }}
                             placeholder="Count…"
                             className={`h-9 w-24 tabular-nums ${fieldClasses}`}
@@ -621,15 +742,12 @@ export function InspectionWorkspacePage({
                         <td className="px-4 py-2.5">
                           <Input
                             value={line.note}
+                            disabled={readOnly}
                             onChange={(event) =>
-                              mutate((current) => ({
-                                ...current,
-                                peripherals: current.peripherals.map((row) =>
-                                  row.id === line.id
-                                    ? { ...row, note: event.target.value }
-                                    : row,
-                                ),
-                              }))
+                              changePeripheral({
+                                ...line,
+                                note: event.target.value,
+                              })
                             }
                             placeholder="Note (optional)…"
                             className={`h-9 min-w-[180px] text-xs ${fieldClasses}`}
@@ -658,13 +776,21 @@ export function InspectionWorkspacePage({
         }}
         title="Add unexpected serial"
         description="For a unit physically in the delivery but not on the manifest — it will be flagged as Unlisted/Excess."
+        loading={addUnlistedItem.isPending}
         footer={
           <>
             <Button variant="outline" onClick={() => setUnlistedOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={addUnlistedUnit}>
-              <ScanBarcode className="h-4 w-4" strokeWidth={1.75} />
+            <Button
+              onClick={addUnlistedUnit}
+              disabled={addUnlistedItem.isPending}
+            >
+              {addUnlistedItem.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.75} />
+              ) : (
+                <ScanBarcode className="h-4 w-4" strokeWidth={1.75} />
+              )}
               Add unit
             </Button>
           </>
@@ -692,12 +818,19 @@ export function InspectionWorkspacePage({
                 setUnlistedProductId(value)
                 setUnlistedError('')
               }}
+              disabled={productsQuery.isPending}
             >
               <SelectTrigger className={`w-full ${fieldClasses}`}>
-                <SelectValue placeholder="Select the product model" />
+                <SelectValue
+                  placeholder={
+                    productsQuery.isPending
+                      ? 'Loading products…'
+                      : 'Select the product model'
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
-                {SHIPMENT_PRODUCT_OPTIONS.map((product) => (
+                {(productsQuery.data ?? []).map((product) => (
                   <SelectItem key={product.id} value={product.id}>
                     {product.modelName}
                     <span className="ml-1 text-brand-900/40">

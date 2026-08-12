@@ -11,4 +11,5 @@ export * from "./item-category.js";
 export * from "./warehouse.js";
 export * from "./product.js";
 export * from "./terminal.js";
+export * from "./inbound-shipment.js";
 

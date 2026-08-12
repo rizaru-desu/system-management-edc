@@ -1,81 +1,64 @@
-import { Copy, FileWarning } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Copy, FileWarning, Loader2, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { BaseModal } from '#/components/ui/base-modal.tsx'
 import { Button } from '#/components/ui/button.tsx'
-import {
-  findShipmentItem,
-  findShipmentProduct,
-  findShipmentWarehouse,
-  missingRequiredItems,
-} from '../data/inbound-shipments.ts'
+import { EmptyState } from '#/components/ui/empty-state.tsx'
+import { discrepancyReportQueryOptions } from '../api/discrepancy-report.ts'
 import type {
-  InboundShipmentRecord,
-  ShipmentUnit,
-} from '../data/inbound-shipments.ts'
+  DiscrepancyReport,
+  DiscrepancyUnit,
+} from '../api/discrepancy-report.ts'
 
-function unitLine(unit: ShipmentUnit): string {
-  const product = findShipmentProduct(unit.productId)
-  const parts = [unit.serialNumber, product?.modelName ?? '-']
-  if (unit.note) parts.push(unit.note)
+function unitLine(unit: DiscrepancyUnit): string {
+  const parts = [unit.serialNumber, unit.productModelName]
+  if (unit.notes) parts.push(unit.notes)
   return parts.join(' — ')
 }
 
 /** The report as plain text, ready to paste into an email to the partner. */
-function buildReportText(shipment: InboundShipmentRecord): string {
-  const warehouse = findShipmentWarehouse(shipment.warehouseId)
+function buildReportText(report: DiscrepancyReport): string {
   const lines: Array<string> = [
-    `DISCREPANCY REPORT — ${shipment.doNumber}`,
-    `Partner: ${shipment.partnerName}`,
-    `Destination: ${warehouse?.name ?? '-'}`,
-    `Received: ${shipment.receivedDate || '-'}`,
+    `DISCREPANCY REPORT — ${report.doNumber}`,
+    `Partner: ${report.partnerName}`,
+    `Destination: ${report.destinationWarehouseName}`,
+    `Received: ${report.receivedDate}`,
     '',
   ]
 
-  const missing = shipment.units.filter((unit) => unit.result === 'missing')
-  const damaged = shipment.units.filter(
-    (unit) => unit.result === 'found' && unit.condition === 'damaged',
-  )
-  const incomplete = shipment.units.filter(
-    (unit) => unit.result === 'found' && missingRequiredItems(unit).length > 0,
-  )
-  const unlisted = shipment.units.filter((unit) => unit.unlisted)
-  const variances = shipment.peripherals.filter(
-    (line) => line.actualQty !== null && line.actualQty !== line.documentedQty,
-  )
-
-  if (missing.length > 0) {
-    lines.push(`MISSING UNITS (${missing.length})`)
-    for (const unit of missing) lines.push(`  - ${unitLine(unit)}`)
+  if (report.missingUnits.length > 0) {
+    lines.push(`MISSING UNITS (${report.missingUnits.length})`)
+    for (const unit of report.missingUnits) lines.push(`  - ${unitLine(unit)}`)
     lines.push('')
   }
-  if (damaged.length > 0) {
-    lines.push(`DAMAGED UNITS (${damaged.length})`)
-    for (const unit of damaged) lines.push(`  - ${unitLine(unit)}`)
+  if (report.damagedUnits.length > 0) {
+    lines.push(`DAMAGED UNITS (${report.damagedUnits.length})`)
+    for (const unit of report.damagedUnits) lines.push(`  - ${unitLine(unit)}`)
     lines.push('')
   }
-  if (incomplete.length > 0) {
-    lines.push(`INCOMPLETE UNITS (${incomplete.length})`)
-    for (const unit of incomplete) {
-      const items = missingRequiredItems(unit)
-        .map((entry) => entry.itemName)
+  if (report.incompleteUnits.length > 0) {
+    lines.push(`INCOMPLETE UNITS (${report.incompleteUnits.length})`)
+    for (const unit of report.incompleteUnits) {
+      const items = unit.missingAccessories
+        .map((accessory) => accessory.itemName)
         .join(', ')
       lines.push(`  - ${unitLine(unit)} (missing: ${items})`)
     }
     lines.push('')
   }
-  if (unlisted.length > 0) {
-    lines.push(`UNLISTED/EXCESS UNITS (${unlisted.length})`)
-    for (const unit of unlisted) lines.push(`  - ${unitLine(unit)}`)
+  if (report.unlistedUnits.length > 0) {
+    lines.push(`UNLISTED/EXCESS UNITS (${report.unlistedUnits.length})`)
+    for (const unit of report.unlistedUnits) lines.push(`  - ${unitLine(unit)}`)
     lines.push('')
   }
-  if (variances.length > 0) {
-    lines.push(`PERIPHERAL QUANTITY VARIANCES (${variances.length})`)
-    for (const line of variances) {
-      const item = findShipmentItem(line.itemCode)
-      const variance = (line.actualQty ?? 0) - line.documentedQty
+  if (report.peripheralVariances.length > 0) {
+    lines.push(
+      `PERIPHERAL QUANTITY VARIANCES (${report.peripheralVariances.length})`,
+    )
+    for (const line of report.peripheralVariances) {
       lines.push(
-        `  - ${item?.name ?? line.itemCode}: documented ${line.documentedQty}, received ${line.actualQty} (${variance > 0 ? '+' : ''}${variance})${line.note ? ` — ${line.note}` : ''}`,
+        `  - ${line.itemName}: documented ${line.documentedQty}, received ${line.receivedQty ?? '-'} (${line.variance > 0 ? '+' : ''}${line.variance})${line.notes ? ` — ${line.notes}` : ''}`,
       )
     }
   }
@@ -86,24 +69,31 @@ function buildReportText(shipment: InboundShipmentRecord): string {
 interface DiscrepancyReportModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  shipment: InboundShipmentRecord
+  shipmentId: string
 }
 
 /**
  * The pre-filled discrepancy summary meant to be shared back with the
- * partner: every missing, damaged and incomplete unit plus the peripheral
- * quantity variances. UI only — a PDF export can hang off this later.
+ * partner. The data comes from GET /inbound-shipments/:id/discrepancy-report
+ * — derived server-side from the stored inspection results, so the report
+ * can never disagree with the record. UI only: a PDF export can hang off
+ * this later.
  */
 export function DiscrepancyReportModal({
   open,
   onOpenChange,
-  shipment,
+  shipmentId,
 }: DiscrepancyReportModalProps) {
-  const report = buildReportText(shipment)
+  const reportQuery = useQuery({
+    ...discrepancyReportQueryOptions(shipmentId),
+    enabled: open,
+  })
+  const report = reportQuery.data ?? null
+  const text = report ? buildReportText(report) : ''
 
   const copyReport = async () => {
     try {
-      await navigator.clipboard.writeText(report)
+      await navigator.clipboard.writeText(text)
       toast.success('Discrepancy report copied to the clipboard.')
     } catch {
       toast.error('Could not access the clipboard — copy the text manually.')
@@ -121,22 +111,59 @@ export function DiscrepancyReportModal({
           Discrepancy report
         </span>
       }
-      description={`Everything to raise with ${shipment.partnerName} about ${shipment.doNumber}.`}
+      description={
+        report
+          ? `Everything to raise with ${report.partnerName} about ${report.doNumber}.`
+          : 'Loading the recorded discrepancies…'
+      }
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={() => void copyReport()}>
+          <Button onClick={() => void copyReport()} disabled={!text}>
             <Copy className="h-4 w-4" strokeWidth={1.75} />
             Copy report
           </Button>
         </>
       }
     >
-      <pre className="whitespace-pre-wrap rounded-xl border border-brand-100 bg-brand-50/60 p-4 font-mono text-xs leading-relaxed text-brand-900/80">
-        {report}
-      </pre>
+      {reportQuery.isPending ? (
+        <div className="flex items-center justify-center py-10 text-sm text-brand-900/50">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" strokeWidth={1.75} />
+          Loading the discrepancy report…
+        </div>
+      ) : reportQuery.isError ? (
+        <EmptyState
+          icon={TriangleAlert}
+          tone="danger"
+          title={
+            reportQuery.error instanceof Error
+              ? reportQuery.error.message
+              : 'Failed to load the discrepancy report.'
+          }
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => reportQuery.refetch()}
+            >
+              Try again
+            </Button>
+          }
+        />
+      ) : report?.hasDiscrepancies ? (
+        <pre className="whitespace-pre-wrap rounded-xl border border-brand-100 bg-brand-50/60 p-4 font-mono text-xs leading-relaxed text-brand-900/80">
+          {text}
+        </pre>
+      ) : (
+        <EmptyState
+          icon={FileWarning}
+          iconChip
+          title="No discrepancies recorded"
+          description="Every unit arrived, in good condition and complete, and every peripheral quantity matched the paperwork."
+        />
+      )}
     </BaseModal>
   )
 }
