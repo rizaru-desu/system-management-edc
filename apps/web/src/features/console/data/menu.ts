@@ -173,6 +173,16 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         directRoute: '/products',
       },
       {
+        title: 'Inbound Shipments',
+        path: 'inbound-shipments',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Inventory_Controller',
+        ],
+        directRoute: '/inbound-shipments',
+      },
+      {
         title: 'Terminals',
         path: 'terminals',
         allowedRoles: ALL,

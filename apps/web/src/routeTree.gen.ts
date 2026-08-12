@@ -25,6 +25,8 @@ import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
+import { Route as AuthedInboundShipmentsIndexRouteImport } from './routes/_authed/inbound-shipments/index'
+import { Route as AuthedInboundShipmentsNewRouteImport } from './routes/_authed/inbound-shipments/new'
 import { Route as AuthedProductsIndexRouteImport } from './routes/_authed/products/index'
 import { Route as AuthedProductsProductIdRouteImport } from './routes/_authed/products/$productId'
 import { Route as AuthedProductsNewRouteImport } from './routes/_authed/products/new'
@@ -32,6 +34,8 @@ import { Route as AuthedTerminalsIndexRouteImport } from './routes/_authed/termi
 import { Route as AuthedTerminalsTerminalIdRouteImport } from './routes/_authed/terminals/$terminalId'
 import { Route as AuthedWarehousesIndexRouteImport } from './routes/_authed/warehouses/index'
 import { Route as AuthedWarehousesWarehouseIdRouteImport } from './routes/_authed/warehouses/$warehouseId'
+import { Route as AuthedInboundShipmentsShipmentIdIndexRouteImport } from './routes/_authed/inbound-shipments/$shipmentId/index'
+import { Route as AuthedInboundShipmentsShipmentIdSummaryRouteImport } from './routes/_authed/inbound-shipments/$shipmentId/summary'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -112,6 +116,18 @@ const AuthedUsersRoute = AuthedUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedInboundShipmentsIndexRoute =
+  AuthedInboundShipmentsIndexRouteImport.update({
+    id: '/inbound-shipments/',
+    path: '/inbound-shipments/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedInboundShipmentsNewRoute =
+  AuthedInboundShipmentsNewRouteImport.update({
+    id: '/inbound-shipments/new',
+    path: '/inbound-shipments/new',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedProductsIndexRoute = AuthedProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -149,6 +165,18 @@ const AuthedWarehousesWarehouseIdRoute =
     path: '/warehouses/$warehouseId',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedInboundShipmentsShipmentIdIndexRoute =
+  AuthedInboundShipmentsShipmentIdIndexRouteImport.update({
+    id: '/inbound-shipments/$shipmentId/',
+    path: '/inbound-shipments/$shipmentId/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedInboundShipmentsShipmentIdSummaryRoute =
+  AuthedInboundShipmentsShipmentIdSummaryRouteImport.update({
+    id: '/inbound-shipments/$shipmentId/summary',
+    path: '/inbound-shipments/$shipmentId/summary',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -166,13 +194,17 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
   '/products/': typeof AuthedProductsIndexRoute
   '/terminals/': typeof AuthedTerminalsIndexRoute
   '/warehouses/': typeof AuthedWarehousesIndexRoute
+  '/inbound-shipments/$shipmentId/summary': typeof AuthedInboundShipmentsShipmentIdSummaryRoute
+  '/inbound-shipments/$shipmentId/': typeof AuthedInboundShipmentsShipmentIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -190,13 +222,17 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/inbound-shipments': typeof AuthedInboundShipmentsIndexRoute
   '/products': typeof AuthedProductsIndexRoute
   '/terminals': typeof AuthedTerminalsIndexRoute
   '/warehouses': typeof AuthedWarehousesIndexRoute
+  '/inbound-shipments/$shipmentId/summary': typeof AuthedInboundShipmentsShipmentIdSummaryRoute
+  '/inbound-shipments/$shipmentId': typeof AuthedInboundShipmentsShipmentIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -216,13 +252,17 @@ export interface FileRoutesById {
   '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
+  '/_authed/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/_authed/products/$productId': typeof AuthedProductsProductIdRoute
   '/_authed/products/new': typeof AuthedProductsNewRoute
   '/_authed/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/_authed/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
   '/_authed/products/': typeof AuthedProductsIndexRoute
   '/_authed/terminals/': typeof AuthedTerminalsIndexRoute
   '/_authed/warehouses/': typeof AuthedWarehousesIndexRoute
+  '/_authed/inbound-shipments/$shipmentId/summary': typeof AuthedInboundShipmentsShipmentIdSummaryRoute
+  '/_authed/inbound-shipments/$shipmentId/': typeof AuthedInboundShipmentsShipmentIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -242,13 +282,17 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/inbound-shipments/new'
     | '/products/$productId'
     | '/products/new'
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
+    | '/inbound-shipments/'
     | '/products/'
     | '/terminals/'
     | '/warehouses/'
+    | '/inbound-shipments/$shipmentId/summary'
+    | '/inbound-shipments/$shipmentId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -266,13 +310,17 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/inbound-shipments/new'
     | '/products/$productId'
     | '/products/new'
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
+    | '/inbound-shipments'
     | '/products'
     | '/terminals'
     | '/warehouses'
+    | '/inbound-shipments/$shipmentId/summary'
+    | '/inbound-shipments/$shipmentId'
   id:
     | '__root__'
     | '/'
@@ -291,13 +339,17 @@ export interface FileRouteTypes {
     | '/_authed/projects'
     | '/_authed/service-points'
     | '/_authed/users'
+    | '/_authed/inbound-shipments/new'
     | '/_authed/products/$productId'
     | '/_authed/products/new'
     | '/_authed/terminals/$terminalId'
     | '/_authed/warehouses/$warehouseId'
+    | '/_authed/inbound-shipments/'
     | '/_authed/products/'
     | '/_authed/terminals/'
     | '/_authed/warehouses/'
+    | '/_authed/inbound-shipments/$shipmentId/summary'
+    | '/_authed/inbound-shipments/$shipmentId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -423,6 +475,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/inbound-shipments/': {
+      id: '/_authed/inbound-shipments/'
+      path: '/inbound-shipments'
+      fullPath: '/inbound-shipments/'
+      preLoaderRoute: typeof AuthedInboundShipmentsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/inbound-shipments/new': {
+      id: '/_authed/inbound-shipments/new'
+      path: '/inbound-shipments/new'
+      fullPath: '/inbound-shipments/new'
+      preLoaderRoute: typeof AuthedInboundShipmentsNewRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/products/': {
       id: '/_authed/products/'
       path: '/products'
@@ -472,6 +538,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedWarehousesWarehouseIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/inbound-shipments/$shipmentId/': {
+      id: '/_authed/inbound-shipments/$shipmentId/'
+      path: '/inbound-shipments/$shipmentId'
+      fullPath: '/inbound-shipments/$shipmentId/'
+      preLoaderRoute: typeof AuthedInboundShipmentsShipmentIdIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/inbound-shipments/$shipmentId/summary': {
+      id: '/_authed/inbound-shipments/$shipmentId/summary'
+      path: '/inbound-shipments/$shipmentId/summary'
+      fullPath: '/inbound-shipments/$shipmentId/summary'
+      preLoaderRoute: typeof AuthedInboundShipmentsShipmentIdSummaryRouteImport
+      parentRoute: typeof AuthedRoute
+    }
   }
 }
 
@@ -486,13 +566,17 @@ interface AuthedRouteChildren {
   AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
+  AuthedInboundShipmentsNewRoute: typeof AuthedInboundShipmentsNewRoute
   AuthedProductsProductIdRoute: typeof AuthedProductsProductIdRoute
   AuthedProductsNewRoute: typeof AuthedProductsNewRoute
   AuthedTerminalsTerminalIdRoute: typeof AuthedTerminalsTerminalIdRoute
   AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
+  AuthedInboundShipmentsIndexRoute: typeof AuthedInboundShipmentsIndexRoute
   AuthedProductsIndexRoute: typeof AuthedProductsIndexRoute
   AuthedTerminalsIndexRoute: typeof AuthedTerminalsIndexRoute
   AuthedWarehousesIndexRoute: typeof AuthedWarehousesIndexRoute
+  AuthedInboundShipmentsShipmentIdSummaryRoute: typeof AuthedInboundShipmentsShipmentIdSummaryRoute
+  AuthedInboundShipmentsShipmentIdIndexRoute: typeof AuthedInboundShipmentsShipmentIdIndexRoute
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
@@ -506,13 +590,19 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,
+  AuthedInboundShipmentsNewRoute: AuthedInboundShipmentsNewRoute,
   AuthedProductsProductIdRoute: AuthedProductsProductIdRoute,
   AuthedProductsNewRoute: AuthedProductsNewRoute,
   AuthedTerminalsTerminalIdRoute: AuthedTerminalsTerminalIdRoute,
   AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
+  AuthedInboundShipmentsIndexRoute: AuthedInboundShipmentsIndexRoute,
   AuthedProductsIndexRoute: AuthedProductsIndexRoute,
   AuthedTerminalsIndexRoute: AuthedTerminalsIndexRoute,
   AuthedWarehousesIndexRoute: AuthedWarehousesIndexRoute,
+  AuthedInboundShipmentsShipmentIdSummaryRoute:
+    AuthedInboundShipmentsShipmentIdSummaryRoute,
+  AuthedInboundShipmentsShipmentIdIndexRoute:
+    AuthedInboundShipmentsShipmentIdIndexRoute,
 }
 
 const AuthedRouteWithChildren =
