@@ -8,8 +8,10 @@ import type { TerminalSeed } from '@repo/db';
  * history for a handful so the detail page has something real to render.
  * Idempotent: rows are upserted by serial number with their history
  * replaced wholesale, so re-running never duplicates records. References
- * resolve by product model name and warehouse code — run seed:products
- * and seed:warehouses first (and seed:merchants for the installed links).
+ * resolve by product model name and warehouse code; the seed:terminals
+ * npm script runs the prerequisite seeds (item categories → products,
+ * warehouses, service points → merchants) first, so it works standalone
+ * against a fresh database.
  *
  * Usage: pnpm --filter backend seed:terminals
  */
