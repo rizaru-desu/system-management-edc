@@ -113,3 +113,50 @@ export const terminalStatusHistory = pgTable(
     index("terminal_status_history_changed_at_idx").on(table.changedAt),
   ],
 );
+
+/**
+ * How a terminal status transition reads as a stock movement (Inventory →
+ * Stock Movements). Derived from (from_status, to_status) — never stored —
+ * so the movement log stays a pure view of `terminal_status_history`.
+ */
+export const EDC_MOVEMENT_TYPES = [
+  "INBOUND_RECEIPT",
+  "TRANSFER_OUT",
+  "TRANSFER_IN",
+  "INSTALLATION",
+  "MARKED_DAMAGED",
+  "MAINTENANCE",
+  "RETURNED_TO_STOCK",
+  "RETIRED",
+  "STATUS_CHANGE",
+] as const;
+export type EdcMovementType = (typeof EDC_MOVEMENT_TYPES)[number];
+
+/**
+ * The transition → movement-type mapping, in precedence order:
+ * registration (no prior status) first, then the destination status, with
+ * IN_STOCK split by where the unit came from. STATUS_CHANGE is the
+ * fallback for transitions no rule names (shouldn't occur in practice).
+ */
+export function deriveEdcMovementType(
+  fromStatus: TerminalStatus | null,
+  toStatus: TerminalStatus,
+): EdcMovementType {
+  if (fromStatus === null) return "INBOUND_RECEIPT";
+  switch (toStatus) {
+    case "DAMAGED":
+      return "MARKED_DAMAGED";
+    case "INSTALLED":
+      return "INSTALLATION";
+    case "IN_TRANSIT":
+      return "TRANSFER_OUT";
+    case "UNDER_MAINTENANCE":
+      return "MAINTENANCE";
+    case "RETIRED":
+      return "RETIRED";
+    case "IN_STOCK":
+      return fromStatus === "IN_TRANSIT" ? "TRANSFER_IN" : "RETURNED_TO_STOCK";
+    default:
+      return "STATUS_CHANGE";
+  }
+}

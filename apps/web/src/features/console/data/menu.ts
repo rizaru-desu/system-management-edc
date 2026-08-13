@@ -226,11 +226,13 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
           'Inventory_Controller',
           'Operations_Specialist',
         ],
+        directRoute: '/stock',
       },
       {
         title: 'Stock Movements',
         path: 'stock-movements',
         allowedRoles: ['System_Administrator', 'Inventory_Controller'],
+        directRoute: '/stock-movements',
       },
     ],
   },
