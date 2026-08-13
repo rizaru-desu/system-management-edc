@@ -284,3 +284,29 @@ export {
   type UpdateInboundShipmentResult,
   type UpdatePeripheralItemInput,
 } from "./queries/inbound-shipments.js";
+export {
+  EDC_MOVEMENT_TYPES,
+  deriveEdcMovementType,
+  type EdcMovementType,
+} from "./schema/terminal.js";
+export {
+  LOW_STOCK_THRESHOLD,
+  listEdcStockLevels,
+  listEdcStockMovements,
+  listPeripheralStockLevels,
+  listPeripheralStockMovements,
+  seedPeripheralStock,
+  stockLevelSummary,
+  type EdcStockLevelRow,
+  type EdcStockMovementPage,
+  type EdcStockMovementRow,
+  type ListEdcStockMovementsOptions,
+  type ListPeripheralStockMovementsOptions,
+  type PeripheralStockLevelRow,
+  type PeripheralStockMovementPage,
+  type PeripheralStockMovementRow,
+  type StockLevelFilters,
+  type StockLevelSummary,
+  type StockSeedLevel,
+  type StockSeedMovement,
+} from "./queries/stock.js";

@@ -7,6 +7,7 @@ import {
   inboundShipmentEdcItems,
   inboundShipmentPeripheralItems,
   inboundShipments,
+  peripheralStockMovements,
   warehouseItemStocks,
 } from "../schema/inbound-shipment.js";
 import type {
@@ -1131,6 +1132,16 @@ export async function finalizeInboundShipment(
             updatedAt: new Date(),
           },
         });
+      // The running total keeps no history of its own, so the same
+      // transaction logs the change for Inventory -> Stock Movements.
+      await tx.insert(peripheralStockMovements).values({
+        warehouseId: shipment.destinationWarehouseId,
+        itemCategoryId: line.itemCategoryId,
+        quantityChange: received,
+        reason: "INBOUND_RECEIPT",
+        relatedShipmentId: shipmentId,
+        notes: `Inbound shipment ${shipment.doNumber}.`,
+      });
       stockLinesUpdated += 1;
       stockQuantityAdded += received;
     }

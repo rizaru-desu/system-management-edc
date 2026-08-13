@@ -15,6 +15,7 @@ import { ProductModule } from './products/product.module';
 import { ProjectModule } from './projects/project.module';
 import { ServicePointAssignmentModule } from './service-point-assignments/service-point-assignment.module';
 import { InboundShipmentModule } from './inbound-shipments/inbound-shipment.module';
+import { StockModule } from './stock/stock.module';
 import { TerminalModule } from './terminals/terminal.module';
 import { ServicePointModule } from './service-points/service-point.module';
 import { UsersModule } from './users/users.module';
@@ -38,6 +39,7 @@ import { WarehouseModule } from './warehouses/warehouse.module';
     ServicePointAssignmentModule,
     TerminalModule,
     InboundShipmentModule,
+    StockModule,
     WarehouseModule,
   ],
   controllers: [AppController],

@@ -277,3 +277,56 @@ export const warehouseItemStocks = pgTable(
     index("warehouse_item_stocks_warehouse_id_idx").on(table.warehouseId),
   ],
 );
+
+/** Why one peripheral stock quantity changed at a warehouse. */
+export const PERIPHERAL_MOVEMENT_REASONS = [
+  "INBOUND_RECEIPT",
+  "TRANSFER_IN",
+  "TRANSFER_OUT",
+  "ADJUSTMENT",
+] as const;
+export type PeripheralMovementReason =
+  (typeof PERIPHERAL_MOVEMENT_REASONS)[number];
+
+/**
+ * peripheral_stock_movements
+ * The audit trail behind `warehouse_item_stocks`: one row per quantity
+ * change, signed (positive = stock in, negative = stock out). The running
+ * total stores no history of its own, so every write path that touches it
+ * — today the inbound-inspection finalize, later transfers and manual
+ * adjustments — must log here in the same transaction. Inventory → Stock
+ * Movements reads this table; rows are never edited or deleted.
+ */
+export const peripheralStockMovements = pgTable(
+  "peripheral_stock_movements",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(createId),
+    warehouseId: text("warehouse_id")
+      .notNull()
+      .references(() => warehouses.id),
+    itemCategoryId: text("item_category_id")
+      .notNull()
+      .references(() => itemCategories.id),
+    /** Signed delta applied to the running total. */
+    quantityChange: integer("quantity_change").notNull(),
+    reason: text("reason").$type<PeripheralMovementReason>().notNull(),
+    /** The inbound shipment that caused the change, when there is one. */
+    relatedShipmentId: text("related_shipment_id").references(
+      () => inboundShipments.id,
+      { onDelete: "set null" },
+    ),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("peripheral_stock_movements_warehouse_id_idx").on(
+      table.warehouseId,
+    ),
+    index("peripheral_stock_movements_item_category_id_idx").on(
+      table.itemCategoryId,
+    ),
+    index("peripheral_stock_movements_created_at_idx").on(table.createdAt),
+  ],
+);
