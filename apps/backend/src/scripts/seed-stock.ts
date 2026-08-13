@@ -20,6 +20,12 @@ import type { StockSeedLevel, StockSeedMovement } from '@repo/db';
  */
 
 const STOCK_LEVELS: StockSeedLevel[] = [
+  // Central after the finalized inbound receipts (12/14/36) minus the
+  // outbound transfers and adjustment logged below — so summing the
+  // movement log per line always reproduces the level.
+  { warehouseCode: 'WH-CTR-JKT', itemCode: 'ACC-001', quantity: 10 },
+  { warehouseCode: 'WH-CTR-JKT', itemCode: 'ACC-003', quantity: 4 },
+  { warehouseCode: 'WH-CTR-JKT', itemCode: 'ACC-004', quantity: 12 },
   // Jawa Barat cluster — healthy paper, low chargers at Bandung.
   { warehouseCode: 'WH-REG-JABAR', itemCode: 'ACC-002', quantity: 12 },
   { warehouseCode: 'WH-REG-JABAR', itemCode: 'ACC-004', quantity: 8 },
@@ -33,6 +39,7 @@ const STOCK_LEVELS: StockSeedLevel[] = [
 ];
 
 const STOCK_MOVEMENTS: StockSeedMovement[] = [
+  // Central → Bandung paper transfer.
   {
     warehouseCode: 'WH-CTR-JKT',
     itemCode: 'ACC-004',
@@ -49,6 +56,7 @@ const STOCK_MOVEMENTS: StockSeedMovement[] = [
     notes: 'Dari Gudang Pusat Jakarta.',
     daysAgo: 2,
   },
+  // Central → Jawa Timur SIM cards.
   {
     warehouseCode: 'WH-CTR-JKT',
     itemCode: 'ACC-003',
@@ -65,6 +73,7 @@ const STOCK_MOVEMENTS: StockSeedMovement[] = [
     notes: 'Dari Gudang Pusat Jakarta.',
     daysAgo: 3,
   },
+  // Write-offs and opening balances.
   {
     warehouseCode: 'WH-CTR-JKT',
     itemCode: 'ACC-001',
@@ -74,27 +83,51 @@ const STOCK_MOVEMENTS: StockSeedMovement[] = [
     daysAgo: 5,
   },
   {
-    warehouseCode: 'WH-CTR-JKT',
-    itemCode: 'ACC-002',
-    quantityChange: -12,
-    reason: 'TRANSFER_OUT',
-    notes: 'Ke Gudang Wilayah Jawa Barat.',
-    daysAgo: 8,
+    warehouseCode: 'WH-SP-BDG',
+    itemCode: 'ACC-001',
+    quantityChange: 3,
+    reason: 'ADJUSTMENT',
+    notes: 'Stok awal service point.',
+    daysAgo: 9,
+  },
+  {
+    warehouseCode: 'WH-SP-BKS',
+    itemCode: 'ACC-004',
+    quantityChange: 6,
+    reason: 'ADJUSTMENT',
+    notes: 'Stok awal service point.',
+    daysAgo: 9,
   },
   {
     warehouseCode: 'WH-REG-JABAR',
     itemCode: 'ACC-002',
     quantityChange: 12,
-    reason: 'TRANSFER_IN',
-    notes: 'Dari Gudang Pusat Jakarta.',
-    daysAgo: 8,
+    reason: 'ADJUSTMENT',
+    notes: 'Stok awal gudang wilayah.',
+    daysAgo: 10,
+  },
+  {
+    warehouseCode: 'WH-REG-JABAR',
+    itemCode: 'ACC-004',
+    quantityChange: 8,
+    reason: 'ADJUSTMENT',
+    notes: 'Stok awal gudang wilayah.',
+    daysAgo: 10,
+  },
+  {
+    warehouseCode: 'WH-SP-SBY',
+    itemCode: 'ACC-003',
+    quantityChange: 6,
+    reason: 'ADJUSTMENT',
+    notes: 'Stok awal service point.',
+    daysAgo: 11,
   },
   {
     warehouseCode: 'WH-SP-SBY',
     itemCode: 'ACC-002',
     quantityChange: 15,
     reason: 'ADJUSTMENT',
-    notes: 'Stok awal Service Point Surabaya.',
+    notes: 'Stok awal service point.',
     daysAgo: 12,
   },
 ];

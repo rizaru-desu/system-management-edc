@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
   SearchX,
+  TriangleAlert,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
@@ -12,6 +14,7 @@ import { Card } from '#/components/ui/card.tsx'
 import { EmptyState } from '#/components/ui/empty-state.tsx'
 import { Input } from '#/components/ui/input.tsx'
 import { SearchInput } from '#/components/ui/search-input.tsx'
+import { Skeleton } from '#/components/ui/skeleton.tsx'
 import {
   Select,
   SelectContent,
@@ -21,22 +24,23 @@ import {
 } from '#/components/ui/select.tsx'
 import { cn } from '#/lib/utils.ts'
 import {
+  edcMovementsQueryOptions,
+  movementWarehouseOptionsQueryOptions,
+  peripheralMovementsQueryOptions,
+} from '../api/stock-movements.ts'
+import {
   EDC_MOVEMENT_TYPES,
   EDC_MOVEMENT_TYPE_BADGE_CLASSES,
   EDC_MOVEMENT_TYPE_LABELS,
   PERIPHERAL_MOVEMENT_REASONS,
   PERIPHERAL_MOVEMENT_REASON_BADGE_CLASSES,
   PERIPHERAL_MOVEMENT_REASON_LABELS,
-  SEED_EDC_MOVEMENTS,
-  SEED_PERIPHERAL_MOVEMENTS,
-  STOCK_WAREHOUSE_OPTIONS,
-} from '../data/stock-movements.ts'
-import type {
-  EdcMovementRecord,
-  PeripheralMovementRecord,
 } from '../data/stock-movements.ts'
 
 const PAGE_SIZE = 10
+
+/** Row count used by the loading-skeleton rows. */
+const SKELETON_ROWS = 6
 
 const TABS = [
   { key: 'edc', label: 'EDC Movements' },
@@ -77,17 +81,20 @@ function paginationItems(
 function TableFooter({
   page,
   total,
+  shown,
   label,
   onPageChange,
 }: {
   page: number
   total: number
+  /** Rows actually on this page (the last page can be short). */
+  shown: number
   label: string
   onPageChange: (page: number) => void
 }) {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const rangeStart = total === 0 ? 0 : page * PAGE_SIZE + 1
-  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, total)
+  const rangeEnd = page * PAGE_SIZE + shown
   if (total === 0) return null
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-brand-100 px-5 py-3">
@@ -148,54 +155,90 @@ const headerRowClasses =
   'border-b border-brand-100 text-[11px] uppercase tracking-wider text-brand-900/50'
 const bodyRowClasses = 'border-b border-brand-100 last:border-0'
 
-function NoMovements({ onClear }: { onClear: () => void }) {
+function SkeletonRows({ columns }: { columns: number }) {
   return (
-    <EmptyState
-      icon={SearchX}
-      iconChip
-      title="No movements found"
-      description="Try a different search term, warehouse, type or date range."
-      action={
-        <Button variant="outline" size="sm" onClick={onClear}>
-          Clear filters
-        </Button>
-      }
-    />
+    <>
+      {Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
+        <tr key={rowIndex} className={bodyRowClasses}>
+          {Array.from({ length: columns }, (__, cellIndex) => (
+            <td key={cellIndex} className="px-5 py-3.5">
+              <Skeleton
+                className={cn('h-4', cellIndex === 0 ? 'w-28' : 'w-16')}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  )
+}
+
+function ErrorRow({
+  columns,
+  message,
+  onRetry,
+}: {
+  columns: number
+  message: string
+  onRetry: () => void
+}) {
+  return (
+    <tr>
+      <td colSpan={columns} className="px-5">
+        <EmptyState
+          icon={TriangleAlert}
+          tone="danger"
+          title={message}
+          action={
+            <Button variant="outline" size="sm" onClick={onRetry}>
+              Try again
+            </Button>
+          }
+        />
+      </td>
+    </tr>
   )
 }
 
 /**
  * Inventory → Stock Movements: the read-only log of every stock change.
- * Two tabs — serialized EDC units (from the terminal movement history) and
- * peripheral quantities (from the stock movement log). Pure audit trail:
- * no create or edit actions here; rows are written by the flows that move
- * stock (inbound inspections, transfers, installations, …). UI-only stage
- * on mock rows; the api layer replaces the arrays.
+ * Two tabs — serialized EDC units (from the terminal movement history,
+ * with the movement type derived server-side from each status transition)
+ * and peripheral quantities (from the stock movement log). Pure audit
+ * trail: no create or edit actions; rows are written by the flows that
+ * move stock. Search, filters and pagination all run server-side.
  */
 export function StockMovementsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>('edc')
 
-  // ── Filters (shared across tabs where they apply) ──────────────────────
+  // ── Filters (server-side; search debounced) ────────────────────────────
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(0)
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
   // The type filter's options differ per tab, so switching tabs resets it.
   useEffect(() => {
     setTypeFilter('all')
     setSearch('')
+    setDebouncedSearch('')
     setPage(0)
   }, [activeTab])
 
   useEffect(() => {
     setPage(0)
-  }, [search, warehouseFilter, typeFilter, dateFrom, dateTo])
+  }, [debouncedSearch, warehouseFilter, typeFilter, dateFrom, dateTo])
 
   const isFiltering =
-    search.trim() !== '' ||
+    debouncedSearch.trim() !== '' ||
     warehouseFilter !== 'all' ||
     typeFilter !== 'all' ||
     dateFrom !== '' ||
@@ -203,62 +246,59 @@ export function StockMovementsPage() {
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setWarehouseFilter('all')
     setTypeFilter('all')
     setDateFrom('')
     setDateTo('')
   }
 
-  const warehouseName =
-    STOCK_WAREHOUSE_OPTIONS.find((option) => option.id === warehouseFilter)
-      ?.name ?? null
+  const warehouseOptionsQuery = useQuery(movementWarehouseOptionsQueryOptions())
+  const warehouseOptions = warehouseOptionsQuery.data ?? []
 
-  /** Shared date-range check against the row's yyyy-mm-dd HH:mm stamp. */
-  const inDateRange = (movedAt: string) => {
-    const day = movedAt.slice(0, 10)
-    if (dateFrom && day < dateFrom) return false
-    if (dateTo && day > dateTo) return false
-    return true
+  const filters = {
+    search: debouncedSearch,
+    warehouseId: warehouseFilter,
+    type: typeFilter,
+    dateFrom,
+    dateTo,
+    page: page + 1,
+    pageSize: PAGE_SIZE,
   }
-
-  // The mock arrays are small, so both filters recompute per render; the
-  // api layer moves all of this server-side.
-  const term = search.trim().toLowerCase()
-
-  const filteredEdc = SEED_EDC_MOVEMENTS.filter((row) => {
-    if (term && !row.serialNumber.toLowerCase().includes(term)) return false
-    if (
-      warehouseName &&
-      row.fromWarehouseName !== warehouseName &&
-      row.toWarehouseName !== warehouseName
-    ) {
-      return false
-    }
-    if (typeFilter !== 'all' && row.movementType !== typeFilter) return false
-    return inDateRange(row.movedAt)
+  // Only the active tab's query runs; switching tabs starts the other.
+  const edcQuery = useQuery({
+    ...edcMovementsQueryOptions(filters),
+    enabled: activeTab === 'edc',
   })
-
-  const filteredPeripherals = SEED_PERIPHERAL_MOVEMENTS.filter((row) => {
-    if (
-      term &&
-      !row.itemName.toLowerCase().includes(term) &&
-      !(row.itemCode ?? '').toLowerCase().includes(term)
-    ) {
-      return false
-    }
-    if (warehouseName && row.warehouseName !== warehouseName) return false
-    if (typeFilter !== 'all' && row.reason !== typeFilter) return false
-    return inDateRange(row.movedAt)
+  const peripheralsQuery = useQuery({
+    ...peripheralMovementsQueryOptions(filters),
+    enabled: activeTab === 'peripherals',
   })
+  const activeQuery = activeTab === 'edc' ? edcQuery : peripheralsQuery
+  const total = activeQuery.data?.total ?? 0
+  const edcRows = edcQuery.data?.movements ?? []
+  const peripheralRows = peripheralsQuery.data?.movements ?? []
 
-  const total =
-    activeTab === 'edc' ? filteredEdc.length : filteredPeripherals.length
-  const pageEdc: Array<EdcMovementRecord> = filteredEdc.slice(
-    page * PAGE_SIZE,
-    (page + 1) * PAGE_SIZE,
+  const emptyState = isFiltering ? (
+    <EmptyState
+      icon={SearchX}
+      iconChip
+      title="No movements found"
+      description="Try a different search term, warehouse, type or date range."
+      action={
+        <Button variant="outline" size="sm" onClick={clearFilters}>
+          Clear filters
+        </Button>
+      }
+    />
+  ) : (
+    <EmptyState
+      icon={ArrowLeftRight}
+      iconChip
+      title="No movements yet"
+      description="Movements appear here as stock is received, transferred and installed."
+    />
   )
-  const pagePeripherals: Array<PeripheralMovementRecord> =
-    filteredPeripherals.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
     <div className="animate-fade-up">
@@ -310,6 +350,7 @@ export function StockMovementsPage() {
               : 'Search item name or code…'
           }
           containerClassName="min-w-[220px] sm:max-w-xs"
+          isFetching={activeQuery.isFetching && !activeQuery.isPending}
         />
         <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
           <SelectTrigger className="w-[220px]">
@@ -317,8 +358,10 @@ export function StockMovementsPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All warehouses</SelectItem>
-            {STOCK_WAREHOUSE_OPTIONS.map((warehouse) => (
+            {warehouseOptions.map((warehouse) => (
               <SelectItem key={warehouse.id} value={warehouse.id}>
+                {/* Figure-space indent mirrors the tree depth. */}
+                {'  '.repeat(warehouse.depth)}
                 {warehouse.name}
               </SelectItem>
             ))}
@@ -379,65 +422,74 @@ export function StockMovementsPage() {
               </tr>
             </thead>
             <tbody>
-              {total === 0 && (
+              {edcQuery.isPending && <SkeletonRows columns={7} />}
+              {edcQuery.isError && (
+                <ErrorRow
+                  columns={7}
+                  message={
+                    edcQuery.error instanceof Error
+                      ? edcQuery.error.message
+                      : 'Failed to load the EDC movements.'
+                  }
+                  onRetry={() => edcQuery.refetch()}
+                />
+              )}
+              {!edcQuery.isPending && !edcQuery.isError && total === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5">
-                    {isFiltering ? (
-                      <NoMovements onClear={clearFilters} />
-                    ) : (
-                      <EmptyState
-                        icon={ArrowLeftRight}
-                        iconChip
-                        title="No movements yet"
-                        description="EDC movements appear here as units are received, transferred and installed."
-                      />
-                    )}
+                    {emptyState}
                   </td>
                 </tr>
               )}
-              {pageEdc.map((row) => (
-                <tr key={row.id} className={bodyRowClasses}>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/60 tabular-nums">
-                    {row.movedAt}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-medium text-brand-900 tabular-nums">
-                    {row.serialNumber}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/80">
-                    {row.productModelName}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
-                    {row.fromWarehouseName ?? (
-                      <span className="text-brand-900/40">—</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
-                    {row.toWarehouseName ?? (
-                      <span className="text-brand-900/40">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <Badge
-                      className={
-                        EDC_MOVEMENT_TYPE_BADGE_CLASSES[row.movementType]
-                      }
-                    >
-                      {EDC_MOVEMENT_TYPE_LABELS[row.movementType]}
-                    </Badge>
-                  </td>
-                  <td className="max-w-[280px] truncate px-5 py-3.5 text-xs text-brand-900/60">
-                    {row.notes || <span className="text-brand-900/40">—</span>}
-                  </td>
-                </tr>
-              ))}
+              {!edcQuery.isPending &&
+                edcRows.map((row) => (
+                  <tr key={row.id} className={bodyRowClasses}>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/60 tabular-nums">
+                      {row.movedAt}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-medium text-brand-900 tabular-nums">
+                      {row.serialNumber}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/80">
+                      {row.productModelName}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
+                      {row.fromWarehouseName ?? (
+                        <span className="text-brand-900/40">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
+                      {row.toWarehouseName ?? (
+                        <span className="text-brand-900/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Badge
+                        className={
+                          EDC_MOVEMENT_TYPE_BADGE_CLASSES[row.movementType]
+                        }
+                      >
+                        {EDC_MOVEMENT_TYPE_LABELS[row.movementType]}
+                      </Badge>
+                    </td>
+                    <td className="max-w-[280px] truncate px-5 py-3.5 text-xs text-brand-900/60">
+                      {row.notes || (
+                        <span className="text-brand-900/40">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
-          <TableFooter
-            page={page}
-            total={total}
-            label="movements"
-            onPageChange={setPage}
-          />
+          {!edcQuery.isPending && !edcQuery.isError && (
+            <TableFooter
+              page={page}
+              total={total}
+              shown={edcRows.length}
+              label="movements"
+              onPageChange={setPage}
+            />
+          )}
         </Card>
       )}
 
@@ -456,74 +508,85 @@ export function StockMovementsPage() {
               </tr>
             </thead>
             <tbody>
-              {total === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5">
-                    {isFiltering ? (
-                      <NoMovements onClear={clearFilters} />
-                    ) : (
-                      <EmptyState
-                        icon={ArrowLeftRight}
-                        iconChip
-                        title="No movements yet"
-                        description="Peripheral movements appear here as inbound inspections and transfers change stock."
-                      />
-                    )}
-                  </td>
-                </tr>
+              {peripheralsQuery.isPending && <SkeletonRows columns={6} />}
+              {peripheralsQuery.isError && (
+                <ErrorRow
+                  columns={6}
+                  message={
+                    peripheralsQuery.error instanceof Error
+                      ? peripheralsQuery.error.message
+                      : 'Failed to load the peripheral movements.'
+                  }
+                  onRetry={() => peripheralsQuery.refetch()}
+                />
               )}
-              {pagePeripherals.map((row) => (
-                <tr key={row.id} className={bodyRowClasses}>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/60 tabular-nums">
-                    {row.movedAt}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span className="block font-medium text-brand-900">
-                      {row.itemName}
-                    </span>
-                    <span className="text-[11px] text-brand-900/45">
-                      {row.itemCode ?? '—'}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
-                    {row.warehouseName}
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <span
-                      className={cn(
-                        'font-semibold tabular-nums',
-                        row.quantityChange < 0
-                          ? 'text-rose-600'
-                          : 'text-emerald-700',
+              {!peripheralsQuery.isPending &&
+                !peripheralsQuery.isError &&
+                total === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-5">
+                      {emptyState}
+                    </td>
+                  </tr>
+                )}
+              {!peripheralsQuery.isPending &&
+                peripheralRows.map((row) => (
+                  <tr key={row.id} className={bodyRowClasses}>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/60 tabular-nums">
+                      {row.movedAt}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="block font-medium text-brand-900">
+                        {row.itemName}
+                      </span>
+                      <span className="text-[11px] text-brand-900/45">
+                        {row.itemCode ?? '—'}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-3.5 text-brand-900/70">
+                      {row.warehouseName}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={cn(
+                          'font-semibold tabular-nums',
+                          row.quantityChange < 0
+                            ? 'text-rose-600'
+                            : 'text-emerald-700',
+                        )}
+                      >
+                        {row.quantityChange > 0
+                          ? `+${row.quantityChange}`
+                          : row.quantityChange}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Badge
+                        className={
+                          PERIPHERAL_MOVEMENT_REASON_BADGE_CLASSES[row.reason]
+                        }
+                      >
+                        {PERIPHERAL_MOVEMENT_REASON_LABELS[row.reason]}
+                      </Badge>
+                    </td>
+                    <td className="max-w-[280px] truncate px-5 py-3.5 text-xs text-brand-900/60">
+                      {row.notes || (
+                        <span className="text-brand-900/40">—</span>
                       )}
-                    >
-                      {row.quantityChange > 0
-                        ? `+${row.quantityChange}`
-                        : row.quantityChange}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <Badge
-                      className={
-                        PERIPHERAL_MOVEMENT_REASON_BADGE_CLASSES[row.reason]
-                      }
-                    >
-                      {PERIPHERAL_MOVEMENT_REASON_LABELS[row.reason]}
-                    </Badge>
-                  </td>
-                  <td className="max-w-[280px] truncate px-5 py-3.5 text-xs text-brand-900/60">
-                    {row.notes || <span className="text-brand-900/40">—</span>}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
-          <TableFooter
-            page={page}
-            total={total}
-            label="movements"
-            onPageChange={setPage}
-          />
+          {!peripheralsQuery.isPending && !peripheralsQuery.isError && (
+            <TableFooter
+              page={page}
+              total={total}
+              shown={peripheralRows.length}
+              label="movements"
+              onPageChange={setPage}
+            />
+          )}
         </Card>
       )}
     </div>

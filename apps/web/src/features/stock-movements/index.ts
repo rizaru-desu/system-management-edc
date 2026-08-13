@@ -13,3 +13,9 @@ export type {
   PeripheralMovementReason,
   PeripheralMovementRecord,
 } from './data/stock-movements.ts'
+export {
+  edcMovementsQueryOptions,
+  movementWarehouseOptionsQueryOptions,
+  peripheralMovementsQueryOptions,
+  stockMovementsQueryKey,
+} from './api/stock-movements.ts'
