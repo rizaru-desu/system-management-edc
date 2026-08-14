@@ -9,6 +9,7 @@ export * from "./project.js";
 export * from "./contract-line.js";
 export * from "./item-category.js";
 export * from "./warehouse.js";
+export * from "./payment-method.js";
 export * from "./product.js";
 export * from "./terminal.js";
 export * from "./inbound-shipment.js";

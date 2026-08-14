@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import type {
+  PaymentMethodOption,
   ItemCategoryOption,
   ProductDetailRow,
   ProductListPage,
@@ -41,6 +42,12 @@ export class ProductController {
   @Get('completeness-item-options')
   completenessItemOptions(): Promise<ItemCategoryOption[]> {
     return this.productService.completenessItemOptions();
+  }
+
+  /** Active payment methods for the editor's Payment Methods tab. */
+  @Get('payment-method-options')
+  paymentMethodOptions(): Promise<PaymentMethodOption[]> {
+    return this.productService.paymentMethodOptions();
   }
 
   /** The row plus its full standard completeness list (joined item data). */

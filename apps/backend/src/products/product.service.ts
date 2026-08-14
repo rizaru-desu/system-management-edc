@@ -7,6 +7,7 @@ import {
 import {
   createProduct,
   findProductById,
+  listActivePaymentMethods,
   listItemCategoryOptions,
   listProducts,
   softDeleteProduct,
@@ -15,6 +16,7 @@ import {
 } from '@repo/db';
 import type {
   ItemCategoryOption,
+  PaymentMethodOption,
   ListProductsOptions,
   ProductDetailRow,
   ProductListPage,
@@ -41,6 +43,15 @@ export class ProductService {
     return listItemCategoryOptions();
   }
 
+  /**
+   * Active payment methods for the editor's Payment Methods tab, served
+   * under the caller's products grant (the same decoupling as the
+   * completeness picker).
+   */
+  paymentMethodOptions(): Promise<PaymentMethodOption[]> {
+    return listActivePaymentMethods();
+  }
+
   /** One product with its full standard completeness list. */
   async get(id: string): Promise<ProductDetailRow> {
     const product = await findProductById(id);
@@ -58,6 +69,18 @@ export class ProductService {
       case 'duplicate-item':
         throw new BadRequestException(
           'The same completeness item cannot be listed twice on one product.',
+        );
+      case 'duplicate-method':
+        throw new BadRequestException(
+          'The same payment method cannot be linked twice on one product.',
+        );
+      case 'method-not-found':
+        throw new BadRequestException(
+          'One of the payment methods no longer exists in the Payment Methods master.',
+        );
+      case 'method-not-active':
+        throw new BadRequestException(
+          'Only active payment methods can be linked to a product.',
         );
       default:
         throw new BadRequestException(
@@ -80,6 +103,18 @@ export class ProductService {
       case 'item-not-found':
         throw new BadRequestException(
           'One of the completeness items no longer exists in the Item Categories master.',
+        );
+      case 'duplicate-method':
+        throw new BadRequestException(
+          'The same payment method cannot be linked twice on one product.',
+        );
+      case 'method-not-found':
+        throw new BadRequestException(
+          'One of the payment methods no longer exists in the Payment Methods master.',
+        );
+      case 'method-not-active':
+        throw new BadRequestException(
+          'Only active payment methods can be linked to a product.',
         );
       default:
         throw new NotFoundException('Product not found.');
