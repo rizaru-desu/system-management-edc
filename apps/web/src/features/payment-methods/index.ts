@@ -7,3 +7,11 @@ export type {
   PaymentMethodRecord,
   PaymentMethodStatus,
 } from './data/payment-methods.ts'
+export {
+  paymentMethodsListQueryOptions,
+  paymentMethodsQueryKey,
+  useCreatePaymentMethod,
+  useDeletePaymentMethod,
+  useTogglePaymentMethodStatus,
+  useUpdatePaymentMethod,
+} from './api/payment-methods.ts'

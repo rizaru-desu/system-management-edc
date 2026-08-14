@@ -31,6 +31,7 @@ import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { cn } from '#/lib/utils.ts'
 import { completenessItemOptionsQueryOptions } from '../api/completeness-item-options.ts'
+import { paymentMethodOptionsQueryOptions } from '../api/payment-method-options.ts'
 import { useCreateProduct } from '../api/create-product.ts'
 import type { ProductPayload } from '../api/create-product.ts'
 import { isDuplicateModelNameError } from '../api/list-products.ts'
@@ -192,16 +193,31 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
 
   // ── Supported payment methods rows ─────────────────────────────────────
-  const [paymentRows, setPaymentRows] = useState<Array<PaymentMethodRow>>([])
+  const [paymentRows, setPaymentRows] = useState<Array<PaymentMethodRow>>(() =>
+    (product?.paymentMethods ?? []).map((method) => ({
+      key: rowKeyRef.current++,
+      paymentMethodId: method.paymentMethodId,
+      methodName: method.methodName,
+      required: method.required,
+    })),
+  )
   /** Per-row validation message, keyed by the row's render key. */
   const [paymentRowErrors, setPaymentRowErrors] = useState<
     Record<number, string>
   >({})
 
-  // Structure-only stage: the dropdown feeds off the Payment Methods
-  // master once its backend lands (served through the products module's
-  // own options endpoint, like the completeness picker).
-  const paymentMethodOptions: Array<{ id: string; name: string }> = []
+  // The dropdown feeds off the Payment Methods master (active methods
+  // only), served through the products module's own options endpoint so
+  // the editor works with the products grant alone.
+  const paymentMethodsQuery = useQuery(paymentMethodOptionsQueryOptions())
+  const paymentMethodOptions = useMemo<Array<{ id: string; name: string }>>(
+    () =>
+      (paymentMethodsQuery.data ?? []).map((option) => ({
+        id: option.id,
+        name: option.code ? `${option.name} (${option.code})` : option.name,
+      })),
+    [paymentMethodsQuery.data],
+  )
 
   const usedPaymentMethodIds = useMemo(
     () =>
@@ -337,6 +353,10 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
         itemCategoryId: row.itemCategoryId,
         required: row.required,
         standardQty: Number(row.qty),
+      })),
+      paymentMethods: paymentRows.map((row) => ({
+        paymentMethodId: row.paymentMethodId,
+        required: row.required,
       })),
     }
 
@@ -804,11 +824,32 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
                 settlement checklist derives its transaction tests from this
                 list.
               </p>
-              <Button variant="outline" size="sm" onClick={addPaymentRow}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addPaymentRow}
+                disabled={paymentMethodsQuery.isPending}
+              >
                 <Wallet className="h-4 w-4 text-primary" strokeWidth={1.75} />
                 Add Payment Method
               </Button>
             </div>
+
+            {paymentMethodsQuery.isError && (
+              <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                {paymentMethodsQuery.error instanceof Error
+                  ? paymentMethodsQuery.error.message
+                  : 'Failed to load the payment methods.'}{' '}
+                The method dropdown may be incomplete.{' '}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2"
+                  onClick={() => paymentMethodsQuery.refetch()}
+                >
+                  Try again
+                </button>
+              </p>
+            )}
 
             {paymentRows.length === 0 ? (
               <EmptyState
@@ -870,6 +911,7 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
                                     )?.name ?? row.methodName,
                                 })
                               }
+                              disabled={paymentMethodsQuery.isPending}
                             >
                               <SelectTrigger
                                 aria-invalid={Boolean(
@@ -877,7 +919,13 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
                                 )}
                                 className={`w-full min-w-[220px] ${fieldClasses}`}
                               >
-                                <SelectValue placeholder="Select a payment method" />
+                                <SelectValue
+                                  placeholder={
+                                    paymentMethodsQuery.isPending
+                                      ? 'Loading methods…'
+                                      : 'Select a payment method'
+                                  }
+                                />
                               </SelectTrigger>
                               <SelectContent>
                                 {options.length === 0 && (

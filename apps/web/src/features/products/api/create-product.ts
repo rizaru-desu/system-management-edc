@@ -31,6 +31,10 @@ export interface ProductPayload {
     required: boolean
     standardQty: number
   }>
+  paymentMethods: Array<{
+    paymentMethodId: string
+    required: boolean
+  }>
 }
 
 /** Console payload → the backend body (labels → uppercase enums, '' → null). */
@@ -42,6 +46,7 @@ export function toBackendPayload(payload: ProductPayload) {
     description: payload.description.trim() ? payload.description.trim() : null,
     status: toBackendStatus(payload.status),
     completenessItems: payload.completenessItems,
+    paymentMethods: payload.paymentMethods,
   }
 }
 

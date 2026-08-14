@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -11,6 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import {
+  isDuplicateCodeError,
+  isDuplicateNameError,
+  paymentMethodsListQueryOptions,
+  useCreatePaymentMethod,
+  useDeletePaymentMethod,
+  useTogglePaymentMethodStatus,
+  useUpdatePaymentMethod,
+} from '../api/payment-methods.ts'
+import type { PaymentMethodPayload } from '../api/payment-methods.ts'
 import type {
   PaymentMethodRecord,
   PaymentMethodStatus,
@@ -23,13 +34,14 @@ import { PaymentMethodsTable } from './payment-methods-table.tsx'
 /**
  * Administration → Payment Methods: the payment types a product can
  * support, which will later drive the auto-generated transaction test
- * checklist during Job Order settlement. Structure-only stage: search,
- * filter and the form render but nothing is wired — the api layer arrives
- * with the backend, replacing the empty list below.
+ * checklist during Job Order settlement. Search, status filter and
+ * pagination all run server-side; every write goes through the backend
+ * API — the mutation hooks own toasts and cache invalidation.
  */
 export function PaymentMethodsPage() {
-  // ── Search & filter (unwired until the api layer lands) ────────────────
+  // ── Search & filter (server-side; search debounced) ────────────────────
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | PaymentMethodStatus>(
     'all',
   )
@@ -38,26 +50,59 @@ export function PaymentMethodsPage() {
     pageSize: 10,
   })
 
-  const isFiltering = search.trim() !== '' || statusFilter !== 'all'
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Changing the search term or filter changes the row set, so any page
+  // beyond the first may no longer exist — jump back to page one.
+  useEffect(() => {
+    setPagination((previous) =>
+      previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
+    )
+  }, [debouncedSearch, statusFilter])
+
+  const isFiltering = debouncedSearch.trim() !== '' || statusFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setStatusFilter('all')
   }
+
+  const listQuery = useQuery(
+    paymentMethodsListQueryOptions({
+      search: debouncedSearch,
+      status: statusFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const methods = listQuery.data?.paymentMethods ?? []
+  const total = listQuery.data?.total ?? 0
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<PaymentMethodRecord | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState<PaymentMethodRecord | null>(null)
+  // Bumped on every duplicate 409 so the form modal highlights the field
+  // without losing the entered values.
+  const [duplicateNameConflict, setDuplicateNameConflict] = useState(0)
+  const [duplicateCodeConflict, setDuplicateCodeConflict] = useState(0)
 
   const openCreate = () => {
     setEditing(null)
+    setDuplicateNameConflict(0)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
   }
 
   const openEdit = (record: PaymentMethodRecord) => {
     setEditing(record)
+    setDuplicateNameConflict(0)
+    setDuplicateCodeConflict(0)
     setFormOpen(true)
   }
 
@@ -66,15 +111,55 @@ export function PaymentMethodsPage() {
     setDeleteOpen(true)
   }
 
-  // Wired to the backend mutations once the api layer lands.
-  const handleSubmit = (_values: PaymentMethodFormValues) => {
-    setFormOpen(false)
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createMethod = useCreatePaymentMethod()
+  const updateMethod = useUpdatePaymentMethod()
+  const toggleStatus = useTogglePaymentMethodStatus()
+  const deleteMethod = useDeletePaymentMethod()
+
+  const saving = createMethod.isPending || updateMethod.isPending
+
+  // The form stays open (submit disabled) until the save lands, so a
+  // rejected payload keeps the user's input; a duplicate-name/code 409
+  // additionally highlights the field inline.
+  const handleSubmit = (values: PaymentMethodFormValues) => {
+    const payload: PaymentMethodPayload = {
+      name: values.name,
+      code: values.code || null,
+      description: values.description || null,
+      status: values.status === 'active' ? 'ACTIVE' : 'INACTIVE',
+    }
+    const callbacks = {
+      onSuccess: () => setFormOpen(false),
+      onError: (error: unknown) => {
+        if (isDuplicateNameError(error)) {
+          setDuplicateNameConflict((previous) => previous + 1)
+        }
+        if (isDuplicateCodeError(error)) {
+          setDuplicateCodeConflict((previous) => previous + 1)
+        }
+      },
+    }
+    if (editing) {
+      updateMethod.mutate({ id: editing.id, ...payload }, callbacks)
+      return
+    }
+    createMethod.mutate(payload, callbacks)
   }
 
-  const handleToggleStatus = (_record: PaymentMethodRecord) => {}
+  const handleToggleStatus = (record: PaymentMethodRecord) => {
+    toggleStatus.mutate({ id: record.id })
+  }
 
   const handleDelete = () => {
-    setDeleteOpen(false)
+    if (!deleting) return
+    deleteMethod.mutate(
+      { id: deleting.id },
+      {
+        onSuccess: () => setDeleteOpen(false),
+        onError: () => setDeleteOpen(false),
+      },
+    )
   }
 
   return (
@@ -107,6 +192,7 @@ export function PaymentMethodsPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search payment method…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select
           value={statusFilter}
@@ -125,16 +211,20 @@ export function PaymentMethodsPage() {
         </Select>
       </div>
 
-      {/* Table (empty until the api layer lands) */}
+      {/* Table */}
       <PaymentMethodsTable
-        rows={[]}
-        total={0}
+        rows={methods}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
-        isPending={false}
-        isError={false}
-        errorMessage=""
-        onRetry={() => {}}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load the payment methods.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEdit={openEdit}
@@ -146,9 +236,9 @@ export function PaymentMethodsPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         method={editing}
-        saving={false}
-        duplicateNameConflict={0}
-        duplicateCodeConflict={0}
+        saving={saving}
+        duplicateNameConflict={duplicateNameConflict}
+        duplicateCodeConflict={duplicateCodeConflict}
         onSubmit={handleSubmit}
       />
 

@@ -58,8 +58,17 @@ export interface ProductCompletenessItemRecord {
 }
 
 /** The detail payload: a product plus its full completeness list. */
+/** One linked payment method as the console consumes it. */
+export interface ProductPaymentMethodRecord {
+  paymentMethodId: string
+  methodName: string
+  methodCode: string
+  required: boolean
+}
+
 export interface ProductDetail extends ProductRecord {
   completenessItems: Array<ProductCompletenessItemRecord>
+  paymentMethods: Array<ProductPaymentMethodRecord>
 }
 
 // The former SEED_PRODUCTS list, COMPLETENESS_ITEM_OPTIONS constant and
