@@ -24,6 +24,7 @@
     "seed:inbound-shipments": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-products.js && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-accounts.js && node dist/scripts/seed-inbound-shipments.js",
     "seed:payment-methods": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-products.js && node dist/scripts/seed-payment-methods.js",
     "seed:stock": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-stock.js",
+    "seed:field-engineers": "pnpm run build:deps && nest build && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-field-engineers.js",
     "seed:merchants": "pnpm run build:deps && nest build && node dist/scripts/seed-merchants.js",
     "seed:accounts": "pnpm run build:deps && nest build && node dist/scripts/seed-accounts.js",
     "seed:projects": "pnpm run build:deps && nest build && node dist/scripts/seed-projects.js",
