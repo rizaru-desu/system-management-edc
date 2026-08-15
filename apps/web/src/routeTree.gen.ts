@@ -25,6 +25,8 @@ import { Route as AuthedMerchantsRouteImport } from './routes/_authed/merchants'
 import { Route as AuthedProjectsRouteImport } from './routes/_authed/projects'
 import { Route as AuthedServicePointsRouteImport } from './routes/_authed/service-points'
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
+import { Route as AuthedEngineersIndexRouteImport } from './routes/_authed/engineers/index'
+import { Route as AuthedEngineersUserIdRouteImport } from './routes/_authed/engineers/$userId'
 import { Route as AuthedInboundShipmentsIndexRouteImport } from './routes/_authed/inbound-shipments/index'
 import { Route as AuthedInboundShipmentsNewRouteImport } from './routes/_authed/inbound-shipments/new'
 import { Route as AuthedPaymentMethodsIndexRouteImport } from './routes/_authed/payment-methods/index'
@@ -117,6 +119,16 @@ const AuthedServicePointsRoute = AuthedServicePointsRouteImport.update({
 const AuthedUsersRoute = AuthedUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedEngineersIndexRoute = AuthedEngineersIndexRouteImport.update({
+  id: '/engineers/',
+  path: '/engineers/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedEngineersUserIdRoute = AuthedEngineersUserIdRouteImport.update({
+  id: '/engineers/$userId',
+  path: '/engineers/$userId',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedInboundShipmentsIndexRoute =
@@ -214,11 +226,13 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/engineers/$userId': typeof AuthedEngineersUserIdRoute
   '/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/engineers/': typeof AuthedEngineersIndexRoute
   '/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
   '/payment-methods/': typeof AuthedPaymentMethodsIndexRoute
   '/products/': typeof AuthedProductsIndexRoute
@@ -245,11 +259,13 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedProjectsRoute
   '/service-points': typeof AuthedServicePointsRoute
   '/users': typeof AuthedUsersRoute
+  '/engineers/$userId': typeof AuthedEngineersUserIdRoute
   '/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/products/$productId': typeof AuthedProductsProductIdRoute
   '/products/new': typeof AuthedProductsNewRoute
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/engineers': typeof AuthedEngineersIndexRoute
   '/inbound-shipments': typeof AuthedInboundShipmentsIndexRoute
   '/payment-methods': typeof AuthedPaymentMethodsIndexRoute
   '/products': typeof AuthedProductsIndexRoute
@@ -278,11 +294,13 @@ export interface FileRoutesById {
   '/_authed/projects': typeof AuthedProjectsRoute
   '/_authed/service-points': typeof AuthedServicePointsRoute
   '/_authed/users': typeof AuthedUsersRoute
+  '/_authed/engineers/$userId': typeof AuthedEngineersUserIdRoute
   '/_authed/inbound-shipments/new': typeof AuthedInboundShipmentsNewRoute
   '/_authed/products/$productId': typeof AuthedProductsProductIdRoute
   '/_authed/products/new': typeof AuthedProductsNewRoute
   '/_authed/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
+  '/_authed/engineers/': typeof AuthedEngineersIndexRoute
   '/_authed/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
   '/_authed/payment-methods/': typeof AuthedPaymentMethodsIndexRoute
   '/_authed/products/': typeof AuthedProductsIndexRoute
@@ -311,11 +329,13 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/engineers/$userId'
     | '/inbound-shipments/new'
     | '/products/$productId'
     | '/products/new'
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
+    | '/engineers/'
     | '/inbound-shipments/'
     | '/payment-methods/'
     | '/products/'
@@ -342,11 +362,13 @@ export interface FileRouteTypes {
     | '/projects'
     | '/service-points'
     | '/users'
+    | '/engineers/$userId'
     | '/inbound-shipments/new'
     | '/products/$productId'
     | '/products/new'
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
+    | '/engineers'
     | '/inbound-shipments'
     | '/payment-methods'
     | '/products'
@@ -374,11 +396,13 @@ export interface FileRouteTypes {
     | '/_authed/projects'
     | '/_authed/service-points'
     | '/_authed/users'
+    | '/_authed/engineers/$userId'
     | '/_authed/inbound-shipments/new'
     | '/_authed/products/$productId'
     | '/_authed/products/new'
     | '/_authed/terminals/$terminalId'
     | '/_authed/warehouses/$warehouseId'
+    | '/_authed/engineers/'
     | '/_authed/inbound-shipments/'
     | '/_authed/payment-methods/'
     | '/_authed/products/'
@@ -513,6 +537,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/engineers/': {
+      id: '/_authed/engineers/'
+      path: '/engineers'
+      fullPath: '/engineers/'
+      preLoaderRoute: typeof AuthedEngineersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/engineers/$userId': {
+      id: '/_authed/engineers/$userId'
+      path: '/engineers/$userId'
+      fullPath: '/engineers/$userId'
+      preLoaderRoute: typeof AuthedEngineersUserIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/inbound-shipments/': {
       id: '/_authed/inbound-shipments/'
       path: '/inbound-shipments'
@@ -625,11 +663,13 @@ interface AuthedRouteChildren {
   AuthedProjectsRoute: typeof AuthedProjectsRoute
   AuthedServicePointsRoute: typeof AuthedServicePointsRoute
   AuthedUsersRoute: typeof AuthedUsersRoute
+  AuthedEngineersUserIdRoute: typeof AuthedEngineersUserIdRoute
   AuthedInboundShipmentsNewRoute: typeof AuthedInboundShipmentsNewRoute
   AuthedProductsProductIdRoute: typeof AuthedProductsProductIdRoute
   AuthedProductsNewRoute: typeof AuthedProductsNewRoute
   AuthedTerminalsTerminalIdRoute: typeof AuthedTerminalsTerminalIdRoute
   AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
+  AuthedEngineersIndexRoute: typeof AuthedEngineersIndexRoute
   AuthedInboundShipmentsIndexRoute: typeof AuthedInboundShipmentsIndexRoute
   AuthedPaymentMethodsIndexRoute: typeof AuthedPaymentMethodsIndexRoute
   AuthedProductsIndexRoute: typeof AuthedProductsIndexRoute
@@ -652,11 +692,13 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedProjectsRoute: AuthedProjectsRoute,
   AuthedServicePointsRoute: AuthedServicePointsRoute,
   AuthedUsersRoute: AuthedUsersRoute,
+  AuthedEngineersUserIdRoute: AuthedEngineersUserIdRoute,
   AuthedInboundShipmentsNewRoute: AuthedInboundShipmentsNewRoute,
   AuthedProductsProductIdRoute: AuthedProductsProductIdRoute,
   AuthedProductsNewRoute: AuthedProductsNewRoute,
   AuthedTerminalsTerminalIdRoute: AuthedTerminalsTerminalIdRoute,
   AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
+  AuthedEngineersIndexRoute: AuthedEngineersIndexRoute,
   AuthedInboundShipmentsIndexRoute: AuthedInboundShipmentsIndexRoute,
   AuthedPaymentMethodsIndexRoute: AuthedPaymentMethodsIndexRoute,
   AuthedProductsIndexRoute: AuthedProductsIndexRoute,

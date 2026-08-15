@@ -258,6 +258,7 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         title: 'Field Engineers',
         path: 'engineers',
         allowedRoles: ['System_Administrator', 'Operations_Specialist'],
+        directRoute: '/engineers',
       },
     ],
   },
