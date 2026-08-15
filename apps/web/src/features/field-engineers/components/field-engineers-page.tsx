@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { UserPlus } from 'lucide-react'
 import type { PaginationState } from '@tanstack/react-table'
 
@@ -11,13 +12,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select.tsx'
+import {
+  availableEngineerUsersQueryOptions,
+  engineerWarehouseOptionsQueryOptions,
+  fieldEngineersListQueryOptions,
+  useCreateEngineerProfile,
+  useRemoveEngineerProfile,
+  useUpdateEngineerProfile,
+} from '../api/field-engineers.ts'
 import type { FieldEngineerRecord } from '../data/field-engineers.ts'
 import { FieldEngineerProfileModal } from './field-engineer-profile-modal.tsx'
 import type { FieldEngineerProfileFormValues } from './field-engineer-profile-modal.tsx'
 import { FieldEngineersTable } from './field-engineers-table.tsx'
 import { RemoveProfileDialog } from './remove-profile-dialog.tsx'
 
-/** Profile-status filter choices (server-side once wired). */
+/** Profile-status filter choices (mapped onto the server's filter). */
 const PROFILE_FILTERS = [
   { key: 'all', label: 'All profiles' },
   { key: 'complete', label: 'Profile Complete' },
@@ -31,14 +40,13 @@ type ProfileFilter = (typeof PROFILE_FILTERS)[number]['key']
  * Engineer role, joined with their work profile (warehouse, coverage
  * region, specializations, duty status). This module never creates
  * people — accounts and roles live in Users & Roles; here they only get
- * onboarded with a work profile.
- *
- * Phase 1: structure only — search/filters are not wired and the table
- * renders the real empty state until the API integration phase.
+ * onboarded with a work profile. Search, filters and pagination all run
+ * server-side; the mutation hooks own toasts and cache invalidation.
  */
 export function FieldEngineersPage() {
-  // ── Search & filters (UI only until the API phase) ─────────────────────
+  // ── Search & filters (server-side; search debounced) ───────────────────
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('all')
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>('all')
   const [pagination, setPagination] = useState<PaginationState>({
@@ -46,20 +54,58 @@ export function FieldEngineersPage() {
     pageSize: 10,
   })
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // Changing the search term or filters changes the row set, so any page
+  // beyond the first may no longer exist — jump back to page one.
+  useEffect(() => {
+    setPagination((previous) =>
+      previous.pageIndex === 0 ? previous : { ...previous, pageIndex: 0 },
+    )
+  }, [debouncedSearch, warehouseFilter, profileFilter])
+
   const isFiltering =
-    search.trim() !== '' || warehouseFilter !== 'all' || profileFilter !== 'all'
+    debouncedSearch.trim() !== '' ||
+    warehouseFilter !== 'all' ||
+    profileFilter !== 'all'
 
   const clearFilters = () => {
     setSearch('')
+    setDebouncedSearch('')
     setWarehouseFilter('all')
     setProfileFilter('all')
   }
+
+  const listQuery = useQuery(
+    fieldEngineersListQueryOptions({
+      search: debouncedSearch,
+      warehouseId: warehouseFilter,
+      profileStatus: profileFilter,
+      page: pagination.pageIndex + 1,
+      pageSize: pagination.pageSize,
+    }),
+  )
+  const engineers = listQuery.data?.engineers ?? []
+  const total = listQuery.data?.total ?? 0
+
+  // Active warehouses feed both the filter and the form dropdown.
+  const warehousesQuery = useQuery(engineerWarehouseOptionsQueryOptions())
+  const warehouseOptions = warehousesQuery.data ?? []
 
   // ── Modals ─────────────────────────────────────────────────────────────
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<FieldEngineerRecord | null>(null)
   const [removeOpen, setRemoveOpen] = useState(false)
   const [removing, setRemoving] = useState<FieldEngineerRecord | null>(null)
+
+  // Only fetched while the create flow can actually show the picker.
+  const availableUsersQuery = useQuery({
+    ...availableEngineerUsersQueryOptions(),
+    enabled: formOpen && editing === null,
+  })
 
   const openComplete = () => {
     setEditing(null)
@@ -76,13 +122,33 @@ export function FieldEngineersPage() {
     setRemoveOpen(true)
   }
 
-  // Wired to the backend in the API integration phase.
-  const handleSubmit = (_values: FieldEngineerProfileFormValues) => {
-    setFormOpen(false)
+  // ── CRUD (backend API; the mutation hooks own toasts + cache updates) ──
+  const createProfile = useCreateEngineerProfile()
+  const updateProfile = useUpdateEngineerProfile()
+  const removeProfile = useRemoveEngineerProfile()
+
+  const saving = createProfile.isPending || updateProfile.isPending
+
+  const handleSubmit = (values: FieldEngineerProfileFormValues) => {
+    const callbacks = { onSuccess: () => setFormOpen(false) }
+    // Editing an engineer that already has a profile updates it; picking
+    // a user without one (create flow or "Complete profile") creates it.
+    if (editing?.profile) {
+      updateProfile.mutate(values, callbacks)
+      return
+    }
+    createProfile.mutate(values, callbacks)
   }
 
   const handleRemove = () => {
-    setRemoveOpen(false)
+    if (!removing) return
+    removeProfile.mutate(
+      { userId: removing.userId },
+      {
+        onSuccess: () => setRemoveOpen(false),
+        onError: () => setRemoveOpen(false),
+      },
+    )
   }
 
   return (
@@ -115,13 +181,19 @@ export function FieldEngineersPage() {
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search engineer…"
           containerClassName="min-w-[240px] sm:max-w-xs"
+          isFetching={listQuery.isFetching && !listQuery.isPending}
         />
         <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Filter by warehouse" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All warehouses</SelectItem>
+            {warehouseOptions.map((option) => (
+              <SelectItem key={option.id} value={option.id}>
+                {option.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select
@@ -141,16 +213,20 @@ export function FieldEngineersPage() {
         </Select>
       </div>
 
-      {/* Table — empty until the API integration phase. */}
+      {/* Table */}
       <FieldEngineersTable
-        rows={[]}
-        total={0}
+        rows={engineers}
+        total={total}
         pagination={pagination}
         onPaginationChange={setPagination}
-        isPending={false}
-        isError={false}
-        errorMessage="Failed to load the field engineers."
-        onRetry={() => {}}
+        isPending={listQuery.isPending}
+        isError={listQuery.isError}
+        errorMessage={
+          listQuery.error instanceof Error
+            ? listQuery.error.message
+            : 'Failed to load the field engineers.'
+        }
+        onRetry={() => listQuery.refetch()}
         isFiltering={isFiltering}
         onClearFilters={clearFilters}
         onEditProfile={openEdit}
@@ -161,13 +237,13 @@ export function FieldEngineersPage() {
         open={formOpen}
         onOpenChange={setFormOpen}
         engineer={editing}
-        availableUsers={[]}
-        availableUsersPending={false}
-        availableUsersError={false}
-        onRetryAvailableUsers={() => {}}
-        warehouseOptions={[]}
-        warehouseOptionsPending={false}
-        saving={false}
+        availableUsers={availableUsersQuery.data ?? []}
+        availableUsersPending={availableUsersQuery.isPending}
+        availableUsersError={availableUsersQuery.isError}
+        onRetryAvailableUsers={() => availableUsersQuery.refetch()}
+        warehouseOptions={warehouseOptions}
+        warehouseOptionsPending={warehousesQuery.isPending}
+        saving={saving}
         onSubmit={handleSubmit}
       />
 

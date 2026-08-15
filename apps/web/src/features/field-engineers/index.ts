@@ -12,6 +12,17 @@ export {
   SPECIALIZATIONS,
   specializationLabel,
 } from './data/field-engineers.ts'
+export {
+  availableEngineerUsersQueryOptions,
+  engineerWarehouseOptionsQueryOptions,
+  fieldEngineerDetailQueryOptions,
+  fieldEngineersListQueryOptions,
+  fieldEngineersQueryKey,
+  useCreateEngineerProfile,
+  useRemoveEngineerProfile,
+  useSetEngineerStatus,
+  useUpdateEngineerProfile,
+} from './api/field-engineers.ts'
 export type {
   AvailableEngineerUser,
   EngineerStatus,
