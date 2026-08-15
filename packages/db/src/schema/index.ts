@@ -13,4 +13,5 @@ export * from "./payment-method.js";
 export * from "./product.js";
 export * from "./terminal.js";
 export * from "./inbound-shipment.js";
+export * from "./field-engineer.js";
 

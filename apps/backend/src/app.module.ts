@@ -3,6 +3,7 @@ import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from '@repo/auth';
 import { AccountModule } from './accounts/account.module';
 import { ContractLineModule } from './contract-lines/contract-line.module';
+import { FieldEngineerModule } from './field-engineers/field-engineer.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppReleaseModule } from './app-releases/app-release.module';
@@ -28,6 +29,7 @@ import { WarehouseModule } from './warehouses/warehouse.module';
     AccountModule,
     AppReleaseModule,
     ContractLineModule,
+    FieldEngineerModule,
     ItemCategoryModule,
     UsersModule,
     PermissionsModule,
