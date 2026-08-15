@@ -1,7 +1,23 @@
-import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../client.js";
 import { itemCategories } from "../schema/item-category.js";
-import { productCompletenessItems, products } from "../schema/product.js";
+import { paymentMethods } from "../schema/payment-method.js";
+import {
+  productCompletenessItems,
+  productPaymentMethods,
+  products,
+} from "../schema/product.js";
 import type { ProductCategory, ProductStatus } from "../schema/product.js";
 
 /** One live product row in the shape the console's list consumes. */
@@ -39,9 +55,22 @@ export interface ProductCompletenessItemRow {
   standardQty: number;
 }
 
-/** The detail payload: a product plus its full completeness list. */
+/**
+ * One row of a product's supported payment methods, with the referenced
+ * method's display fields joined in — the future Job Order settlement
+ * checklist derives its transaction tests from these.
+ */
+export interface ProductPaymentMethodRow {
+  paymentMethodId: string;
+  methodName: string;
+  methodCode: string | null;
+  required: boolean;
+}
+
+/** The detail payload: a product plus both of its relation lists. */
 export interface ProductDetailRow extends ProductRow {
   completenessItems: ProductCompletenessItemRow[];
+  paymentMethods: ProductPaymentMethodRow[];
 }
 
 export interface ListProductsOptions {
@@ -102,8 +131,7 @@ const notDeleted = isNull(products.deletedAt);
 
 /** Executor for shared checks: the pool client or a transaction. */
 type DbExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** WHERE clause for the list filters (always scoped to live rows). */
 function listConditions(options: ListProductsOptions) {
@@ -183,7 +211,28 @@ async function listCompletenessItems(
     .orderBy(asc(itemCategories.name));
 }
 
-/** Reads one product + completeness list through an executor. */
+/** The payment-method links of one product, in method name order. */
+async function listPaymentMethodLinks(
+  executor: DbExecutor,
+  productId: string,
+): Promise<ProductPaymentMethodRow[]> {
+  return executor
+    .select({
+      paymentMethodId: productPaymentMethods.paymentMethodId,
+      methodName: paymentMethods.name,
+      methodCode: paymentMethods.code,
+      required: productPaymentMethods.required,
+    })
+    .from(productPaymentMethods)
+    .innerJoin(
+      paymentMethods,
+      eq(productPaymentMethods.paymentMethodId, paymentMethods.id),
+    )
+    .where(eq(productPaymentMethods.productId, productId))
+    .orderBy(asc(paymentMethods.name));
+}
+
+/** Reads one product + both relation lists through an executor. */
 async function readDetail(
   executor: DbExecutor,
   id: string,
@@ -194,7 +243,8 @@ async function readDetail(
     .where(and(eq(products.id, id), notDeleted));
   if (!row) return null;
   const completenessItems = await listCompletenessItems(executor, id);
-  return { ...row, completenessItems };
+  const methodLinks = await listPaymentMethodLinks(executor, id);
+  return { ...row, completenessItems, paymentMethods: methodLinks };
 }
 
 /** A single live product with its completeness list; null when unknown. */
@@ -210,6 +260,11 @@ export interface ProductCompletenessItemInput {
   standardQty: number;
 }
 
+export interface ProductPaymentMethodInput {
+  paymentMethodId: string;
+  required: boolean;
+}
+
 export interface ProductInput {
   modelName: string;
   brand: string;
@@ -218,26 +273,31 @@ export interface ProductInput {
   photoUrl: string | null;
   status: ProductStatus;
   completenessItems: ProductCompletenessItemInput[];
+  paymentMethods: ProductPaymentMethodInput[];
 }
+
+/** Rejections shared by the create and update paths. */
+export type ProductWriteError =
+  | "name-taken"
+  | "item-not-found"
+  | "duplicate-item"
+  | "method-not-found"
+  | "method-not-active"
+  | "duplicate-method";
 
 export type CreateProductResult =
   | { ok: true; product: ProductDetailRow }
-  | { ok: false; error: "name-taken" | "item-not-found" | "duplicate-item" };
+  | { ok: false; error: ProductWriteError };
 
 export type UpdateProductResult =
   | { ok: true; product: ProductDetailRow }
-  | {
-      ok: false;
-      error: "not-found" | "name-taken" | "item-not-found" | "duplicate-item";
-    };
+  | { ok: false; error: "not-found" | ProductWriteError };
 
 export type ToggleProductStatusResult =
-  | { ok: true; product: ProductDetailRow }
-  | { ok: false; error: "not-found" };
+  { ok: true; product: ProductDetailRow } | { ok: false; error: "not-found" };
 
 export type DeleteProductResult =
-  | { ok: true }
-  | { ok: false; error: "not-found" };
+  { ok: true } | { ok: false; error: "not-found" };
 
 /** True when another live row already uses `modelName` (case-insensitive). */
 async function nameTaken(
@@ -295,6 +355,62 @@ async function replaceCompletenessItems(
 }
 
 /**
+ * Validates a payment-methods payload: no method linked twice, every
+ * referenced method a live row, and newly-added methods ACTIVE. A method
+ * that went inactive after being linked stays acceptable on the product
+ * that already carries it (`existingProductId`), so re-saving an old
+ * product never fails on a link it did not touch.
+ */
+async function paymentMethodsError(
+  executor: DbExecutor,
+  methods: ProductPaymentMethodInput[],
+  existingProductId?: string,
+): Promise<
+  "duplicate-method" | "method-not-found" | "method-not-active" | null
+> {
+  const ids = methods.map((method) => method.paymentMethodId);
+  if (new Set(ids).size !== ids.length) return "duplicate-method";
+  if (ids.length === 0) return null;
+
+  const found = await executor
+    .select({ id: paymentMethods.id, status: paymentMethods.status })
+    .from(paymentMethods)
+    .where(
+      and(inArray(paymentMethods.id, ids), isNull(paymentMethods.deletedAt)),
+    );
+  if (found.length !== ids.length) return "method-not-found";
+
+  const inactive = found.filter((row) => row.status !== "ACTIVE");
+  if (inactive.length === 0) return null;
+
+  if (!existingProductId) return "method-not-active";
+  const existingLinks = await executor
+    .select({ paymentMethodId: productPaymentMethods.paymentMethodId })
+    .from(productPaymentMethods)
+    .where(eq(productPaymentMethods.productId, existingProductId));
+  const carriedOver = new Set(existingLinks.map((row) => row.paymentMethodId));
+  return inactive.every((row) => carriedOver.has(row.id))
+    ? null
+    : "method-not-active";
+}
+
+/** Replaces the whole payment-method set of one product (hard replace). */
+async function replacePaymentMethodLinks(
+  executor: DbExecutor,
+  productId: string,
+  methods: ProductPaymentMethodInput[],
+): Promise<void> {
+  await executor
+    .delete(productPaymentMethods)
+    .where(eq(productPaymentMethods.productId, productId));
+  if (methods.length > 0) {
+    await executor
+      .insert(productPaymentMethods)
+      .values(methods.map((method) => ({ ...method, productId })));
+  }
+}
+
+/**
  * Creates a product with its completeness list after checking live
  * model-name uniqueness and that every referenced Item Category exists.
  * The partial unique index on lower(model_name) and the (product, item)
@@ -309,8 +425,14 @@ export async function createProduct(
     }
     const itemsError = await completenessError(tx, input.completenessItems);
     if (itemsError) return { ok: false as const, error: itemsError };
+    const methodsError = await paymentMethodsError(tx, input.paymentMethods);
+    if (methodsError) return { ok: false as const, error: methodsError };
 
-    const { completenessItems: items, ...productValues } = input;
+    const {
+      completenessItems: items,
+      paymentMethods: methods,
+      ...productValues
+    } = input;
     const [inserted] = await tx
       .insert(products)
       .values(productValues)
@@ -318,6 +440,7 @@ export async function createProduct(
     if (!inserted) throw new Error("Insert returned no row.");
 
     await replaceCompletenessItems(tx, inserted.id, items);
+    await replacePaymentMethodLinks(tx, inserted.id, methods);
 
     const detail = await readDetail(tx, inserted.id);
     if (!detail) throw new Error("Insert row vanished mid-transaction.");
@@ -348,10 +471,18 @@ export async function updateProduct(
       return { ok: false as const, error: "name-taken" as const };
     }
 
-    const { completenessItems: items, ...productValues } = input;
+    const {
+      completenessItems: items,
+      paymentMethods: methods,
+      ...productValues
+    } = input;
     if (items !== undefined) {
       const itemsError = await completenessError(tx, items);
       if (itemsError) return { ok: false as const, error: itemsError };
+    }
+    if (methods !== undefined) {
+      const methodsError = await paymentMethodsError(tx, methods, id);
+      if (methodsError) return { ok: false as const, error: methodsError };
     }
 
     if (Object.keys(productValues).length > 0) {
@@ -359,6 +490,9 @@ export async function updateProduct(
     }
     if (items !== undefined) {
       await replaceCompletenessItems(tx, id, items);
+    }
+    if (methods !== undefined) {
+      await replacePaymentMethodLinks(tx, id, methods);
     }
 
     const detail = await readDetail(tx, id);

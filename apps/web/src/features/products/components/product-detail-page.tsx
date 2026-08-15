@@ -10,6 +10,7 @@ import {
   SearchX,
   Trash2,
   TriangleAlert,
+  Wallet,
 } from 'lucide-react'
 
 import { Badge } from '#/components/ui/badge.tsx'
@@ -30,6 +31,7 @@ import { Switch } from '#/components/ui/switch.tsx'
 import { Textarea } from '#/components/ui/textarea.tsx'
 import { cn } from '#/lib/utils.ts'
 import { completenessItemOptionsQueryOptions } from '../api/completeness-item-options.ts'
+import { paymentMethodOptionsQueryOptions } from '../api/payment-method-options.ts'
 import { useCreateProduct } from '../api/create-product.ts'
 import type { ProductPayload } from '../api/create-product.ts'
 import { isDuplicateModelNameError } from '../api/list-products.ts'
@@ -53,6 +55,17 @@ interface CompletenessRow {
   qty: string
 }
 
+/** One editable row of the supported payment methods table. */
+interface PaymentMethodRow {
+  /** Stable render key, independent of the picked method. */
+  key: number
+  /** '' until the user picks a method — required, validated on save. */
+  paymentMethodId: string
+  /** Display fallback when the method is missing from the active options. */
+  methodName: string
+  required: boolean
+}
+
 interface GeneralErrors {
   modelName?: string
   brand?: string
@@ -62,6 +75,7 @@ interface GeneralErrors {
 const TABS = [
   { key: 'general', label: 'General Information' },
   { key: 'completeness', label: 'Standard Completeness' },
+  { key: 'payments', label: 'Payment Methods' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -178,6 +192,63 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
   /** Per-row validation message, keyed by the row's render key. */
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({})
 
+  // ── Supported payment methods rows ─────────────────────────────────────
+  const [paymentRows, setPaymentRows] = useState<Array<PaymentMethodRow>>(() =>
+    (product?.paymentMethods ?? []).map((method) => ({
+      key: rowKeyRef.current++,
+      paymentMethodId: method.paymentMethodId,
+      methodName: method.methodName,
+      required: method.required,
+    })),
+  )
+  /** Per-row validation message, keyed by the row's render key. */
+  const [paymentRowErrors, setPaymentRowErrors] = useState<
+    Record<number, string>
+  >({})
+
+  // The dropdown feeds off the Payment Methods master (active methods
+  // only), served through the products module's own options endpoint so
+  // the editor works with the products grant alone.
+  const paymentMethodsQuery = useQuery(paymentMethodOptionsQueryOptions())
+  const paymentMethodOptions = useMemo<Array<{ id: string; name: string }>>(
+    () =>
+      (paymentMethodsQuery.data ?? []).map((option) => ({
+        id: option.id,
+        name: option.code ? `${option.name} (${option.code})` : option.name,
+      })),
+    [paymentMethodsQuery.data],
+  )
+
+  const usedPaymentMethodIds = useMemo(
+    () =>
+      new Set(paymentRows.map((row) => row.paymentMethodId).filter(Boolean)),
+    [paymentRows],
+  )
+
+  const addPaymentRow = () => {
+    setPaymentRows((previous) => [
+      ...previous,
+      {
+        key: rowKeyRef.current++,
+        paymentMethodId: '',
+        methodName: '',
+        required: true,
+      },
+    ])
+  }
+
+  const updatePaymentRow = (key: number, patch: Partial<PaymentMethodRow>) => {
+    setPaymentRows((previous) =>
+      previous.map((row) => (row.key === key ? { ...row, ...patch } : row)),
+    )
+    setPaymentRowErrors((previous) => ({ ...previous, [key]: '' }))
+  }
+
+  const removePaymentRow = (key: number) => {
+    setPaymentRows((previous) => previous.filter((row) => row.key !== key))
+    setPaymentRowErrors((previous) => ({ ...previous, [key]: '' }))
+  }
+
   // The dropdown options come from the live Item Categories master (active
   // items only), served through the products module's own endpoint so the
   // editor works with the products grant alone.
@@ -250,6 +321,14 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
     }
     setRowErrors(nextRowErrors)
 
+    const nextPaymentRowErrors: Record<number, string> = {}
+    for (const row of paymentRows) {
+      if (!row.paymentMethodId) {
+        nextPaymentRowErrors[row.key] = 'Pick a payment method.'
+      }
+    }
+    setPaymentRowErrors(nextPaymentRowErrors)
+
     // Land the user on the first tab that still has a problem.
     if (Object.keys(nextGeneralErrors).length > 0) {
       setActiveTab('general')
@@ -257,6 +336,10 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
     }
     if (Object.keys(nextRowErrors).length > 0) {
       setActiveTab('completeness')
+      return
+    }
+    if (Object.keys(nextPaymentRowErrors).length > 0) {
+      setActiveTab('payments')
       return
     }
 
@@ -270,6 +353,10 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
         itemCategoryId: row.itemCategoryId,
         required: row.required,
         standardQty: Number(row.qty),
+      })),
+      paymentMethods: paymentRows.map((row) => ({
+        paymentMethodId: row.paymentMethodId,
+        required: row.required,
       })),
     }
 
@@ -363,6 +450,11 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
                 {tab.key === 'completeness' && (
                   <span className="ml-1.5 rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-900/60 tabular-nums">
                     {rows.length}
+                  </span>
+                )}
+                {tab.key === 'payments' && (
+                  <span className="ml-1.5 rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-900/60 tabular-nums">
+                    {paymentRows.length}
                   </span>
                 )}
                 {activeTab === tab.key && (
@@ -719,6 +811,177 @@ function ProductEditor({ product }: { product: ProductDetail | null }) {
                 Every active completeness item from the Item Categories master
                 is already on this product.
               </p>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3 — Payment Methods */}
+        {activeTab === 'payments' && (
+          <div className="p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-brand-900/60">
+                Payment types every unit of this model supports — the Job Order
+                settlement checklist derives its transaction tests from this
+                list.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addPaymentRow}
+                disabled={paymentMethodsQuery.isPending}
+              >
+                <Wallet className="h-4 w-4 text-primary" strokeWidth={1.75} />
+                Add Payment Method
+              </Button>
+            </div>
+
+            {paymentMethodsQuery.isError && (
+              <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-600">
+                {paymentMethodsQuery.error instanceof Error
+                  ? paymentMethodsQuery.error.message
+                  : 'Failed to load the payment methods.'}{' '}
+                The method dropdown may be incomplete.{' '}
+                <button
+                  type="button"
+                  className="font-semibold underline underline-offset-2"
+                  onClick={() => paymentMethodsQuery.refetch()}
+                >
+                  Try again
+                </button>
+              </p>
+            )}
+
+            {paymentRows.length === 0 ? (
+              <EmptyState
+                icon={Wallet}
+                iconChip
+                title="No payment methods linked yet"
+                description="Add the payment types this model supports; required ones must pass the settlement test."
+              />
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-brand-100">
+                <table className="w-full min-w-xl text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-brand-100 text-[11px] uppercase tracking-wider text-brand-900/50">
+                      <th className="px-4 py-3 font-semibold">
+                        Payment method
+                      </th>
+                      <th className="px-4 py-3 font-semibold">Required</th>
+                      <th className="px-4 py-3 text-right font-semibold">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentRows.map((row) => {
+                      // Every active option not claimed by another row (the
+                      // same method can never be linked twice), plus the
+                      // row's own pick even when no longer active so an
+                      // existing link still renders and round-trips.
+                      const options = paymentMethodOptions.filter(
+                        (option) =>
+                          option.id === row.paymentMethodId ||
+                          !usedPaymentMethodIds.has(option.id),
+                      )
+                      if (
+                        row.paymentMethodId &&
+                        !options.some(
+                          (option) => option.id === row.paymentMethodId,
+                        )
+                      ) {
+                        options.unshift({
+                          id: row.paymentMethodId,
+                          name: `${row.methodName} (inactive)`,
+                        })
+                      }
+                      return (
+                        <tr
+                          key={row.key}
+                          className="border-b border-brand-100 last:border-0"
+                        >
+                          <td className="px-4 py-3 align-top">
+                            <Select
+                              value={row.paymentMethodId}
+                              onValueChange={(value) =>
+                                updatePaymentRow(row.key, {
+                                  paymentMethodId: value,
+                                  methodName:
+                                    paymentMethodOptions.find(
+                                      (option) => option.id === value,
+                                    )?.name ?? row.methodName,
+                                })
+                              }
+                              disabled={paymentMethodsQuery.isPending}
+                            >
+                              <SelectTrigger
+                                aria-invalid={Boolean(
+                                  paymentRowErrors[row.key],
+                                )}
+                                className={`w-full min-w-[220px] ${fieldClasses}`}
+                              >
+                                <SelectValue
+                                  placeholder={
+                                    paymentMethodsQuery.isPending
+                                      ? 'Loading methods…'
+                                      : 'Select a payment method'
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {options.length === 0 && (
+                                  <p className="px-3 py-2 text-xs text-brand-900/50">
+                                    No payment methods available yet.
+                                  </p>
+                                )}
+                                {options.map((option) => (
+                                  <SelectItem key={option.id} value={option.id}>
+                                    {option.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {paymentRowErrors[row.key] && (
+                              <p className="mt-1 text-xs text-rose-600">
+                                {paymentRowErrors[row.key]}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex items-center gap-2.5 pt-1.5">
+                              <Switch
+                                size="sm"
+                                checked={row.required}
+                                onCheckedChange={(checked) =>
+                                  updatePaymentRow(row.key, {
+                                    required: checked,
+                                  })
+                                }
+                                aria-label="Required payment method"
+                                className="data-[state=checked]:bg-[#3F6FA8] data-[state=unchecked]:bg-[#DDE0EC] dark:data-[state=unchecked]:bg-[#DDE0EC] [&_[data-slot=switch-thumb]]:!bg-white"
+                              />
+                              <span className="text-xs text-brand-900/60">
+                                {row.required ? 'Required' : 'Optional'}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right align-top">
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title="Remove method"
+                              aria-label="Remove payment method"
+                              className="text-rose-600 hover:text-rose-700"
+                              onClick={() => removePaymentRow(row.key)}
+                            >
+                              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

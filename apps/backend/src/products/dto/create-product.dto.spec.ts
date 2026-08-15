@@ -17,6 +17,7 @@ describe('parseCreateProductDto', () => {
       photoUrl: null,
       status: 'ACTIVE',
       completenessItems: [],
+      paymentMethods: [],
     });
   });
 

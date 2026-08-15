@@ -12,6 +12,7 @@ import type { BackendProduct } from './list-products.ts'
 import type {
   ProductCompletenessItemRecord,
   ProductDetail,
+  ProductPaymentMethodRecord,
 } from '../data/products.ts'
 
 /** One completeness row as served by GET /products/:id (item data joined). */
@@ -24,9 +25,18 @@ export interface BackendCompletenessItem {
   standardQty: number
 }
 
-/** Detail shape of GET /products/:id: the row plus its completeness list. */
+/** One payment-method link as served by GET /products/:id (joined). */
+export interface BackendProductPaymentMethod {
+  paymentMethodId: string
+  methodName: string
+  methodCode: string | null
+  required: boolean
+}
+
+/** Detail shape of GET /products/:id: the row plus both relation lists. */
 export interface BackendProductDetail extends BackendProduct {
   completenessItems: Array<BackendCompletenessItem>
+  paymentMethods: Array<BackendProductPaymentMethod>
 }
 
 function toCompletenessItemRecord(
@@ -42,10 +52,22 @@ function toCompletenessItemRecord(
   }
 }
 
+function toPaymentMethodRecord(
+  row: BackendProductPaymentMethod,
+): ProductPaymentMethodRecord {
+  return {
+    paymentMethodId: row.paymentMethodId,
+    methodName: row.methodName,
+    methodCode: row.methodCode ?? '',
+    required: row.required,
+  }
+}
+
 export function toProductDetail(row: BackendProductDetail): ProductDetail {
   return {
     ...toProductRecord(row),
     completenessItems: row.completenessItems.map(toCompletenessItemRecord),
+    paymentMethods: row.paymentMethods.map(toPaymentMethodRecord),
   }
 }
 

@@ -27,6 +27,7 @@ import { Route as AuthedServicePointsRouteImport } from './routes/_authed/servic
 import { Route as AuthedUsersRouteImport } from './routes/_authed/users'
 import { Route as AuthedInboundShipmentsIndexRouteImport } from './routes/_authed/inbound-shipments/index'
 import { Route as AuthedInboundShipmentsNewRouteImport } from './routes/_authed/inbound-shipments/new'
+import { Route as AuthedPaymentMethodsIndexRouteImport } from './routes/_authed/payment-methods/index'
 import { Route as AuthedProductsIndexRouteImport } from './routes/_authed/products/index'
 import { Route as AuthedProductsProductIdRouteImport } from './routes/_authed/products/$productId'
 import { Route as AuthedProductsNewRouteImport } from './routes/_authed/products/new'
@@ -130,6 +131,12 @@ const AuthedInboundShipmentsNewRoute =
     path: '/inbound-shipments/new',
     getParentRoute: () => AuthedRoute,
   } as any)
+const AuthedPaymentMethodsIndexRoute =
+  AuthedPaymentMethodsIndexRouteImport.update({
+    id: '/payment-methods/',
+    path: '/payment-methods/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 const AuthedProductsIndexRoute = AuthedProductsIndexRouteImport.update({
   id: '/products/',
   path: '/products/',
@@ -213,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
+  '/payment-methods/': typeof AuthedPaymentMethodsIndexRoute
   '/products/': typeof AuthedProductsIndexRoute
   '/stock-movements/': typeof AuthedStockMovementsIndexRoute
   '/stock/': typeof AuthedStockIndexRoute
@@ -243,6 +251,7 @@ export interface FileRoutesByTo {
   '/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/inbound-shipments': typeof AuthedInboundShipmentsIndexRoute
+  '/payment-methods': typeof AuthedPaymentMethodsIndexRoute
   '/products': typeof AuthedProductsIndexRoute
   '/stock-movements': typeof AuthedStockMovementsIndexRoute
   '/stock': typeof AuthedStockIndexRoute
@@ -275,6 +284,7 @@ export interface FileRoutesById {
   '/_authed/terminals/$terminalId': typeof AuthedTerminalsTerminalIdRoute
   '/_authed/warehouses/$warehouseId': typeof AuthedWarehousesWarehouseIdRoute
   '/_authed/inbound-shipments/': typeof AuthedInboundShipmentsIndexRoute
+  '/_authed/payment-methods/': typeof AuthedPaymentMethodsIndexRoute
   '/_authed/products/': typeof AuthedProductsIndexRoute
   '/_authed/stock-movements/': typeof AuthedStockMovementsIndexRoute
   '/_authed/stock/': typeof AuthedStockIndexRoute
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
     | '/inbound-shipments/'
+    | '/payment-methods/'
     | '/products/'
     | '/stock-movements/'
     | '/stock/'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/terminals/$terminalId'
     | '/warehouses/$warehouseId'
     | '/inbound-shipments'
+    | '/payment-methods'
     | '/products'
     | '/stock-movements'
     | '/stock'
@@ -368,6 +380,7 @@ export interface FileRouteTypes {
     | '/_authed/terminals/$terminalId'
     | '/_authed/warehouses/$warehouseId'
     | '/_authed/inbound-shipments/'
+    | '/_authed/payment-methods/'
     | '/_authed/products/'
     | '/_authed/stock-movements/'
     | '/_authed/stock/'
@@ -514,6 +527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedInboundShipmentsNewRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/payment-methods/': {
+      id: '/_authed/payment-methods/'
+      path: '/payment-methods'
+      fullPath: '/payment-methods/'
+      preLoaderRoute: typeof AuthedPaymentMethodsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/products/': {
       id: '/_authed/products/'
       path: '/products'
@@ -611,6 +631,7 @@ interface AuthedRouteChildren {
   AuthedTerminalsTerminalIdRoute: typeof AuthedTerminalsTerminalIdRoute
   AuthedWarehousesWarehouseIdRoute: typeof AuthedWarehousesWarehouseIdRoute
   AuthedInboundShipmentsIndexRoute: typeof AuthedInboundShipmentsIndexRoute
+  AuthedPaymentMethodsIndexRoute: typeof AuthedPaymentMethodsIndexRoute
   AuthedProductsIndexRoute: typeof AuthedProductsIndexRoute
   AuthedStockMovementsIndexRoute: typeof AuthedStockMovementsIndexRoute
   AuthedStockIndexRoute: typeof AuthedStockIndexRoute
@@ -637,6 +658,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedTerminalsTerminalIdRoute: AuthedTerminalsTerminalIdRoute,
   AuthedWarehousesWarehouseIdRoute: AuthedWarehousesWarehouseIdRoute,
   AuthedInboundShipmentsIndexRoute: AuthedInboundShipmentsIndexRoute,
+  AuthedPaymentMethodsIndexRoute: AuthedPaymentMethodsIndexRoute,
   AuthedProductsIndexRoute: AuthedProductsIndexRoute,
   AuthedStockMovementsIndexRoute: AuthedStockMovementsIndexRoute,
   AuthedStockIndexRoute: AuthedStockIndexRoute,

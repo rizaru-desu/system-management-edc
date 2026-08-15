@@ -22,6 +22,7 @@
     "seed:terminals": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-products.js && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-service-points.js && node dist/scripts/seed-merchants.js && node dist/scripts/seed-terminals.js",
     "seed:warehouses": "pnpm run build:deps && nest build && node dist/scripts/seed-warehouses.js",
     "seed:inbound-shipments": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-products.js && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-accounts.js && node dist/scripts/seed-inbound-shipments.js",
+    "seed:payment-methods": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-products.js && node dist/scripts/seed-payment-methods.js",
     "seed:stock": "pnpm run build:deps && nest build && node dist/scripts/seed-item-categories.js && node dist/scripts/seed-warehouses.js && node dist/scripts/seed-stock.js",
     "seed:merchants": "pnpm run build:deps && nest build && node dist/scripts/seed-merchants.js",
     "seed:accounts": "pnpm run build:deps && nest build && node dist/scripts/seed-accounts.js",

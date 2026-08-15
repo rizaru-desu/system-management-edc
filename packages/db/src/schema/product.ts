@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createId } from "../id.js";
 import { itemCategories } from "./item-category.js";
+import { paymentMethods } from "./payment-method.js";
 
 export const PRODUCT_STATUSES = ["ACTIVE", "INACTIVE"] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
@@ -39,19 +40,14 @@ export type ProductCategory = (typeof PRODUCT_CATEGORIES)[number];
 export const products = pgTable(
   "products",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     modelName: text("model_name").notNull(),
     brand: text("brand").notNull(),
     category: text("category").$type<ProductCategory>().notNull(),
     description: text("description"),
     /** Product photo URL; null until the upload flow exists. */
     photoUrl: text("photo_url"),
-    status: text("status")
-      .$type<ProductStatus>()
-      .notNull()
-      .default("ACTIVE"),
+    status: text("status").$type<ProductStatus>().notNull().default("ACTIVE"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -82,9 +78,7 @@ export const products = pgTable(
 export const productCompletenessItems = pgTable(
   "product_completeness_items",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     productId: text("product_id")
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
@@ -107,6 +101,42 @@ export const productCompletenessItems = pgTable(
     index("product_completeness_items_product_id_idx").on(table.productId),
     index("product_completeness_items_item_category_id_idx").on(
       table.itemCategoryId,
+    ),
+  ],
+);
+
+/**
+ * product_payment_methods
+ * The payment types every unit of a product supports — one row per
+ * (product, payment method), mirroring `product_completeness_items`.
+ * `required` methods must pass the transaction test during Job Order
+ * settlement; optional ones are informational. Rows live and die with
+ * their product (cascade), so there is no soft delete here.
+ */
+export const productPaymentMethods = pgTable(
+  "product_payment_methods",
+  {
+    id: text("id").primaryKey().$defaultFn(createId),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    paymentMethodId: text("payment_method_id")
+      .notNull()
+      .references(() => paymentMethods.id),
+    /** Required methods block settlement when their test fails. */
+    required: boolean("required").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // One row per (product, method): the same payment method can never be
+    // linked twice on one product.
+    uniqueIndex("product_payment_methods_product_method_idx").on(
+      table.productId,
+      table.paymentMethodId,
+    ),
+    index("product_payment_methods_product_id_idx").on(table.productId),
+    index("product_payment_methods_payment_method_id_idx").on(
+      table.paymentMethodId,
     ),
   ],
 );

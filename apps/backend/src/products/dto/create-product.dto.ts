@@ -37,6 +37,26 @@ const completenessItemsSchema = z
   );
 
 /**
+ * One supported payment method: a Payment Method reference and whether
+ * passing its transaction test is required during settlement.
+ */
+const paymentMethodLinkSchema = z.object({
+  paymentMethodId: z.string().min(1, 'paymentMethodId is required'),
+  required: z.boolean().default(true),
+});
+
+/** The same method can never be linked twice on one product. */
+const paymentMethodsSchema = z
+  .array(paymentMethodLinkSchema)
+  .max(100)
+  .refine(
+    (methods) =>
+      new Set(methods.map((method) => method.paymentMethodId)).size ===
+      methods.length,
+    { message: 'paymentMethods must not repeat a method' },
+  );
+
+/**
  * Shared field validators of the create/update forms. `status` carries no
  * default here on purpose: a default would survive `.partial()` and make
  * every PATCH silently force ACTIVE — the create schema adds it below.
@@ -52,11 +72,13 @@ export const productBaseSchema = z.object({
   photoUrl: optionalText,
   status: z.enum(PRODUCT_STATUSES),
   completenessItems: completenessItemsSchema,
+  paymentMethods: paymentMethodsSchema,
 });
 
 const createProductSchema = productBaseSchema.extend({
   status: z.enum(PRODUCT_STATUSES).default('ACTIVE'),
   completenessItems: completenessItemsSchema.default([]),
+  paymentMethods: paymentMethodsSchema.default([]),
 });
 
 export type CreateProductDto = z.infer<typeof createProductSchema>;

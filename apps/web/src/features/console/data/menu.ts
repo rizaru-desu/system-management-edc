@@ -289,6 +289,16 @@ export const SIDEBAR_MENU: Array<MenuGroup> = [
         directRoute: '/item-categories',
       },
       {
+        title: 'Payment Methods',
+        path: 'payment-methods',
+        allowedRoles: [
+          'System_Administrator',
+          'Operations_Specialist',
+          'Inventory_Controller',
+        ],
+        directRoute: '/payment-methods',
+      },
+      {
         title: 'App Releases',
         path: 'app-releases',
         allowedRoles: ['System_Administrator'],
