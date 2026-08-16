@@ -33,8 +33,13 @@ export interface DiscrepancyReport {
   shipmentId: string
   doNumber: string
   partnerName: string
+  /** The partner PIC's email from the accounts master; default recipient. */
+  partnerEmail: string | null
+  partnerPicName: string | null
   destinationWarehouseName: string
   receivedDate: string
+  discrepancyStatus:
+    'NONE' | 'OPEN' | 'REPORTED' | 'CONFIRMED' | 'RESOLVED' | null
   missingUnits: Array<DiscrepancyUnit>
   damagedUnits: Array<DiscrepancyUnit>
   incompleteUnits: Array<DiscrepancyUnit>

@@ -29,6 +29,7 @@ import {
 import { Textarea } from '#/components/ui/textarea.tsx'
 import {
   shipmentItemOptionsQueryOptions,
+  shipmentParentOptionsQueryOptions,
   shipmentPartnerOptionsQueryOptions,
   shipmentProductOptionsQueryOptions,
   shipmentWarehouseOptionsQueryOptions,
@@ -110,10 +111,12 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const warehousesQuery = useQuery(shipmentWarehouseOptionsQueryOptions())
   const productsQuery = useQuery(shipmentProductOptionsQueryOptions())
   const itemsQuery = useQuery(shipmentItemOptionsQueryOptions())
+  const parentsQuery = useQuery(shipmentParentOptionsQueryOptions())
   const partnerOptions = partnersQuery.data ?? []
   const warehouseOptions = warehousesQuery.data ?? []
   const productOptions = productsQuery.data ?? []
   const itemOptions = itemsQuery.data ?? []
+  const parentOptionsAll = parentsQuery.data ?? []
 
   const optionsError =
     partnersQuery.isError ||
@@ -132,7 +135,20 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     draft?.receivedDate ?? todayIso(),
   )
   const [notes, setNotes] = useState(draft?.notes ?? '')
+  const [parentShipmentId, setParentShipmentId] = useState(
+    draft?.parentShipmentId ?? '',
+  )
   const [headerErrors, setHeaderErrors] = useState<HeaderErrors>({})
+
+  // "Follow-up of" candidates narrow to the chosen partner — a shortage is
+  // always fulfilled by the partner who caused it. The current selection
+  // stays listed even across a partner switch so it can be seen and cleared.
+  const parentOptions = parentOptionsAll.filter(
+    (option) =>
+      option.id === parentShipmentId ||
+      !partnerAccountId ||
+      option.partnerAccountId === partnerAccountId,
+  )
 
   // ── Step 2 — EDC units manifest ────────────────────────────────────────
   const [unitRows, setUnitRows] = useState<Array<UnitRow>>(() =>
@@ -339,6 +355,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     receivedDate,
     notes: notes.trim() ? notes.trim() : null,
     status,
+    parentShipmentId: parentShipmentId || null,
     edcItems: unitRows.map((row) => ({
       serialNumber: row.serialNumber.trim(),
       productId: row.productId,
@@ -611,6 +628,46 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                     </p>
                   )}
                 </div>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Follow-up of DO (optional)</Label>
+                <Select
+                  // Radix rejects empty item values, so "none" stands in.
+                  value={parentShipmentId || 'none'}
+                  onValueChange={(value) =>
+                    setParentShipmentId(value === 'none' ? '' : value)
+                  }
+                  disabled={parentsQuery.isPending}
+                >
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue
+                      placeholder={
+                        parentsQuery.isPending
+                          ? 'Loading open discrepancies…'
+                          : 'Not a follow-up shipment'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      Not a follow-up shipment
+                    </SelectItem>
+                    {parentOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.doNumber}
+                        <span className="ml-1 text-brand-900/40">
+                          · {option.partnerName} · received{' '}
+                          {option.receivedDate}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-brand-900/50">
+                  Pick the earlier DO whose shortage this delivery fulfils —
+                  completing this shipment then resolves that DO&apos;s
+                  discrepancy case automatically.
+                </p>
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="shipment-notes">Notes (optional)</Label>
@@ -996,6 +1053,20 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                       {receivedDate || '—'}
                     </dd>
                   </div>
+                  {parentShipmentId && (
+                    <div>
+                      <dt className="text-[11px] font-semibold uppercase tracking-wider text-brand-900/45">
+                        Follow-up of DO
+                      </dt>
+                      <dd className="mt-0.5 text-brand-900/80 tabular-nums">
+                        {parentOptionsAll.find(
+                          (option) => option.id === parentShipmentId,
+                        )?.doNumber ??
+                          draft?.parentDoNumber ??
+                          parentShipmentId}
+                      </dd>
+                    </div>
+                  )}
                   {notes.trim() && (
                     <div className="sm:col-span-2 lg:col-span-3">
                       <dt className="text-[11px] font-semibold uppercase tracking-wider text-brand-900/45">

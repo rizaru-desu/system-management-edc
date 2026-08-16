@@ -1,8 +1,21 @@
-import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "../client.js";
 import { accounts } from "../schema/account.js";
 import type { AccountType } from "../schema/account.js";
+import { user } from "../schema/auth.js";
 import {
+  inboundShipmentDiscrepancyEvents,
   inboundShipmentEdcItemAccessories,
   inboundShipmentEdcItems,
   inboundShipmentPeripheralItems,
@@ -11,6 +24,9 @@ import {
   warehouseItemStocks,
 } from "../schema/inbound-shipment.js";
 import type {
+  DiscrepancyEventAction,
+  DiscrepancyPartnerResponse,
+  DiscrepancyStatus,
   EdcCompletenessStatus,
   EdcFoundStatus,
   EdcItemCondition,
@@ -19,18 +35,14 @@ import type {
 import { itemCategories } from "../schema/item-category.js";
 import type { ItemCategoryUnit } from "../schema/item-category.js";
 import { productCompletenessItems, products } from "../schema/product.js";
-import {
-  terminalStatusHistory,
-  terminals,
-} from "../schema/terminal.js";
+import { terminalStatusHistory, terminals } from "../schema/terminal.js";
 import type { TerminalCondition } from "../schema/terminal.js";
 import { warehouses } from "../schema/warehouse.js";
 import type { WarehouseType } from "../schema/warehouse.js";
 
 /** Executor for shared checks: the pool client or a transaction. */
 type DbExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const notDeleted = isNull(inboundShipments.deletedAt);
 
@@ -52,6 +64,11 @@ export interface InboundShipmentRow {
   shipmentDate: string | null;
   receivedDate: string;
   status: InboundShipmentStatus;
+  /** Null until finalized; then NONE or the partner follow-up state. */
+  discrepancyStatus: DiscrepancyStatus | null;
+  /** The original DO this shipment fulfils the shortage of, if any. */
+  parentShipmentId: string | null;
+  parentDoNumber: string | null;
   notes: string | null;
   /** Units on the partner's paperwork (excludes unlisted finds). */
   manifestUnitCount: number;
@@ -106,16 +123,39 @@ export interface InboundShipmentPeripheralItemRow {
   notes: string | null;
 }
 
+/** One step of the discrepancy follow-up trail, actor name joined. */
+export interface InboundShipmentDiscrepancyEventRow {
+  id: string;
+  action: DiscrepancyEventAction;
+  partnerResponse: DiscrepancyPartnerResponse | null;
+  recipientEmail: string | null;
+  notes: string | null;
+  actorUserId: string | null;
+  actorName: string | null;
+  createdAt: Date;
+}
+
+/** A later shipment recorded as fulfilling this one's shortage. */
+export interface FollowUpShipmentRow {
+  id: string;
+  doNumber: string;
+  status: InboundShipmentStatus;
+  receivedDate: string;
+}
+
 /** The detail payload: the header plus both manifests, fully joined. */
 export interface InboundShipmentDetailRow extends InboundShipmentRow {
   edcItems: InboundShipmentEdcItemRow[];
   peripheralItems: InboundShipmentPeripheralItemRow[];
+  discrepancyEvents: InboundShipmentDiscrepancyEventRow[];
+  followUpShipments: FollowUpShipmentRow[];
 }
 
 export interface ListInboundShipmentsOptions {
   /** Case-insensitive substring match on DO number or partner name. */
   search?: string;
   status?: InboundShipmentStatus;
+  discrepancyStatus?: DiscrepancyStatus;
   warehouseId?: string;
   partnerAccountId?: string;
   /** 1-based page number; defaults to 1. */
@@ -157,6 +197,9 @@ const peripheralLineCountSql = sql<number>`(
   where p.inbound_shipment_id = ${inboundShipments.id}
 )`;
 
+/** Self-join target for the parent Delivery Order's display fields. */
+const parentShipments = alias(inboundShipments, "parent_shipments");
+
 const rowColumns = {
   id: inboundShipments.id,
   doNumber: inboundShipments.doNumber,
@@ -168,6 +211,9 @@ const rowColumns = {
   shipmentDate: inboundShipments.shipmentDate,
   receivedDate: inboundShipments.receivedDate,
   status: inboundShipments.status,
+  discrepancyStatus: inboundShipments.discrepancyStatus,
+  parentShipmentId: inboundShipments.parentShipmentId,
+  parentDoNumber: parentShipments.doNumber,
   notes: inboundShipments.notes,
   manifestUnitCount: manifestUnitCountSql,
   inspectedUnitCount: inspectedUnitCountSql,
@@ -177,7 +223,7 @@ const rowColumns = {
   updatedAt: inboundShipments.updatedAt,
 };
 
-/** The header select with its partner/warehouse joins applied. */
+/** The header select with its partner/warehouse/parent joins applied. */
 function selectShipmentRows(executor: DbExecutor) {
   return executor
     .select(rowColumns)
@@ -186,6 +232,10 @@ function selectShipmentRows(executor: DbExecutor) {
     .innerJoin(
       warehouses,
       eq(warehouses.id, inboundShipments.destinationWarehouseId),
+    )
+    .leftJoin(
+      parentShipments,
+      eq(parentShipments.id, inboundShipments.parentShipmentId),
     );
 }
 
@@ -210,6 +260,11 @@ export async function listInboundShipments(
   }
   if (options.status) {
     filters.push(eq(inboundShipments.status, options.status));
+  }
+  if (options.discrepancyStatus) {
+    filters.push(
+      eq(inboundShipments.discrepancyStatus, options.discrepancyStatus),
+    );
   }
   if (options.warehouseId) {
     filters.push(
@@ -304,7 +359,10 @@ async function listEdcItems(
       ),
     )
     .where(eq(inboundShipmentEdcItems.inboundShipmentId, shipmentId))
-    .orderBy(desc(inboundShipmentEdcItemAccessories.isRequired), asc(itemCategories.name));
+    .orderBy(
+      desc(inboundShipmentEdcItemAccessories.isRequired),
+      asc(itemCategories.name),
+    );
 
   const byItem = new Map<string, InboundShipmentAccessoryRow[]>();
   for (const { edcItemId, ...accessory } of accessoryRows) {
@@ -344,6 +402,48 @@ async function listPeripheralItems(
     .orderBy(asc(itemCategories.name));
 }
 
+/** The discrepancy follow-up trail, oldest step first. */
+async function listDiscrepancyEvents(
+  executor: DbExecutor,
+  shipmentId: string,
+): Promise<InboundShipmentDiscrepancyEventRow[]> {
+  return executor
+    .select({
+      id: inboundShipmentDiscrepancyEvents.id,
+      action: inboundShipmentDiscrepancyEvents.action,
+      partnerResponse: inboundShipmentDiscrepancyEvents.partnerResponse,
+      recipientEmail: inboundShipmentDiscrepancyEvents.recipientEmail,
+      notes: inboundShipmentDiscrepancyEvents.notes,
+      actorUserId: inboundShipmentDiscrepancyEvents.actorUserId,
+      actorName: user.name,
+      createdAt: inboundShipmentDiscrepancyEvents.createdAt,
+    })
+    .from(inboundShipmentDiscrepancyEvents)
+    .leftJoin(user, eq(user.id, inboundShipmentDiscrepancyEvents.actorUserId))
+    .where(eq(inboundShipmentDiscrepancyEvents.inboundShipmentId, shipmentId))
+    .orderBy(asc(inboundShipmentDiscrepancyEvents.createdAt));
+}
+
+/** Live shipments recorded as follow-ups of this one, oldest first. */
+async function listFollowUpShipments(
+  executor: DbExecutor,
+  shipmentId: string,
+): Promise<FollowUpShipmentRow[]> {
+  return executor
+    .select({
+      id: inboundShipments.id,
+      doNumber: inboundShipments.doNumber,
+      status: inboundShipments.status,
+      receivedDate: inboundShipments.receivedDate,
+    })
+    .from(inboundShipments)
+    .where(and(eq(inboundShipments.parentShipmentId, shipmentId), notDeleted))
+    .orderBy(
+      asc(inboundShipments.receivedDate),
+      asc(inboundShipments.createdAt),
+    );
+}
+
 /** Re-reads the full detail payload (inside `executor`). */
 async function readDetail(
   executor: DbExecutor,
@@ -353,11 +453,20 @@ async function readDetail(
     and(eq(inboundShipments.id, id), notDeleted),
   );
   if (!row) return null;
-  const [edcItems, peripheralItems] = await Promise.all([
-    listEdcItems(executor, id),
-    listPeripheralItems(executor, id),
-  ]);
-  return { ...row, edcItems, peripheralItems };
+  const [edcItems, peripheralItems, discrepancyEvents, followUpShipments] =
+    await Promise.all([
+      listEdcItems(executor, id),
+      listPeripheralItems(executor, id),
+      listDiscrepancyEvents(executor, id),
+      listFollowUpShipments(executor, id),
+    ]);
+  return {
+    ...row,
+    edcItems,
+    peripheralItems,
+    discrepancyEvents,
+    followUpShipments,
+  };
 }
 
 /** One live shipment with both manifests; null when unknown. */
@@ -387,6 +496,8 @@ export interface InboundShipmentInput {
   receivedDate: string;
   notes: string | null;
   status: Extract<InboundShipmentStatus, "DRAFT" | "PENDING_INSPECTION">;
+  /** The earlier DO whose shortage this shipment fulfils, if any. */
+  parentShipmentId: string | null;
   edcItems: InboundShipmentEdcItemInput[];
   peripheralItems: InboundShipmentPeripheralItemInput[];
 }
@@ -396,6 +507,8 @@ export type InboundShipmentWriteError =
   | "do-number-taken"
   | "partner-not-found"
   | "warehouse-not-found"
+  | "parent-not-found"
+  | "parent-self"
   | "product-not-found"
   | "item-category-not-found"
   | "duplicate-serial"
@@ -435,13 +548,15 @@ async function doNumberTaken(
   return row !== undefined;
 }
 
-/** Validates the header references; null when both resolve to live rows. */
+/** Validates the header references; null when all resolve to live rows. */
 async function headerReferenceError(
   executor: DbExecutor,
   input: Pick<
     InboundShipmentInput,
-    "partnerAccountId" | "destinationWarehouseId"
+    "partnerAccountId" | "destinationWarehouseId" | "parentShipmentId"
   >,
+  /** The shipment being updated, to reject it as its own parent. */
+  selfId?: string,
 ): Promise<InboundShipmentWriteError | null> {
   const [partner] = await executor
     .select({ id: accounts.id })
@@ -461,6 +576,15 @@ async function headerReferenceError(
       ),
     );
   if (!warehouse) return "warehouse-not-found";
+
+  if (input.parentShipmentId) {
+    if (selfId && input.parentShipmentId === selfId) return "parent-self";
+    const [parent] = await executor
+      .select({ id: inboundShipments.id })
+      .from(inboundShipments)
+      .where(and(eq(inboundShipments.id, input.parentShipmentId), notDeleted));
+    if (!parent) return "parent-not-found";
+  }
   return null;
 }
 
@@ -609,6 +733,7 @@ export async function createInboundShipment(
         receivedDate: input.receivedDate,
         notes: input.notes,
         status: input.status,
+        parentShipmentId: input.parentShipmentId,
       })
       .returning({ id: inboundShipments.id });
     if (!inserted) throw new Error("Insert returned no row.");
@@ -646,7 +771,7 @@ export async function updateInboundShipment(
     if (await doNumberTaken(tx, input.doNumber, id)) {
       return { ok: false as const, error: "do-number-taken" as const };
     }
-    const refError = await headerReferenceError(tx, input);
+    const refError = await headerReferenceError(tx, input, id);
     if (refError) return { ok: false as const, error: refError };
     const badManifest = await manifestError(tx, input);
     if (badManifest) return { ok: false as const, error: badManifest };
@@ -661,6 +786,7 @@ export async function updateInboundShipment(
         receivedDate: input.receivedDate,
         notes: input.notes,
         status: input.status,
+        parentShipmentId: input.parentShipmentId,
       })
       .where(eq(inboundShipments.id, id));
 
@@ -964,7 +1090,11 @@ export interface FinalizeInspectionSummary {
 }
 
 export type FinalizeInspectionResult =
-  | { ok: true; summary: FinalizeInspectionSummary; shipment: InboundShipmentDetailRow }
+  | {
+      ok: true;
+      summary: FinalizeInspectionSummary;
+      shipment: InboundShipmentDetailRow;
+    }
   | {
       ok: false;
       error:
@@ -1002,6 +1132,7 @@ export async function finalizeInboundShipment(
         destinationWarehouseId: inboundShipments.destinationWarehouseId,
         doNumber: inboundShipments.doNumber,
         receivedDate: inboundShipments.receivedDate,
+        parentShipmentId: inboundShipments.parentShipmentId,
       })
       .from(inboundShipments)
       .where(and(eq(inboundShipments.id, shipmentId), notDeleted));
@@ -1111,9 +1242,11 @@ export async function finalizeInboundShipment(
     let stockLinesUpdated = 0;
     let stockQuantityAdded = 0;
     let peripheralVariance = 0;
+    let varianceLineCount = 0;
     for (const line of peripheralLines) {
       const received = line.receivedQty ?? 0;
       peripheralVariance += received - line.documentedQty;
+      if (received !== line.documentedQty) varianceLineCount += 1;
       if (received <= 0) continue;
       await tx
         .insert(warehouseItemStocks)
@@ -1146,10 +1279,62 @@ export async function finalizeInboundShipment(
       stockQuantityAdded += received;
     }
 
+    const missingUnits = edcItems.filter(
+      (item) => item.foundStatus === "MISSING",
+    ).length;
+    const damagedUnits = edcItems.filter(
+      (item) => item.condition === "DAMAGED",
+    ).length;
+    const incompleteUnits = edcItems.filter(
+      (item) => item.completenessStatus === "INCOMPLETE",
+    ).length;
+    const unlistedUnits = edcItems.filter((item) => item.isUnlisted).length;
+
+    // The finalize verdict on the SOP's "Sesuai?" question: anything worth
+    // raising with the partner opens the discrepancy follow-up trail.
+    const hasDiscrepancies =
+      missingUnits > 0 ||
+      damagedUnits > 0 ||
+      incompleteUnits > 0 ||
+      unlistedUnits > 0 ||
+      varianceLineCount > 0;
+
     await tx
       .update(inboundShipments)
-      .set({ status: "COMPLETED" })
+      .set({
+        status: "COMPLETED",
+        discrepancyStatus: hasDiscrepancies ? "OPEN" : "NONE",
+      })
       .where(eq(inboundShipments.id, shipmentId));
+
+    // A completed follow-up shipment settles its parent's open
+    // discrepancy — the shortage the partner promised has landed.
+    if (shipment.parentShipmentId) {
+      const [parent] = await tx
+        .select({
+          id: inboundShipments.id,
+          discrepancyStatus: inboundShipments.discrepancyStatus,
+        })
+        .from(inboundShipments)
+        .where(
+          and(eq(inboundShipments.id, shipment.parentShipmentId), notDeleted),
+        );
+      if (
+        parent?.discrepancyStatus &&
+        ["OPEN", "REPORTED", "CONFIRMED"].includes(parent.discrepancyStatus)
+      ) {
+        await tx
+          .update(inboundShipments)
+          .set({ discrepancyStatus: "RESOLVED" })
+          .where(eq(inboundShipments.id, parent.id));
+        await tx.insert(inboundShipmentDiscrepancyEvents).values({
+          inboundShipmentId: parent.id,
+          action: "RESOLVED",
+          actorUserId: changedByUserId,
+          notes: `Follow-up shipment ${shipment.doNumber} completed.`,
+        });
+      }
+    }
 
     const detail = await readDetail(tx, shipmentId);
     if (!detail) throw new Error("Shipment vanished mid-transaction.");
@@ -1161,19 +1346,202 @@ export async function finalizeInboundShipment(
         createdSerialNumbers: passing.map((item) => item.serialNumber),
         stockLinesUpdated,
         stockQuantityAdded,
-        missingUnits: edcItems.filter((item) => item.foundStatus === "MISSING")
-          .length,
-        damagedUnits: edcItems.filter((item) => item.condition === "DAMAGED")
-          .length,
-        incompleteUnits: edcItems.filter(
-          (item) => item.completenessStatus === "INCOMPLETE",
-        ).length,
-        unlistedUnits: edcItems.filter((item) => item.isUnlisted).length,
+        missingUnits,
+        damagedUnits,
+        incompleteUnits,
+        unlistedUnits,
         peripheralVariance,
       },
       shipment: detail,
     };
   });
+}
+
+// ─── Discrepancy follow-up trail ───────────────────────────────────────────
+
+/** Every way a discrepancy step can be rejected by the data layer. */
+export type DiscrepancyActionError =
+  "not-found" | "not-finalized" | "no-discrepancies" | "already-resolved";
+
+export type DiscrepancyActionResult =
+  | { ok: true; shipment: InboundShipmentDetailRow }
+  | { ok: false; error: DiscrepancyActionError };
+
+/**
+ * Shared guard: the shipment must exist, be finalized, and hold an
+ * unresolved discrepancy verdict. Returns the current status when the
+ * step may proceed.
+ */
+async function discrepancyActionError(
+  executor: DbExecutor,
+  shipmentId: string,
+): Promise<
+  | { ok: true; discrepancyStatus: DiscrepancyStatus }
+  | { ok: false; error: DiscrepancyActionError }
+> {
+  const [shipment] = await executor
+    .select({
+      status: inboundShipments.status,
+      discrepancyStatus: inboundShipments.discrepancyStatus,
+    })
+    .from(inboundShipments)
+    .where(and(eq(inboundShipments.id, shipmentId), notDeleted));
+  if (!shipment) return { ok: false, error: "not-found" };
+  if (shipment.status !== "COMPLETED" || !shipment.discrepancyStatus) {
+    return { ok: false, error: "not-finalized" };
+  }
+  if (shipment.discrepancyStatus === "NONE") {
+    return { ok: false, error: "no-discrepancies" };
+  }
+  if (shipment.discrepancyStatus === "RESOLVED") {
+    return { ok: false, error: "already-resolved" };
+  }
+  return { ok: true, discrepancyStatus: shipment.discrepancyStatus };
+}
+
+/** One shared write: appends the event and advances the status. */
+async function appendDiscrepancyEvent(
+  shipmentId: string,
+  event: {
+    action: DiscrepancyEventAction;
+    nextStatus: (current: DiscrepancyStatus) => DiscrepancyStatus;
+    actorUserId: string | null;
+    partnerResponse?: DiscrepancyPartnerResponse;
+    recipientEmail?: string;
+    notes?: string | null;
+  },
+): Promise<DiscrepancyActionResult> {
+  return db.transaction(async (tx) => {
+    const guard = await discrepancyActionError(tx, shipmentId);
+    if (!guard.ok) return { ok: false as const, error: guard.error };
+
+    await tx.insert(inboundShipmentDiscrepancyEvents).values({
+      inboundShipmentId: shipmentId,
+      action: event.action,
+      partnerResponse: event.partnerResponse ?? null,
+      recipientEmail: event.recipientEmail ?? null,
+      notes: event.notes ?? null,
+      actorUserId: event.actorUserId,
+    });
+    await tx
+      .update(inboundShipments)
+      .set({ discrepancyStatus: event.nextStatus(guard.discrepancyStatus) })
+      .where(eq(inboundShipments.id, shipmentId));
+
+    const detail = await readDetail(tx, shipmentId);
+    if (!detail) throw new Error("Shipment vanished mid-transaction.");
+    return { ok: true as const, shipment: detail };
+  });
+}
+
+/**
+ * Records that the discrepancy report went out to the partner (the email
+ * is sent by the caller first). Repeatable — a re-send appends another
+ * REPORTED step. The status never regresses: a case the partner already
+ * CONFIRMED stays CONFIRMED.
+ */
+export function markDiscrepancyReported(
+  shipmentId: string,
+  input: {
+    actorUserId: string | null;
+    recipientEmail: string;
+    notes?: string | null;
+  },
+): Promise<DiscrepancyActionResult> {
+  return appendDiscrepancyEvent(shipmentId, {
+    action: "REPORTED",
+    nextStatus: (current) => (current === "OPEN" ? "REPORTED" : current),
+    actorUserId: input.actorUserId,
+    recipientEmail: input.recipientEmail,
+    notes: input.notes,
+  });
+}
+
+/**
+ * Records the partner's answer to the report. Allowed straight from OPEN
+ * too — a partner may answer by phone before any formal report went out.
+ */
+export function confirmDiscrepancy(
+  shipmentId: string,
+  input: {
+    actorUserId: string | null;
+    partnerResponse: DiscrepancyPartnerResponse;
+    notes?: string | null;
+  },
+): Promise<DiscrepancyActionResult> {
+  return appendDiscrepancyEvent(shipmentId, {
+    action: "CONFIRMED",
+    nextStatus: () => "CONFIRMED",
+    actorUserId: input.actorUserId,
+    partnerResponse: input.partnerResponse,
+    notes: input.notes,
+  });
+}
+
+/**
+ * Closes the discrepancy case by hand — shortage written off, replacement
+ * received outside the system, or dispute settled. (Completing a
+ * follow-up shipment resolves the parent automatically instead.)
+ */
+export function resolveDiscrepancy(
+  shipmentId: string,
+  input: { actorUserId: string | null; notes?: string | null },
+): Promise<DiscrepancyActionResult> {
+  return appendDiscrepancyEvent(shipmentId, {
+    action: "RESOLVED",
+    nextStatus: () => "RESOLVED",
+    actorUserId: input.actorUserId,
+    notes: input.notes,
+  });
+}
+
+/** One entry of the wizard's "follow-up of DO" dropdown. */
+export interface ParentShipmentOption {
+  id: string;
+  doNumber: string;
+  partnerAccountId: string;
+  partnerName: string;
+  receivedDate: string;
+  discrepancyStatus: DiscrepancyStatus;
+}
+
+/**
+ * Completed shipments whose discrepancy is still unresolved — the DOs a
+ * new shipment can be recorded as a follow-up of. The wizard narrows the
+ * list to the chosen partner client-side.
+ */
+export async function listParentShipmentOptions(): Promise<
+  ParentShipmentOption[]
+> {
+  const rows = await db
+    .select({
+      id: inboundShipments.id,
+      doNumber: inboundShipments.doNumber,
+      partnerAccountId: inboundShipments.partnerAccountId,
+      partnerName: accounts.accountName,
+      receivedDate: inboundShipments.receivedDate,
+      discrepancyStatus: inboundShipments.discrepancyStatus,
+    })
+    .from(inboundShipments)
+    .innerJoin(accounts, eq(accounts.id, inboundShipments.partnerAccountId))
+    .where(
+      and(
+        notDeleted,
+        inArray(inboundShipments.discrepancyStatus, [
+          "OPEN",
+          "REPORTED",
+          "CONFIRMED",
+        ]),
+      ),
+    )
+    .orderBy(
+      desc(inboundShipments.receivedDate),
+      asc(inboundShipments.doNumber),
+    );
+  // The filter above guarantees a non-null status; narrow the type.
+  return rows.filter(
+    (row): row is ParentShipmentOption => row.discrepancyStatus !== null,
+  );
 }
 
 // ─── Discrepancy report ────────────────────────────────────────────────────
@@ -1206,8 +1574,12 @@ export interface DiscrepancyReport {
   shipmentId: string;
   doNumber: string;
   partnerName: string;
+  /** The partner PIC's email from the accounts master; default recipient. */
+  partnerEmail: string | null;
+  partnerPicName: string | null;
   destinationWarehouseName: string;
   receivedDate: string;
+  discrepancyStatus: DiscrepancyStatus | null;
   missingUnits: DiscrepancyUnit[];
   damagedUnits: DiscrepancyUnit[];
   incompleteUnits: DiscrepancyUnit[];
@@ -1226,6 +1598,11 @@ export async function buildDiscrepancyReport(
 ): Promise<DiscrepancyReport | null> {
   const detail = await findInboundShipmentById(shipmentId);
   if (!detail) return null;
+
+  const [partner] = await db
+    .select({ picEmail: accounts.picEmail, picName: accounts.picName })
+    .from(accounts)
+    .where(eq(accounts.id, detail.partnerAccountId));
 
   const toUnit = (item: InboundShipmentEdcItemRow): DiscrepancyUnit => ({
     id: item.id,
@@ -1280,8 +1657,11 @@ export async function buildDiscrepancyReport(
     shipmentId: detail.id,
     doNumber: detail.doNumber,
     partnerName: detail.partnerName,
+    partnerEmail: partner?.picEmail ?? null,
+    partnerPicName: partner?.picName ?? null,
     destinationWarehouseName: detail.destinationWarehouseName,
     receivedDate: detail.receivedDate,
+    discrepancyStatus: detail.discrepancyStatus,
     missingUnits,
     damagedUnits,
     incompleteUnits,

@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   Injectable,
@@ -7,19 +8,24 @@ import {
 import {
   addUnlistedEdcItem,
   buildDiscrepancyReport,
+  confirmDiscrepancy,
   createInboundShipment,
   finalizeInboundShipment,
   findInboundShipmentById,
   listAllWarehouses,
   listInboundShipments,
   listItemCategoryOptions,
+  listParentShipmentOptions,
   listPartnerOptions,
   listProductOptions,
+  markDiscrepancyReported,
+  resolveDiscrepancy,
   updateInboundShipment,
   updateInboundShipmentEdcItem,
   updateInboundShipmentPeripheralItem,
 } from '@repo/db';
 import type {
+  DiscrepancyActionError,
   DiscrepancyReport,
   FinalizeInspectionSummary,
   InboundShipmentDetailRow,
@@ -27,13 +33,20 @@ import type {
   InboundShipmentWriteError,
   ItemCategoryOption,
   ListInboundShipmentsOptions,
+  ParentShipmentOption,
   PartnerOption,
   ProductOption,
   WarehouseRow,
 } from '@repo/db';
+import { MailService } from '../mail/mail.service';
 import { buildWarehouseTree } from '../warehouses/utils/tree-builder.util';
 import type { WarehouseTreeNode } from '../warehouses/utils/tree-builder.util';
 import type { CreateInboundShipmentDto } from './dto/create-inbound-shipment.dto';
+import type {
+  ConfirmDiscrepancyDto,
+  ResolveDiscrepancyDto,
+  SendDiscrepancyReportDto,
+} from './dto/discrepancy.dto';
 import type {
   AddEdcItemDto,
   UpdateEdcItemDto,
@@ -88,11 +101,91 @@ function writeException(
       return new ConflictException(
         'This shipment can no longer be edited — its inspection has already started or been finalized.',
       );
+    case 'parent-not-found':
+      return new BadRequestException('Parent shipment not found.');
+    case 'parent-self':
+      return new BadRequestException(
+        'A shipment cannot be recorded as its own follow-up.',
+      );
   }
+}
+
+/** Human wording of the discrepancy-step violations. */
+function discrepancyException(
+  error: DiscrepancyActionError,
+): NotFoundException | BadRequestException | ConflictException {
+  switch (error) {
+    case 'not-found':
+      return new NotFoundException('Inbound shipment not found.');
+    case 'not-finalized':
+      return new BadRequestException(
+        'The inspection must be finalized before its discrepancies can be followed up.',
+      );
+    case 'no-discrepancies':
+      return new BadRequestException(
+        'This shipment closed clean — there is no discrepancy to follow up.',
+      );
+    case 'already-resolved':
+      return new ConflictException(
+        'This discrepancy case has already been resolved.',
+      );
+  }
+}
+
+/** One unit row as the report email template consumes it. */
+function emailUnit(unit: DiscrepancyReport['missingUnits'][number]) {
+  return {
+    serialNumber: unit.serialNumber,
+    product: `${unit.productBrand} ${unit.productModelName}`,
+    notes: unit.notes ?? '—',
+  };
+}
+
+/**
+ * The handlebars context of templates/discrepancy-report.hbs. Every key
+ * the template references is always present (it renders in strict mode).
+ */
+function reportEmailContext(report: DiscrepancyReport, message: string | null) {
+  return {
+    doNumber: report.doNumber,
+    partnerName: report.partnerName,
+    picName: report.partnerPicName ?? '',
+    warehouseName: report.destinationWarehouseName,
+    receivedDate: report.receivedDate,
+    message: message ?? '',
+    hasMissing: report.missingUnits.length > 0,
+    missingCount: report.missingUnits.length,
+    missingUnits: report.missingUnits.map(emailUnit),
+    hasDamaged: report.damagedUnits.length > 0,
+    damagedCount: report.damagedUnits.length,
+    damagedUnits: report.damagedUnits.map(emailUnit),
+    hasIncomplete: report.incompleteUnits.length > 0,
+    incompleteCount: report.incompleteUnits.length,
+    incompleteUnits: report.incompleteUnits.map((unit) => ({
+      ...emailUnit(unit),
+      missingAccessories:
+        unit.missingAccessories.map((entry) => entry.itemName).join(', ') ||
+        '—',
+    })),
+    hasUnlisted: report.unlistedUnits.length > 0,
+    unlistedCount: report.unlistedUnits.length,
+    unlistedUnits: report.unlistedUnits.map(emailUnit),
+    hasVariances: report.peripheralVariances.length > 0,
+    varianceCount: report.peripheralVariances.length,
+    variances: report.peripheralVariances.map((line) => ({
+      itemName: line.itemName,
+      documentedQty: line.documentedQty,
+      receivedQty: line.receivedQty ?? 0,
+      unit: line.itemUnit.toLowerCase(),
+      variance: line.variance > 0 ? `+${line.variance}` : `${line.variance}`,
+    })),
+  };
 }
 
 @Injectable()
 export class InboundShipmentService {
+  constructor(private readonly mailService: MailService) {}
+
   /**
    * One page of shipments with optional search/status/warehouse/partner
    * filters plus the filtered total; partner and warehouse display fields
@@ -143,6 +236,11 @@ export class InboundShipmentService {
 
   itemOptions(): Promise<ItemCategoryOption[]> {
     return listItemCategoryOptions();
+  }
+
+  /** DOs with an unresolved discrepancy, for the "follow-up of" select. */
+  parentShipmentOptions(): Promise<ParentShipmentOption[]> {
+    return listParentShipmentOptions();
   }
 
   /** Records a Delivery Order: header + both manifests in one transaction. */
@@ -244,5 +342,86 @@ export class InboundShipmentService {
     const report = await buildDiscrepancyReport(id);
     if (!report) throw new NotFoundException('Inbound shipment not found.');
     return report;
+  }
+
+  /**
+   * Emails the discrepancy report to the partner and records the REPORTED
+   * step. The state is checked before anything is sent, so a doomed
+   * request never emails the partner; the step is only recorded after the
+   * email actually went out.
+   */
+  async sendDiscrepancyReport(
+    id: string,
+    actorUserId: string | null,
+    dto: SendDiscrepancyReportDto,
+  ): Promise<InboundShipmentDetailRow> {
+    const report = await buildDiscrepancyReport(id);
+    if (!report) throw new NotFoundException('Inbound shipment not found.');
+    if (report.discrepancyStatus === null) {
+      throw discrepancyException('not-finalized');
+    }
+    if (report.discrepancyStatus === 'NONE') {
+      throw discrepancyException('no-discrepancies');
+    }
+    if (report.discrepancyStatus === 'RESOLVED') {
+      throw discrepancyException('already-resolved');
+    }
+
+    const recipient = dto.recipientEmail ?? report.partnerEmail;
+    if (!recipient) {
+      throw new BadRequestException(
+        'The partner account has no PIC email on file — provide recipientEmail.',
+      );
+    }
+
+    try {
+      await this.mailService.send({
+        to: recipient,
+        subject: `Laporan Perbedaan Penerimaan · Surat Jalan ${report.doNumber}`,
+        template: 'discrepancy-report',
+        context: reportEmailContext(report, dto.message),
+      });
+    } catch {
+      throw new BadGatewayException(
+        'The discrepancy report email could not be sent — check the mail configuration and try again.',
+      );
+    }
+
+    const result = await markDiscrepancyReported(id, {
+      actorUserId,
+      recipientEmail: recipient,
+      notes: dto.message,
+    });
+    if (result.ok) return result.shipment;
+    throw discrepancyException(result.error);
+  }
+
+  /** Records the partner's answer to the discrepancy report. */
+  async confirmDiscrepancy(
+    id: string,
+    actorUserId: string | null,
+    dto: ConfirmDiscrepancyDto,
+  ): Promise<InboundShipmentDetailRow> {
+    const result = await confirmDiscrepancy(id, {
+      actorUserId,
+      partnerResponse: dto.partnerResponse,
+      notes: dto.notes,
+    });
+    if (result.ok) return result.shipment;
+    throw discrepancyException(result.error);
+  }
+
+  /** Closes the discrepancy case by hand. */
+  async resolveDiscrepancy(
+    id: string,
+    actorUserId: string | null,
+    dto: ResolveDiscrepancyDto,
+  ): Promise<InboundShipmentDetailRow> {
+    const result = await resolveDiscrepancy(id, {
+      actorUserId,
+      notes: dto.notes,
+    });
+    if (result.ok) return result.shipment;
+    throw discrepancyException(result.error);
   }
 }

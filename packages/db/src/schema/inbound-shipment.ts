@@ -8,9 +8,11 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createId } from "../id.js";
 import { accounts } from "./account.js";
+import { user } from "./auth.js";
 import { itemCategories } from "./item-category.js";
 import { products } from "./product.js";
 import { terminals } from "./terminal.js";
@@ -23,8 +25,7 @@ export const INBOUND_SHIPMENT_STATUSES = [
   "INSPECTION_IN_PROGRESS",
   "COMPLETED",
 ] as const;
-export type InboundShipmentStatus =
-  (typeof INBOUND_SHIPMENT_STATUSES)[number];
+export type InboundShipmentStatus = (typeof INBOUND_SHIPMENT_STATUSES)[number];
 
 /** Stage-1 inspection call on one manifest unit. */
 export const EDC_FOUND_STATUSES = ["PENDING", "FOUND", "MISSING"] as const;
@@ -40,8 +41,38 @@ export type EdcItemCondition = (typeof EDC_ITEM_CONDITIONS)[number];
  * INCOMPLETE), never set by hand.
  */
 export const EDC_COMPLETENESS_STATUSES = ["COMPLETE", "INCOMPLETE"] as const;
-export type EdcCompletenessStatus =
-  (typeof EDC_COMPLETENESS_STATUSES)[number];
+export type EdcCompletenessStatus = (typeof EDC_COMPLETENESS_STATUSES)[number];
+
+/**
+ * Where a finalized shipment's discrepancies stand with the partner.
+ * Null on the column until the inspection is finalized; NONE means the
+ * shipment closed clean and there is nothing to raise.
+ */
+export const DISCREPANCY_STATUSES = [
+  "NONE",
+  "OPEN",
+  "REPORTED",
+  "CONFIRMED",
+  "RESOLVED",
+] as const;
+export type DiscrepancyStatus = (typeof DISCREPANCY_STATUSES)[number];
+
+/** The partner's recorded answer to a discrepancy report. */
+export const DISCREPANCY_PARTNER_RESPONSES = [
+  "WILL_SEND_SHORTAGE",
+  "ACCEPTED_AS_IS",
+  "DISPUTED",
+] as const;
+export type DiscrepancyPartnerResponse =
+  (typeof DISCREPANCY_PARTNER_RESPONSES)[number];
+
+/** One step of the discrepancy follow-up trail. */
+export const DISCREPANCY_EVENT_ACTIONS = [
+  "REPORTED",
+  "CONFIRMED",
+  "RESOLVED",
+] as const;
+export type DiscrepancyEventAction = (typeof DISCREPANCY_EVENT_ACTIONS)[number];
 
 /**
  * inbound_shipments
@@ -57,9 +88,7 @@ export type EdcCompletenessStatus =
 export const inboundShipments = pgTable(
   "inbound_shipments",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     doNumber: text("do_number").notNull(),
     partnerAccountId: text("partner_account_id")
       .notNull()
@@ -75,6 +104,22 @@ export const inboundShipments = pgTable(
       .$type<InboundShipmentStatus>()
       .notNull()
       .default("DRAFT"),
+    /**
+     * Null until finalize renders its verdict; then NONE (clean) or the
+     * OPEN → REPORTED → CONFIRMED → RESOLVED follow-up trail with the
+     * partner, advanced by the discrepancy endpoints (or automatically to
+     * RESOLVED when a follow-up shipment completes).
+     */
+    discrepancyStatus: text("discrepancy_status").$type<DiscrepancyStatus>(),
+    /**
+     * The original Delivery Order this shipment follows up on — set when
+     * the partner ships the shortage of an earlier DO. Completing this
+     * shipment auto-resolves the parent's discrepancy.
+     */
+    parentShipmentId: text("parent_shipment_id").references(
+      (): AnyPgColumn => inboundShipments.id,
+      { onDelete: "set null" },
+    ),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -96,6 +141,51 @@ export const inboundShipments = pgTable(
       table.destinationWarehouseId,
     ),
     index("inbound_shipments_status_idx").on(table.status),
+    index("inbound_shipments_discrepancy_status_idx").on(
+      table.discrepancyStatus,
+    ),
+    index("inbound_shipments_parent_shipment_id_idx").on(
+      table.parentShipmentId,
+    ),
+  ],
+);
+
+/**
+ * inbound_shipment_discrepancy_events
+ * The follow-up trail with the partner over one shipment's discrepancies:
+ * one append-only row per step — the report being sent (REPORTED, with the
+ * recipient address), the partner's answer (CONFIRMED, with the response
+ * verdict), and the case closing (RESOLVED, by hand or by a follow-up
+ * shipment completing). Rows are never edited or deleted; the shipment's
+ * `discrepancyStatus` is the current state, this table is how it got there.
+ */
+export const inboundShipmentDiscrepancyEvents = pgTable(
+  "inbound_shipment_discrepancy_events",
+  {
+    id: text("id").primaryKey().$defaultFn(createId),
+    inboundShipmentId: text("inbound_shipment_id")
+      .notNull()
+      .references(() => inboundShipments.id, { onDelete: "cascade" }),
+    action: text("action").$type<DiscrepancyEventAction>().notNull(),
+    /** Only meaningful on CONFIRMED rows. */
+    partnerResponse:
+      text("partner_response").$type<DiscrepancyPartnerResponse>(),
+    /** Only meaningful on REPORTED rows: where the report was emailed. */
+    recipientEmail: text("recipient_email"),
+    notes: text("notes"),
+    /** Session user who took the step; kept when the account is removed. */
+    actorUserId: text("actor_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("inbound_shipment_discrepancy_events_shipment_id_idx").on(
+      table.inboundShipmentId,
+    ),
+    index("inbound_shipment_discrepancy_events_created_at_idx").on(
+      table.createdAt,
+    ),
   ],
 );
 
@@ -112,9 +202,7 @@ export const inboundShipments = pgTable(
 export const inboundShipmentEdcItems = pgTable(
   "inbound_shipment_edc_items",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     inboundShipmentId: text("inbound_shipment_id")
       .notNull()
       .references(() => inboundShipments.id, { onDelete: "cascade" }),
@@ -171,9 +259,7 @@ export const inboundShipmentEdcItems = pgTable(
 export const inboundShipmentEdcItemAccessories = pgTable(
   "inbound_shipment_edc_item_accessories",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     inboundShipmentEdcItemId: text("inbound_shipment_edc_item_id")
       .notNull()
       .references(() => inboundShipmentEdcItems.id, { onDelete: "cascade" }),
@@ -209,9 +295,7 @@ export const inboundShipmentEdcItemAccessories = pgTable(
 export const inboundShipmentPeripheralItems = pgTable(
   "inbound_shipment_peripheral_items",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     inboundShipmentId: text("inbound_shipment_id")
       .notNull()
       .references(() => inboundShipments.id, { onDelete: "cascade" }),
@@ -253,9 +337,7 @@ export const inboundShipmentPeripheralItems = pgTable(
 export const warehouseItemStocks = pgTable(
   "warehouse_item_stocks",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     warehouseId: text("warehouse_id")
       .notNull()
       .references(() => warehouses.id),
@@ -300,9 +382,7 @@ export type PeripheralMovementReason =
 export const peripheralStockMovements = pgTable(
   "peripheral_stock_movements",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     warehouseId: text("warehouse_id")
       .notNull()
       .references(() => warehouses.id),
@@ -321,9 +401,7 @@ export const peripheralStockMovements = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    index("peripheral_stock_movements_warehouse_id_idx").on(
-      table.warehouseId,
-    ),
+    index("peripheral_stock_movements_warehouse_id_idx").on(table.warehouseId),
     index("peripheral_stock_movements_item_category_id_idx").on(
       table.itemCategoryId,
     ),

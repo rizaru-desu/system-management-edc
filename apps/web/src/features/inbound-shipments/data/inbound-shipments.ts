@@ -38,6 +38,75 @@ export const SHIPMENT_STATUS_BADGE_CLASSES: Record<ShipmentStatus, string> = {
 
 export type ShipmentWarehouseType = 'central' | 'regional' | 'service-point'
 
+// ─── Discrepancy follow-up ─────────────────────────────────────────────────
+
+/**
+ * Where a finalized shipment's discrepancies stand with the partner.
+ * `none` = the inspection closed clean; the rest is the follow-up trail
+ * (report sent → partner answered → case closed). Null on a record means
+ * the inspection has not been finalized yet.
+ */
+export const DISCREPANCY_STATUSES = [
+  'none',
+  'open',
+  'reported',
+  'confirmed',
+  'resolved',
+] as const
+
+export type DiscrepancyStatus = (typeof DISCREPANCY_STATUSES)[number]
+
+export const DISCREPANCY_STATUS_LABELS: Record<DiscrepancyStatus, string> = {
+  none: 'No Discrepancy',
+  open: 'Discrepancy Open',
+  reported: 'Reported to Partner',
+  confirmed: 'Partner Confirmed',
+  resolved: 'Resolved',
+}
+
+export const DISCREPANCY_STATUS_BADGE_CLASSES: Record<
+  DiscrepancyStatus,
+  string
+> = {
+  none: 'bg-emerald-100 text-emerald-700',
+  open: 'bg-red-100 text-red-700',
+  reported: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-sky-100 text-sky-700',
+  resolved: 'bg-brand-100 text-brand-900/60',
+}
+
+/** The partner's recorded answer to a discrepancy report. */
+export type DiscrepancyPartnerResponse =
+  'WILL_SEND_SHORTAGE' | 'ACCEPTED_AS_IS' | 'DISPUTED'
+
+export const PARTNER_RESPONSE_LABELS: Record<
+  DiscrepancyPartnerResponse,
+  string
+> = {
+  WILL_SEND_SHORTAGE: 'Will send the shortage',
+  ACCEPTED_AS_IS: 'Accepted as received',
+  DISPUTED: 'Disputed',
+}
+
+/** One step of the discrepancy follow-up trail. */
+export interface DiscrepancyEvent {
+  id: string
+  action: 'REPORTED' | 'CONFIRMED' | 'RESOLVED'
+  partnerResponse: DiscrepancyPartnerResponse | null
+  recipientEmail: string | null
+  notes: string | null
+  actorName: string | null
+  createdAt: string
+}
+
+/** A later shipment recorded as fulfilling this one's shortage. */
+export interface FollowUpShipment {
+  id: string
+  doNumber: string
+  status: ShipmentStatus
+  receivedDate: string
+}
+
 // ─── Records ───────────────────────────────────────────────────────────────
 
 /** Stage-1 inspection outcome of one manifest unit. */
@@ -101,6 +170,11 @@ export interface InboundShipmentSummaryRecord {
   receivedDate: string
   notes: string
   status: ShipmentStatus
+  /** Null until the inspection is finalized. */
+  discrepancyStatus: DiscrepancyStatus | null
+  /** The original DO this shipment fulfils the shortage of, if any. */
+  parentShipmentId: string | null
+  parentDoNumber: string | null
   /** Units on the partner's paperwork (excludes unlisted finds). */
   manifestUnitCount: number
   /** Units with a found/missing call made (manifest + unlisted). */
@@ -113,6 +187,8 @@ export interface InboundShipmentSummaryRecord {
 export interface InboundShipmentRecord extends InboundShipmentSummaryRecord {
   units: Array<ShipmentUnit>
   peripherals: Array<ShipmentPeripheral>
+  discrepancyEvents: Array<DiscrepancyEvent>
+  followUpShipments: Array<FollowUpShipment>
 }
 
 // ─── Derived helpers ───────────────────────────────────────────────────────

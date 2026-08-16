@@ -39,6 +39,16 @@ export interface ShipmentItemOption {
   unit: string
 }
 
+/** One completed DO with an unresolved discrepancy ("follow-up of"). */
+export interface ShipmentParentOption {
+  id: string
+  doNumber: string
+  partnerAccountId: string
+  partnerName: string
+  receivedDate: string
+  discrepancyStatus: 'OPEN' | 'REPORTED' | 'CONFIRMED'
+}
+
 const WAREHOUSE_TYPE_RECORDS: Record<string, ShipmentWarehouseType> = {
   CENTRAL: 'central',
   REGIONAL: 'regional',
@@ -112,6 +122,23 @@ const fetchWarehouseOptions = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+const fetchParentOptions = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<ShipmentParentOption>> => {
+    const cookie = getRequestHeader('cookie')
+    if (!cookie) return []
+
+    try {
+      const response = await apiClient.get<Array<ShipmentParentOption>>(
+        'inbound-shipments/parent-options',
+        { headers: { cookie } },
+      )
+      return response.data
+    } catch (err: unknown) {
+      throw shipmentError(err, 'Failed to load the follow-up DO options')
+    }
+  },
+)
+
 const fetchItemOptions = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Array<ShipmentItemOption>> => {
     const cookie = getRequestHeader('cookie')
@@ -164,5 +191,13 @@ export const shipmentItemOptionsQueryOptions = () =>
   queryOptions({
     queryKey: [...shipmentsQueryKey, 'item-options'],
     queryFn: () => fetchItemOptions(),
+    staleTime: 30_000,
+  })
+
+/** Completed DOs with an unresolved discrepancy, for "follow-up of". */
+export const shipmentParentOptionsQueryOptions = () =>
+  queryOptions({
+    queryKey: [...shipmentsQueryKey, 'parent-options'],
+    queryFn: () => fetchParentOptions(),
     staleTime: 30_000,
   })
