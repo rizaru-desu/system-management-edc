@@ -11,6 +11,7 @@ import { createId } from "../id.js";
 import { user } from "./auth.js";
 import { merchants } from "./merchant.js";
 import { products } from "./product.js";
+import { projects } from "./project.js";
 import { warehouses } from "./warehouse.js";
 
 /** Lifecycle states of one physical EDC unit. */
@@ -41,9 +42,7 @@ export type TerminalCondition = (typeof TERMINAL_CONDITIONS)[number];
 export const terminals = pgTable(
   "terminals",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     serialNumber: text("serial_number").notNull(),
     productId: text("product_id")
       .notNull()
@@ -55,6 +54,12 @@ export const terminals = pgTable(
       .default("IN_STOCK"),
     condition: text("condition").$type<TerminalCondition>().notNull(),
     merchantId: text("merchant_id").references(() => merchants.id),
+    /**
+     * The project this unit's stock is allocated to (SOP: "Letakan Asset
+     * pada storage Project"); null = free stock. Inherited from the
+     * inbound shipment's allocation at registration.
+     */
+    projectId: text("project_id").references(() => projects.id),
     notes: text("notes"),
     /** Calendar date (yyyy-mm-dd) the unit entered the system. */
     enteredSystemAt: date("entered_system_at").notNull(),
@@ -74,6 +79,7 @@ export const terminals = pgTable(
     index("terminals_product_id_idx").on(table.productId),
     index("terminals_warehouse_id_idx").on(table.warehouseId),
     index("terminals_status_idx").on(table.status),
+    index("terminals_project_id_idx").on(table.projectId),
   ],
 );
 
@@ -88,18 +94,14 @@ export const terminals = pgTable(
 export const terminalStatusHistory = pgTable(
   "terminal_status_history",
   {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(createId),
+    id: text("id").primaryKey().$defaultFn(createId),
     terminalId: text("terminal_id")
       .notNull()
       .references(() => terminals.id, { onDelete: "cascade" }),
     /** null marks the registration entry (the unit entered the system). */
     fromStatus: text("from_status").$type<TerminalStatus>(),
     toStatus: text("to_status").$type<TerminalStatus>().notNull(),
-    fromWarehouseId: text("from_warehouse_id").references(
-      () => warehouses.id,
-    ),
+    fromWarehouseId: text("from_warehouse_id").references(() => warehouses.id),
     toWarehouseId: text("to_warehouse_id").references(() => warehouses.id),
     /** Session user who made the change; kept when the account is removed. */
     changedByUserId: text("changed_by_user_id").references(() => user.id, {

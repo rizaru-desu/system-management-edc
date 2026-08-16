@@ -18,6 +18,7 @@ import {
   listParentShipmentOptions,
   listPartnerOptions,
   listProductOptions,
+  listProjectAllocationOptions,
   markDiscrepancyReported,
   resolveDiscrepancy,
   updateInboundShipment,
@@ -36,6 +37,7 @@ import type {
   ParentShipmentOption,
   PartnerOption,
   ProductOption,
+  ProjectAllocationOption,
   WarehouseRow,
 } from '@repo/db';
 import { MailService } from '../mail/mail.service';
@@ -107,6 +109,8 @@ function writeException(
       return new BadRequestException(
         'A shipment cannot be recorded as its own follow-up.',
       );
+    case 'project-not-found':
+      return new BadRequestException('Project not found.');
   }
 }
 
@@ -241,6 +245,11 @@ export class InboundShipmentService {
   /** DOs with an unresolved discrepancy, for the "follow-up of" select. */
   parentShipmentOptions(): Promise<ParentShipmentOption[]> {
     return listParentShipmentOptions();
+  }
+
+  /** Active projects for the wizard's stock-allocation select. */
+  projectOptions(): Promise<ProjectAllocationOption[]> {
+    return listProjectAllocationOptions();
   }
 
   /** Records a Delivery Order: header + both manifests in one transaction. */

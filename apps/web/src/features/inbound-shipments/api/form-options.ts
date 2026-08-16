@@ -39,6 +39,13 @@ export interface ShipmentItemOption {
   unit: string
 }
 
+/** One entry of the project-allocation dropdown (active projects only). */
+export interface ShipmentProjectOption {
+  id: string
+  projectCode: string
+  projectName: string
+}
+
 /** One completed DO with an unresolved discrepancy ("follow-up of"). */
 export interface ShipmentParentOption {
   id: string
@@ -139,6 +146,23 @@ const fetchParentOptions = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+const fetchProjectOptions = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Array<ShipmentProjectOption>> => {
+    const cookie = getRequestHeader('cookie')
+    if (!cookie) return []
+
+    try {
+      const response = await apiClient.get<Array<ShipmentProjectOption>>(
+        'inbound-shipments/project-options',
+        { headers: { cookie } },
+      )
+      return response.data
+    } catch (err: unknown) {
+      throw shipmentError(err, 'Failed to load the project options')
+    }
+  },
+)
+
 const fetchItemOptions = createServerFn({ method: 'GET' }).handler(
   async (): Promise<Array<ShipmentItemOption>> => {
     const cookie = getRequestHeader('cookie')
@@ -191,6 +215,14 @@ export const shipmentItemOptionsQueryOptions = () =>
   queryOptions({
     queryKey: [...shipmentsQueryKey, 'item-options'],
     queryFn: () => fetchItemOptions(),
+    staleTime: 30_000,
+  })
+
+/** Active projects for the wizard's stock-allocation select. */
+export const shipmentProjectOptionsQueryOptions = () =>
+  queryOptions({
+    queryKey: [...shipmentsQueryKey, 'project-options'],
+    queryFn: () => fetchProjectOptions(),
     staleTime: 30_000,
   })
 

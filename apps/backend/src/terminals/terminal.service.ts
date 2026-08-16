@@ -57,6 +57,8 @@ function writeException(
       return new BadRequestException(
         'A merchant can only be attached while the terminal status is Installed.',
       );
+    case 'project-not-found':
+      return new BadRequestException('Project not found.');
   }
 }
 

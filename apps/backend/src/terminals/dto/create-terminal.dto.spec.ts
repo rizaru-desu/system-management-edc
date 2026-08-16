@@ -17,6 +17,7 @@ describe('parseCreateTerminalDto', () => {
       warehouseId: null,
       status: 'IN_STOCK',
       merchantId: null,
+      projectId: null,
       notes: null,
     });
   });

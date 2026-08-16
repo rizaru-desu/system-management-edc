@@ -80,6 +80,9 @@ export interface BackendShipment {
   discrepancyStatus: BackendDiscrepancyStatus | null
   parentShipmentId: string | null
   parentDoNumber: string | null
+  projectId: string | null
+  projectName: string | null
+  projectCode: string | null
   notes: string | null
   manifestUnitCount: number
   inspectedUnitCount: number
@@ -217,6 +220,9 @@ export function toShipmentSummaryRecord(
       : null,
     parentShipmentId: row.parentShipmentId,
     parentDoNumber: row.parentDoNumber,
+    projectId: row.projectId,
+    projectName: row.projectName,
+    projectCode: row.projectCode,
     manifestUnitCount: row.manifestUnitCount,
     inspectedUnitCount: row.inspectedUnitCount,
     totalUnitCount: row.totalUnitCount,

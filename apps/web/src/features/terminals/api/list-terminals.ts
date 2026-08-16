@@ -35,6 +35,9 @@ export interface BackendTerminal {
   condition: BackendTerminalCondition
   merchantId: string | null
   merchantName: string | null
+  projectId: string | null
+  projectName: string | null
+  projectCode: string | null
   notes: string | null
   enteredSystemAt: string
   createdAt: string
@@ -77,6 +80,9 @@ export function toTerminalRecord(row: BackendTerminal): TerminalRecord {
     condition: row.condition === 'NEW' ? 'new' : 'refurbished',
     merchantId: row.merchantId,
     merchantName: row.merchantName ?? '',
+    projectId: row.projectId,
+    projectName: row.projectName,
+    projectCode: row.projectCode,
     entryDate: row.enteredSystemAt,
     notes: row.notes ?? '',
   }

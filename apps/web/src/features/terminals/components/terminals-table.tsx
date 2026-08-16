@@ -187,6 +187,21 @@ export function TerminalsTable({
           ),
       },
       {
+        id: 'project',
+        header: 'Project',
+        cell: ({ row }) =>
+          row.original.projectName ? (
+            <span
+              className="whitespace-nowrap text-brand-900/70"
+              title={row.original.projectCode ?? undefined}
+            >
+              {row.original.projectName}
+            </span>
+          ) : (
+            <span className="text-brand-900/40">—</span>
+          ),
+      },
+      {
         id: 'condition',
         header: 'Condition',
         cell: ({ row }) => (

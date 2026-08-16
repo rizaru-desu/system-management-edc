@@ -175,6 +175,10 @@ export interface InboundShipmentSummaryRecord {
   /** The original DO this shipment fulfils the shortage of, if any. */
   parentShipmentId: string | null
   parentDoNumber: string | null
+  /** Project the delivery's stock is allocated to; null = free stock. */
+  projectId: string | null
+  projectName: string | null
+  projectCode: string | null
   /** Units on the partner's paperwork (excludes unlisted finds). */
   manifestUnitCount: number
   /** Units with a found/missing call made (manifest + unlisted). */

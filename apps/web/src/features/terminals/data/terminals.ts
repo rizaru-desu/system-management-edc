@@ -69,6 +69,10 @@ export interface TerminalRecord {
   merchantId: string | null
   /** Display name of that merchant; '' when unset. */
   merchantName: string
+  /** Project the unit's stock is allocated to; null = free stock. */
+  projectId: string | null
+  projectName: string | null
+  projectCode: string | null
   /** ISO date (yyyy-mm-dd) the unit entered the system. */
   entryDate: string
   notes: string

@@ -17,6 +17,7 @@ import type {
   ParentShipmentOption,
   PartnerOption,
   ProductOption,
+  ProjectAllocationOption,
 } from '@repo/db';
 import { sessionUser } from '../auth/session-user';
 import { RequirePermission } from '../permissions/require-permission.decorator';
@@ -85,6 +86,12 @@ export class InboundShipmentController {
   @Get('parent-options')
   parentOptions(): Promise<ParentShipmentOption[]> {
     return this.inboundShipmentService.parentShipmentOptions();
+  }
+
+  /** Active projects — the wizard's stock-allocation choices. */
+  @Get('project-options')
+  projectOptions(): Promise<ProjectAllocationOption[]> {
+    return this.inboundShipmentService.projectOptions();
   }
 
   /** The header plus both manifests and every unit's checklist. */

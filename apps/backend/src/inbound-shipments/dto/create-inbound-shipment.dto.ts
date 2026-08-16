@@ -59,6 +59,14 @@ export const inboundShipmentBaseSchema = z.object({
     .string()
     .nullish()
     .transform((value) => (value ? value : null)),
+  /**
+   * The project this delivery's stock is allocated to; finalize stamps it
+   * onto every terminal the shipment produces. Null = free stock.
+   */
+  projectId: z
+    .string()
+    .nullish()
+    .transform((value) => (value ? value : null)),
   edcItems: z.array(edcItemSchema).default([]),
   peripheralItems: z.array(peripheralItemSchema).default([]),
 });

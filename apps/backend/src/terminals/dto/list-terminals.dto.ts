@@ -13,6 +13,7 @@ const listTerminalsSchema = z.object({
   status: z.enum(TERMINAL_STATUSES).optional(),
   warehouseId: z.string().min(1).optional(),
   productId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
   /** 1-based page number. */
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().optional(),

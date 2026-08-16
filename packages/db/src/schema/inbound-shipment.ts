@@ -15,6 +15,7 @@ import { accounts } from "./account.js";
 import { user } from "./auth.js";
 import { itemCategories } from "./item-category.js";
 import { products } from "./product.js";
+import { projects } from "./project.js";
 import { terminals } from "./terminal.js";
 import { warehouses } from "./warehouse.js";
 
@@ -120,6 +121,12 @@ export const inboundShipments = pgTable(
       (): AnyPgColumn => inboundShipments.id,
       { onDelete: "set null" },
     ),
+    /**
+     * The project this delivery's stock is allocated to (SOP: "Letakan
+     * Asset pada storage Project"); null = free stock. Finalize stamps it
+     * onto every terminal the shipment produces.
+     */
+    projectId: text("project_id").references(() => projects.id),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")

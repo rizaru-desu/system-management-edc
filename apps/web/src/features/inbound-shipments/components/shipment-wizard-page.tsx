@@ -32,6 +32,7 @@ import {
   shipmentParentOptionsQueryOptions,
   shipmentPartnerOptionsQueryOptions,
   shipmentProductOptionsQueryOptions,
+  shipmentProjectOptionsQueryOptions,
   shipmentWarehouseOptionsQueryOptions,
 } from '../api/form-options.ts'
 import { isDuplicateDoNumberError } from '../api/list-inbound-shipments.ts'
@@ -112,11 +113,13 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const productsQuery = useQuery(shipmentProductOptionsQueryOptions())
   const itemsQuery = useQuery(shipmentItemOptionsQueryOptions())
   const parentsQuery = useQuery(shipmentParentOptionsQueryOptions())
+  const projectsQuery = useQuery(shipmentProjectOptionsQueryOptions())
   const partnerOptions = partnersQuery.data ?? []
   const warehouseOptions = warehousesQuery.data ?? []
   const productOptions = productsQuery.data ?? []
   const itemOptions = itemsQuery.data ?? []
   const parentOptionsAll = parentsQuery.data ?? []
+  const projectOptions = projectsQuery.data ?? []
 
   const optionsError =
     partnersQuery.isError ||
@@ -138,6 +141,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
   const [parentShipmentId, setParentShipmentId] = useState(
     draft?.parentShipmentId ?? '',
   )
+  const [projectId, setProjectId] = useState(draft?.projectId ?? '')
   const [headerErrors, setHeaderErrors] = useState<HeaderErrors>({})
 
   // "Follow-up of" candidates narrow to the chosen partner — a shortage is
@@ -356,6 +360,7 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
     notes: notes.trim() ? notes.trim() : null,
     status,
     parentShipmentId: parentShipmentId || null,
+    projectId: projectId || null,
     edcItems: unitRows.map((row) => ({
       serialNumber: row.serialNumber.trim(),
       productId: row.productId,
@@ -629,7 +634,46 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                   )}
                 </div>
               </div>
-              <div className="space-y-1.5 sm:col-span-2">
+              <div className="space-y-1.5">
+                <Label>Project allocation (optional)</Label>
+                <Select
+                  // Radix rejects empty item values, so "none" stands in.
+                  value={projectId || 'none'}
+                  onValueChange={(value) =>
+                    setProjectId(value === 'none' ? '' : value)
+                  }
+                  disabled={projectsQuery.isPending}
+                >
+                  <SelectTrigger className={`w-full ${fieldClasses}`}>
+                    <SelectValue
+                      placeholder={
+                        projectsQuery.isPending
+                          ? 'Loading projects…'
+                          : 'Free stock — no project'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      Free stock — no project
+                    </SelectItem>
+                    {projectOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.projectName}
+                        <span className="ml-1 text-brand-900/40">
+                          · {option.projectCode}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-brand-900/50">
+                  Units passing inspection are registered already allocated to
+                  this project (SOP: asset placed on the project&apos;s
+                  storage).
+                </p>
+              </div>
+              <div className="space-y-1.5">
                 <Label>Follow-up of DO (optional)</Label>
                 <Select
                   // Radix rejects empty item values, so "none" stands in.
@@ -1053,6 +1097,23 @@ export function ShipmentWizardPage({ draft = null }: ShipmentWizardPageProps) {
                       {receivedDate || '—'}
                     </dd>
                   </div>
+                  {projectId && (
+                    <div>
+                      <dt className="text-[11px] font-semibold uppercase tracking-wider text-brand-900/45">
+                        Project allocation
+                      </dt>
+                      <dd className="mt-0.5 text-brand-900/80">
+                        {(() => {
+                          const project = projectOptions.find(
+                            (option) => option.id === projectId,
+                          )
+                          return project
+                            ? `${project.projectName} · ${project.projectCode}`
+                            : (draft?.projectName ?? projectId)
+                        })()}
+                      </dd>
+                    </div>
+                  )}
                   {parentShipmentId && (
                     <div>
                       <dt className="text-[11px] font-semibold uppercase tracking-wider text-brand-900/45">

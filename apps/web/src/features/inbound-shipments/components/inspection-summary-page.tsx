@@ -300,6 +300,9 @@ export function InspectionSummaryPage({
           <p className="mt-1 text-sm text-brand-900/60">
             {shipment.partnerName} → {shipment.warehouseName} · received{' '}
             {shipment.receivedDate}
+            {shipment.projectName && (
+              <> · allocated to {shipment.projectName}</>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

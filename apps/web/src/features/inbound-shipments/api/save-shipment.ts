@@ -25,6 +25,8 @@ export interface ShipmentPayload {
   status: 'DRAFT' | 'PENDING_INSPECTION'
   /** The earlier DO whose shortage this shipment fulfils, if any. */
   parentShipmentId: string | null
+  /** Project the delivery's stock is allocated to, if any. */
+  projectId: string | null
   edcItems: Array<{ serialNumber: string; productId: string }>
   peripheralItems: Array<{ itemCategoryId: string; documentedQty: number }>
 }

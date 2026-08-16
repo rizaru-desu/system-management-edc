@@ -35,6 +35,7 @@ import type {
 import { itemCategories } from "../schema/item-category.js";
 import type { ItemCategoryUnit } from "../schema/item-category.js";
 import { productCompletenessItems, products } from "../schema/product.js";
+import { projects } from "../schema/project.js";
 import { terminalStatusHistory, terminals } from "../schema/terminal.js";
 import type { TerminalCondition } from "../schema/terminal.js";
 import { warehouses } from "../schema/warehouse.js";
@@ -69,6 +70,10 @@ export interface InboundShipmentRow {
   /** The original DO this shipment fulfils the shortage of, if any. */
   parentShipmentId: string | null;
   parentDoNumber: string | null;
+  /** The project this delivery's stock is allocated to; null = free stock. */
+  projectId: string | null;
+  projectName: string | null;
+  projectCode: string | null;
   notes: string | null;
   /** Units on the partner's paperwork (excludes unlisted finds). */
   manifestUnitCount: number;
@@ -214,6 +219,9 @@ const rowColumns = {
   discrepancyStatus: inboundShipments.discrepancyStatus,
   parentShipmentId: inboundShipments.parentShipmentId,
   parentDoNumber: parentShipments.doNumber,
+  projectId: inboundShipments.projectId,
+  projectName: projects.projectName,
+  projectCode: projects.projectCode,
   notes: inboundShipments.notes,
   manifestUnitCount: manifestUnitCountSql,
   inspectedUnitCount: inspectedUnitCountSql,
@@ -236,7 +244,8 @@ function selectShipmentRows(executor: DbExecutor) {
     .leftJoin(
       parentShipments,
       eq(parentShipments.id, inboundShipments.parentShipmentId),
-    );
+    )
+    .leftJoin(projects, eq(projects.id, inboundShipments.projectId));
 }
 
 // ─── Reads ─────────────────────────────────────────────────────────────────
@@ -498,6 +507,8 @@ export interface InboundShipmentInput {
   status: Extract<InboundShipmentStatus, "DRAFT" | "PENDING_INSPECTION">;
   /** The earlier DO whose shortage this shipment fulfils, if any. */
   parentShipmentId: string | null;
+  /** The project this delivery's stock is allocated to, if any. */
+  projectId: string | null;
   edcItems: InboundShipmentEdcItemInput[];
   peripheralItems: InboundShipmentPeripheralItemInput[];
 }
@@ -509,6 +520,7 @@ export type InboundShipmentWriteError =
   | "warehouse-not-found"
   | "parent-not-found"
   | "parent-self"
+  | "project-not-found"
   | "product-not-found"
   | "item-category-not-found"
   | "duplicate-serial"
@@ -553,7 +565,10 @@ async function headerReferenceError(
   executor: DbExecutor,
   input: Pick<
     InboundShipmentInput,
-    "partnerAccountId" | "destinationWarehouseId" | "parentShipmentId"
+    | "partnerAccountId"
+    | "destinationWarehouseId"
+    | "parentShipmentId"
+    | "projectId"
   >,
   /** The shipment being updated, to reject it as its own parent. */
   selfId?: string,
@@ -584,6 +599,14 @@ async function headerReferenceError(
       .from(inboundShipments)
       .where(and(eq(inboundShipments.id, input.parentShipmentId), notDeleted));
     if (!parent) return "parent-not-found";
+  }
+
+  if (input.projectId) {
+    const [project] = await executor
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, input.projectId), isNull(projects.deletedAt)));
+    if (!project) return "project-not-found";
   }
   return null;
 }
@@ -734,6 +757,7 @@ export async function createInboundShipment(
         notes: input.notes,
         status: input.status,
         parentShipmentId: input.parentShipmentId,
+        projectId: input.projectId,
       })
       .returning({ id: inboundShipments.id });
     if (!inserted) throw new Error("Insert returned no row.");
@@ -787,6 +811,7 @@ export async function updateInboundShipment(
         notes: input.notes,
         status: input.status,
         parentShipmentId: input.parentShipmentId,
+        projectId: input.projectId,
       })
       .where(eq(inboundShipments.id, id));
 
@@ -1133,6 +1158,7 @@ export async function finalizeInboundShipment(
         doNumber: inboundShipments.doNumber,
         receivedDate: inboundShipments.receivedDate,
         parentShipmentId: inboundShipments.parentShipmentId,
+        projectId: inboundShipments.projectId,
       })
       .from(inboundShipments)
       .where(and(eq(inboundShipments.id, shipmentId), notDeleted));
@@ -1217,6 +1243,7 @@ export async function finalizeInboundShipment(
           status: "IN_STOCK",
           condition: "NEW" satisfies TerminalCondition,
           merchantId: null,
+          projectId: shipment.projectId,
           notes: item.notes,
           enteredSystemAt: shipment.receivedDate,
         })
@@ -1703,6 +1730,32 @@ export async function listPartnerOptions(): Promise<PartnerOption[]> {
     .from(accounts)
     .where(and(isNull(accounts.deletedAt), eq(accounts.status, "ACTIVE")))
     .orderBy(asc(accounts.accountName));
+}
+
+/** One entry of the shipment's project-allocation dropdown. */
+export interface ProjectAllocationOption {
+  id: string;
+  projectCode: string;
+  projectName: string;
+}
+
+/**
+ * Every live ACTIVE project as an allocation option, ordered by code.
+ * Served through the inbound-shipments module so the wizard rides the
+ * caller's shipments grant instead of requiring the projects module grant.
+ */
+export async function listProjectAllocationOptions(): Promise<
+  ProjectAllocationOption[]
+> {
+  return db
+    .select({
+      id: projects.id,
+      projectCode: projects.projectCode,
+      projectName: projects.projectName,
+    })
+    .from(projects)
+    .where(and(isNull(projects.deletedAt), eq(projects.status, "ACTIVE")))
+    .orderBy(asc(projects.projectCode));
 }
 
 // ─── Seeding ───────────────────────────────────────────────────────────────

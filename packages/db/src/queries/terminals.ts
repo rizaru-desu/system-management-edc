@@ -4,14 +4,9 @@ import { db } from "../client.js";
 import { user } from "../schema/auth.js";
 import { merchants } from "../schema/merchant.js";
 import { products } from "../schema/product.js";
-import {
-  terminalStatusHistory,
-  terminals,
-} from "../schema/terminal.js";
-import type {
-  TerminalCondition,
-  TerminalStatus,
-} from "../schema/terminal.js";
+import { projects } from "../schema/project.js";
+import { terminalStatusHistory, terminals } from "../schema/terminal.js";
+import type { TerminalCondition, TerminalStatus } from "../schema/terminal.js";
 import { warehouses } from "../schema/warehouse.js";
 import type { WarehouseType } from "../schema/warehouse.js";
 
@@ -35,6 +30,10 @@ export interface TerminalRow {
   /** Only meaningful while `status` is INSTALLED. */
   merchantId: string | null;
   merchantName: string | null;
+  /** The project this unit's stock is allocated to; null = free stock. */
+  projectId: string | null;
+  projectName: string | null;
+  projectCode: string | null;
   notes: string | null;
   /** Calendar date (yyyy-mm-dd) the unit entered the system. */
   enteredSystemAt: string;
@@ -68,6 +67,7 @@ export interface ListTerminalsOptions {
   status?: TerminalStatus;
   warehouseId?: string;
   productId?: string;
+  projectId?: string;
   /** 1-based page number; defaults to 1. */
   page?: number;
   /** Rows per page, clamped to 1–{@link MAX_PAGE_SIZE}; defaults to 50. */
@@ -101,6 +101,9 @@ const rowColumns = {
   condition: terminals.condition,
   merchantId: terminals.merchantId,
   merchantName: merchants.merchantName,
+  projectId: terminals.projectId,
+  projectName: projects.projectName,
+  projectCode: projects.projectCode,
   notes: terminals.notes,
   enteredSystemAt: terminals.enteredSystemAt,
   createdAt: terminals.createdAt,
@@ -112,8 +115,7 @@ const notDeleted = isNull(terminals.deletedAt);
 
 /** Executor for shared checks: the pool client or a transaction. */
 type DbExecutor =
-  | typeof db
-  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+  typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /** The shared row select with the product/warehouse/merchant joins. */
 function selectRows(executor: DbExecutor) {
@@ -122,7 +124,8 @@ function selectRows(executor: DbExecutor) {
     .from(terminals)
     .innerJoin(products, eq(terminals.productId, products.id))
     .leftJoin(warehouses, eq(terminals.warehouseId, warehouses.id))
-    .leftJoin(merchants, eq(terminals.merchantId, merchants.id));
+    .leftJoin(merchants, eq(terminals.merchantId, merchants.id))
+    .leftJoin(projects, eq(terminals.projectId, projects.id));
 }
 
 /** WHERE clause for the list filters (always scoped to live rows). */
@@ -132,9 +135,7 @@ function listConditions(options: ListTerminalsOptions) {
 
   const term = options.search?.trim();
   if (term) {
-    conditions.push(
-      ilike(terminals.serialNumber, `%${escapeLike(term)}%`),
-    );
+    conditions.push(ilike(terminals.serialNumber, `%${escapeLike(term)}%`));
   }
 
   if (options.status) {
@@ -147,6 +148,10 @@ function listConditions(options: ListTerminalsOptions) {
 
   if (options.productId) {
     conditions.push(eq(terminals.productId, options.productId));
+  }
+
+  if (options.projectId) {
+    conditions.push(eq(terminals.projectId, options.projectId));
   }
 
   return and(...conditions);
@@ -190,10 +195,8 @@ export async function listTerminalHistory(
   executorOrId: DbExecutor | string,
   maybeId?: string,
 ): Promise<TerminalHistoryRow[]> {
-  const executor =
-    typeof executorOrId === "string" ? db : executorOrId;
-  const terminalId =
-    typeof executorOrId === "string" ? executorOrId : maybeId!;
+  const executor = typeof executorOrId === "string" ? db : executorOrId;
+  const terminalId = typeof executorOrId === "string" ? executorOrId : maybeId!;
   return executor
     .select({
       id: terminalStatusHistory.id,
@@ -240,6 +243,8 @@ export interface TerminalInput {
   status: TerminalStatus;
   condition: TerminalCondition;
   merchantId: string | null;
+  /** Project stock allocation; omitted/null = free stock. */
+  projectId?: string | null;
   notes: string | null;
   enteredSystemAt: string;
 }
@@ -249,7 +254,8 @@ export type TerminalWriteError =
   | "product-not-found"
   | "warehouse-not-found"
   | "merchant-not-found"
-  | "merchant-requires-installed";
+  | "merchant-requires-installed"
+  | "project-not-found";
 
 export type CreateTerminalResult =
   | { ok: true; terminal: TerminalDetailRow }
@@ -260,8 +266,7 @@ export type UpdateTerminalResult =
   | { ok: false; error: "not-found" | TerminalWriteError };
 
 export type DeleteTerminalResult =
-  | { ok: true }
-  | { ok: false; error: "not-found" };
+  { ok: true } | { ok: false; error: "not-found" };
 
 /** True when another live row already uses `serialNumber`. */
 async function serialTaken(
@@ -287,7 +292,7 @@ async function referenceError(
   executor: DbExecutor,
   input: Pick<
     TerminalInput,
-    "productId" | "warehouseId" | "merchantId" | "status"
+    "productId" | "warehouseId" | "merchantId" | "projectId" | "status"
   >,
 ): Promise<TerminalWriteError | null> {
   const [productRow] = await executor
@@ -301,10 +306,7 @@ async function referenceError(
       .select({ id: warehouses.id })
       .from(warehouses)
       .where(
-        and(
-          eq(warehouses.id, input.warehouseId),
-          isNull(warehouses.deletedAt),
-        ),
+        and(eq(warehouses.id, input.warehouseId), isNull(warehouses.deletedAt)),
       );
     if (!warehouseRow) return "warehouse-not-found";
   }
@@ -318,6 +320,14 @@ async function referenceError(
         and(eq(merchants.id, input.merchantId), isNull(merchants.deletedAt)),
       );
     if (!merchantRow) return "merchant-not-found";
+  }
+
+  if (input.projectId != null) {
+    const [projectRow] = await executor
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, input.projectId), isNull(projects.deletedAt)));
+    if (!projectRow) return "project-not-found";
   }
 
   return null;
@@ -430,6 +440,9 @@ export async function updateTerminal(
       productId: input.productId ?? existing.productId,
       warehouseId: effectiveWarehouseId,
       merchantId: effectiveMerchantId,
+      // Only a newly supplied allocation needs validating; the stored one
+      // already passed on its own write.
+      projectId: input.projectId ?? null,
       status: effectiveStatus,
     });
     if (refError) return { ok: false as const, error: refError };
@@ -589,9 +602,7 @@ export async function upsertTerminalsBySerial(
       const [existing] = await tx
         .select({ id: terminals.id })
         .from(terminals)
-        .where(
-          and(eq(terminals.serialNumber, seed.serialNumber), notDeleted),
-        );
+        .where(and(eq(terminals.serialNumber, seed.serialNumber), notDeleted));
 
       let terminalId: string;
       if (existing) {
@@ -649,9 +660,7 @@ export async function upsertTerminalsBySerial(
           ),
           changedByUserId: null,
           notes: entry.notes,
-          changedAt: new Date(
-            Date.now() - entry.daysAgo * 24 * 60 * 60 * 1000,
-          ),
+          changedAt: new Date(Date.now() - entry.daysAgo * 24 * 60 * 60 * 1000),
         });
       }
     }

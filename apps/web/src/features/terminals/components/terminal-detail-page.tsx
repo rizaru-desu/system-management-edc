@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CalendarDays,
   CreditCard,
+  FolderKanban,
   Loader2,
   Pencil,
   SearchX,
@@ -377,6 +378,20 @@ export function TerminalDetailPage({ terminalId }: TerminalDetailPageProps) {
             </DetailRow>
             <DetailRow icon={Store} label="Installed merchant">
               {terminal.merchantName || 'Not installed at a merchant'}
+            </DetailRow>
+            <DetailRow icon={FolderKanban} label="Project allocation">
+              {terminal.projectName ? (
+                <>
+                  {terminal.projectName}
+                  {terminal.projectCode && (
+                    <span className="mt-0.5 block text-xs text-brand-900/50">
+                      {terminal.projectCode}
+                    </span>
+                  )}
+                </>
+              ) : (
+                'Free stock — not allocated to a project'
+              )}
             </DetailRow>
             <DetailRow icon={CalendarDays} label="Entry date">
               <span className="tabular-nums">{terminal.entryDate}</span>

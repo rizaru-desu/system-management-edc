@@ -33,6 +33,8 @@ export const terminalBaseSchema = z.object({
   status: z.enum(TERMINAL_STATUSES),
   condition: z.enum(TERMINAL_CONDITIONS),
   merchantId: optionalId,
+  /** Project stock allocation; null = free stock. */
+  projectId: optionalId,
   notes: optionalText,
   /** Calendar date (yyyy-mm-dd) the unit entered the system. */
   enteredSystemAt: z.iso.date('enteredSystemAt must be a yyyy-mm-dd date'),
