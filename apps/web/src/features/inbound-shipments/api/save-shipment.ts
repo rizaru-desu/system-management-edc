@@ -23,6 +23,8 @@ export interface ShipmentPayload {
   receivedDate: string
   notes: string | null
   status: 'DRAFT' | 'PENDING_INSPECTION'
+  /** The earlier DO whose shortage this shipment fulfils, if any. */
+  parentShipmentId: string | null
   edcItems: Array<{ serialNumber: string; productId: string }>
   peripheralItems: Array<{ itemCategoryId: string; documentedQty: number }>
 }

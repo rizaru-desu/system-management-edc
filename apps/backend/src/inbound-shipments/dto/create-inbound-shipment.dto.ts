@@ -51,6 +51,14 @@ export const inboundShipmentBaseSchema = z.object({
    * shipment straight to COMPLETED and skip the finalize transaction.
    */
   status: z.enum(['DRAFT', 'PENDING_INSPECTION']).default('DRAFT'),
+  /**
+   * The earlier DO whose shortage this shipment fulfils; the db layer
+   * verifies it exists and (on update) is not the shipment itself.
+   */
+  parentShipmentId: z
+    .string()
+    .nullish()
+    .transform((value) => (value ? value : null)),
   edcItems: z.array(edcItemSchema).default([]),
   peripheralItems: z.array(peripheralItemSchema).default([]),
 });

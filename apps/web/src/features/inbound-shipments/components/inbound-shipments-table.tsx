@@ -35,6 +35,8 @@ import {
 } from '#/components/ui/select.tsx'
 import { cn } from '#/lib/utils.ts'
 import {
+  DISCREPANCY_STATUS_BADGE_CLASSES,
+  DISCREPANCY_STATUS_LABELS,
   SHIPMENT_STATUS_BADGE_CLASSES,
   SHIPMENT_STATUS_LABELS,
 } from '../data/inbound-shipments.ts'
@@ -174,11 +176,26 @@ export function InboundShipmentsTable({
       {
         id: 'status',
         header: 'Status',
-        cell: ({ row }) => (
-          <Badge className={SHIPMENT_STATUS_BADGE_CLASSES[row.original.status]}>
-            {SHIPMENT_STATUS_LABELS[row.original.status]}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const discrepancy = row.original.discrepancyStatus
+          return (
+            <span className="flex flex-wrap items-center gap-1">
+              <Badge
+                className={SHIPMENT_STATUS_BADGE_CLASSES[row.original.status]}
+              >
+                {SHIPMENT_STATUS_LABELS[row.original.status]}
+              </Badge>
+              {discrepancy && discrepancy !== 'none' && (
+                <Badge
+                  size="sm"
+                  className={DISCREPANCY_STATUS_BADGE_CLASSES[discrepancy]}
+                >
+                  {DISCREPANCY_STATUS_LABELS[discrepancy]}
+                </Badge>
+              )}
+            </span>
+          )
+        },
       },
       {
         id: 'units',

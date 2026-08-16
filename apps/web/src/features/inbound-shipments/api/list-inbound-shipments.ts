@@ -4,6 +4,9 @@ import { getRequestHeader } from '@tanstack/react-start/server'
 
 import { ApiError, apiClient } from '#/lib/api-client.ts'
 import type {
+  DiscrepancyEvent,
+  DiscrepancyStatus,
+  FollowUpShipment,
   InboundShipmentRecord,
   InboundShipmentSummaryRecord,
   ShipmentPeripheral,
@@ -17,6 +20,9 @@ import type {
 /** Backend enum values (display labels stay title-case in the console). */
 export type BackendShipmentStatus =
   'DRAFT' | 'PENDING_INSPECTION' | 'INSPECTION_IN_PROGRESS' | 'COMPLETED'
+
+export type BackendDiscrepancyStatus =
+  'NONE' | 'OPEN' | 'REPORTED' | 'CONFIRMED' | 'RESOLVED'
 
 export type BackendFoundStatus = 'PENDING' | 'FOUND' | 'MISSING'
 export type BackendCondition = 'GOOD' | 'DAMAGED'
@@ -71,6 +77,9 @@ export interface BackendShipment {
   shipmentDate: string | null
   receivedDate: string
   status: BackendShipmentStatus
+  discrepancyStatus: BackendDiscrepancyStatus | null
+  parentShipmentId: string | null
+  parentDoNumber: string | null
   notes: string | null
   manifestUnitCount: number
   inspectedUnitCount: number
@@ -80,10 +89,30 @@ export interface BackendShipment {
   updatedAt: string
 }
 
+export interface BackendDiscrepancyEvent {
+  id: string
+  action: 'REPORTED' | 'CONFIRMED' | 'RESOLVED'
+  partnerResponse: 'WILL_SEND_SHORTAGE' | 'ACCEPTED_AS_IS' | 'DISPUTED' | null
+  recipientEmail: string | null
+  notes: string | null
+  actorUserId: string | null
+  actorName: string | null
+  createdAt: string
+}
+
+export interface BackendFollowUpShipment {
+  id: string
+  doNumber: string
+  status: BackendShipmentStatus
+  receivedDate: string
+}
+
 /** The detail payload carries both manifests alongside the header. */
 export interface BackendShipmentDetail extends BackendShipment {
   edcItems: Array<BackendEdcItem>
   peripheralItems: Array<BackendPeripheralItem>
+  discrepancyEvents: Array<BackendDiscrepancyEvent>
+  followUpShipments: Array<BackendFollowUpShipment>
 }
 
 const STATUS_RECORDS: Record<BackendShipmentStatus, ShipmentStatus> = {
@@ -108,6 +137,15 @@ const FOUND_RECORDS: Record<BackendFoundStatus, UnitInspectionResult> = {
   FOUND: 'found',
   MISSING: 'missing',
 }
+
+const DISCREPANCY_RECORDS: Record<BackendDiscrepancyStatus, DiscrepancyStatus> =
+  {
+    NONE: 'none',
+    OPEN: 'open',
+    REPORTED: 'reported',
+    CONFIRMED: 'confirmed',
+    RESOLVED: 'resolved',
+  }
 
 /** Maps a console status onto the backend's uppercase enum. */
 export function toBackendStatus(status: ShipmentStatus): BackendShipmentStatus {
@@ -174,10 +212,36 @@ export function toShipmentSummaryRecord(
     receivedDate: row.receivedDate,
     notes: row.notes ?? '',
     status: STATUS_RECORDS[row.status],
+    discrepancyStatus: row.discrepancyStatus
+      ? DISCREPANCY_RECORDS[row.discrepancyStatus]
+      : null,
+    parentShipmentId: row.parentShipmentId,
+    parentDoNumber: row.parentDoNumber,
     manifestUnitCount: row.manifestUnitCount,
     inspectedUnitCount: row.inspectedUnitCount,
     totalUnitCount: row.totalUnitCount,
     peripheralLineCount: row.peripheralLineCount,
+  }
+}
+
+function toDiscrepancyEvent(row: BackendDiscrepancyEvent): DiscrepancyEvent {
+  return {
+    id: row.id,
+    action: row.action,
+    partnerResponse: row.partnerResponse,
+    recipientEmail: row.recipientEmail,
+    notes: row.notes,
+    actorName: row.actorName,
+    createdAt: row.createdAt,
+  }
+}
+
+function toFollowUpShipment(row: BackendFollowUpShipment): FollowUpShipment {
+  return {
+    id: row.id,
+    doNumber: row.doNumber,
+    status: STATUS_RECORDS[row.status],
+    receivedDate: row.receivedDate,
   }
 }
 
@@ -189,6 +253,8 @@ export function toShipmentRecord(
     ...toShipmentSummaryRecord(row),
     units: row.edcItems.map(toShipmentUnit),
     peripherals: row.peripheralItems.map(toShipmentPeripheral),
+    discrepancyEvents: row.discrepancyEvents.map(toDiscrepancyEvent),
+    followUpShipments: row.followUpShipments.map(toFollowUpShipment),
   }
 }
 

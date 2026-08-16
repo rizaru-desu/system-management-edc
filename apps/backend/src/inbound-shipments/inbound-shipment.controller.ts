@@ -14,12 +14,18 @@ import type {
   InboundShipmentDetailRow,
   InboundShipmentListPage,
   ItemCategoryOption,
+  ParentShipmentOption,
   PartnerOption,
   ProductOption,
 } from '@repo/db';
 import { sessionUser } from '../auth/session-user';
 import { RequirePermission } from '../permissions/require-permission.decorator';
 import { parseCreateInboundShipmentDto } from './dto/create-inbound-shipment.dto';
+import {
+  parseConfirmDiscrepancyDto,
+  parseResolveDiscrepancyDto,
+  parseSendDiscrepancyReportDto,
+} from './dto/discrepancy.dto';
 import {
   parseAddEdcItemDto,
   parseUpdateEdcItemDto,
@@ -73,6 +79,12 @@ export class InboundShipmentController {
   @Get('item-options')
   itemOptions(): Promise<ItemCategoryOption[]> {
     return this.inboundShipmentService.itemOptions();
+  }
+
+  /** DOs with an unresolved discrepancy — the "follow-up of" choices. */
+  @Get('parent-options')
+  parentOptions(): Promise<ParentShipmentOption[]> {
+    return this.inboundShipmentService.parentShipmentOptions();
   }
 
   /** The header plus both manifests and every unit's checklist. */
@@ -161,6 +173,54 @@ export class InboundShipmentController {
     return this.inboundShipmentService.finalize(
       id,
       sessionUser(session).id ?? null,
+    );
+  }
+
+  /**
+   * Emails the discrepancy report to the partner (PIC email by default)
+   * and advances the case to REPORTED.
+   */
+  @Post(':id/discrepancy/send')
+  @RequirePermission('inbound-shipments', 'update')
+  sendDiscrepancyReport(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Session() session: UserSession,
+  ): Promise<InboundShipmentDetailRow> {
+    return this.inboundShipmentService.sendDiscrepancyReport(
+      id,
+      sessionUser(session).id ?? null,
+      parseSendDiscrepancyReportDto(body),
+    );
+  }
+
+  /** Records the partner's answer to the discrepancy report. */
+  @Post(':id/discrepancy/confirm')
+  @RequirePermission('inbound-shipments', 'update')
+  confirmDiscrepancy(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Session() session: UserSession,
+  ): Promise<InboundShipmentDetailRow> {
+    return this.inboundShipmentService.confirmDiscrepancy(
+      id,
+      sessionUser(session).id ?? null,
+      parseConfirmDiscrepancyDto(body),
+    );
+  }
+
+  /** Closes the discrepancy case by hand. */
+  @Post(':id/discrepancy/resolve')
+  @RequirePermission('inbound-shipments', 'update')
+  resolveDiscrepancy(
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Session() session: UserSession,
+  ): Promise<InboundShipmentDetailRow> {
+    return this.inboundShipmentService.resolveDiscrepancy(
+      id,
+      sessionUser(session).id ?? null,
+      parseResolveDiscrepancyDto(body),
     );
   }
 }

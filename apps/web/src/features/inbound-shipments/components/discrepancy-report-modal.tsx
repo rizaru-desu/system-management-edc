@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { Copy, FileWarning, Loader2, TriangleAlert } from 'lucide-react'
+import {
+  Copy,
+  FileWarning,
+  Loader2,
+  Printer,
+  TriangleAlert,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { BaseModal } from '#/components/ui/base-modal.tsx'
@@ -100,6 +106,44 @@ export function DiscrepancyReportModal({
     }
   }
 
+  /**
+   * Opens the report in a bare print window — the browser's print dialog
+   * doubles as the "save as PDF" export, with no rendering library needed.
+   */
+  const printReport = () => {
+    if (!report) return
+    const printWindow = window.open('', '_blank', 'width=800,height=900')
+    if (!printWindow) {
+      toast.error('The print window was blocked — allow pop-ups and retry.')
+      return
+    }
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+    printWindow.document.write(`<!doctype html>
+<html>
+  <head>
+    <title>Discrepancy Report — ${escapeHtml(report.doNumber)}</title>
+    <style>
+      body { font-family: ui-monospace, 'Courier New', monospace; margin: 40px; color: #111; }
+      h1 { font-size: 16px; margin: 0 0 4px; font-family: system-ui, sans-serif; }
+      p.meta { font-size: 12px; color: #555; margin: 0 0 24px; font-family: system-ui, sans-serif; }
+      pre { white-space: pre-wrap; font-size: 12px; line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <h1>Discrepancy Report — ${escapeHtml(report.doNumber)}</h1>
+    <p class="meta">EDC Management · System Console</p>
+    <pre>${escapeHtml(text)}</pre>
+  </body>
+</html>`)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   return (
     <BaseModal
       open={open}
@@ -120,6 +164,14 @@ export function DiscrepancyReportModal({
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
+          </Button>
+          <Button
+            variant="outline"
+            onClick={printReport}
+            disabled={!report?.hasDiscrepancies}
+          >
+            <Printer className="h-4 w-4" strokeWidth={1.75} />
+            Print / PDF
           </Button>
           <Button onClick={() => void copyReport()} disabled={!text}>
             <Copy className="h-4 w-4" strokeWidth={1.75} />

@@ -22,6 +22,8 @@ import { cn } from '#/lib/utils.ts'
 import { useFinalizeInspection } from '../api/finalize-inspection.ts'
 import { shipmentDetailQueryOptions } from '../api/shipment-detail.ts'
 import {
+  DISCREPANCY_STATUS_BADGE_CLASSES,
+  DISCREPANCY_STATUS_LABELS,
   SHIPMENT_STATUS_BADGE_CLASSES,
   SHIPMENT_STATUS_LABELS,
   missingRequiredItems,
@@ -29,6 +31,7 @@ import {
   summarizeShipment,
 } from '../data/inbound-shipments.ts'
 import type { ShipmentUnit } from '../data/inbound-shipments.ts'
+import { DiscrepancyPanel } from './discrepancy-panel.tsx'
 import { DiscrepancyReportModal } from './discrepancy-report-modal.tsx'
 
 function SummaryCard({
@@ -283,6 +286,16 @@ export function InspectionSummaryPage({
             <Badge className={SHIPMENT_STATUS_BADGE_CLASSES[shipment.status]}>
               {SHIPMENT_STATUS_LABELS[shipment.status]}
             </Badge>
+            {shipment.discrepancyStatus &&
+              shipment.discrepancyStatus !== 'none' && (
+                <Badge
+                  className={
+                    DISCREPANCY_STATUS_BADGE_CLASSES[shipment.discrepancyStatus]
+                  }
+                >
+                  {DISCREPANCY_STATUS_LABELS[shipment.discrepancyStatus]}
+                </Badge>
+              )}
           </div>
           <p className="mt-1 text-sm text-brand-900/60">
             {shipment.partnerName} → {shipment.warehouseName} · received{' '}
@@ -400,6 +413,9 @@ export function InspectionSummaryPage({
       )}
 
       <div className="space-y-4">
+        {/* Discrepancy follow-up with the partner (finalized shipments). */}
+        <DiscrepancyPanel shipment={shipment} />
+
         {/* EDC roll-up */}
         <Card className="p-5">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-brand-900/50">

@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
-import { INBOUND_SHIPMENT_STATUSES } from '@repo/db/schema';
+import {
+  DISCREPANCY_STATUSES,
+  INBOUND_SHIPMENT_STATUSES,
+} from '@repo/db/schema';
 
 /**
  * Query string of GET /inbound-shipments. Numbers arrive as strings in a
@@ -11,6 +14,7 @@ const listInboundShipmentsSchema = z.object({
   /** Case-insensitive substring match on DO number or partner name. */
   search: z.string().optional(),
   status: z.enum(INBOUND_SHIPMENT_STATUSES).optional(),
+  discrepancyStatus: z.enum(DISCREPANCY_STATUSES).optional(),
   warehouseId: z.string().min(1).optional(),
   partnerAccountId: z.string().min(1).optional(),
   /** 1-based page number. */
